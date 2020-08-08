@@ -1,5 +1,25 @@
 fn main() {
     println!("Hello, world!");
+
+    fun(b"asdf01234");
+
+}
+
+fn fun(a : &[u8]) {
+    for (i, &v) in a.iter().enumerate() {
+        println!("{}", v as char);
+
+        if v == b'f' {
+            fun1(&a[i..]);
+        }
+    }
+}
+
+fn fun1(a : &[u8]) {
+    println!("=====");
+    for &v in a.iter() {
+        println!("{}", v as char);
+    }
 }
 
 mod bencode {
