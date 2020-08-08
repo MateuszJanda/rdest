@@ -3,11 +3,19 @@ fn main() {
 }
 
 mod bencode {
-    pub enum Value {}
+    pub enum Value {
+        Int(i32),
+        List()
+    }
 
     impl Value {
-        pub fn parse(arg: &str) {
-            
+        pub fn parse(arg: &[u8]) {
+            for &b in arg.iter() {
+                if b == b'i' {
+
+                }
+            }
+
         }
     }
 }
