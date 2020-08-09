@@ -6,40 +6,55 @@ fn main() {
 //    let s : String = String::new("text");
 
 //    bencode::Value::parse("l4:spam4:eggse");
-    bencode::Value::parse(b"i4e");
+//    bencode::Value::parse(b"i4e");
+    the_loop(b"asdf")
 }
 
-fn fun(a : &[u8]) {
-    println!("len {}", a.len());
-    for (i, &v) in a.iter().enumerate() {
-        println!("{}", v as char);
 
-        if v == b'l' {
-            fun1(&a[i+1..]);
-        }
-    }
-}
-
-fn fun1(a : &[u8]) {
-
-    println!("=====");
-    println!("len {}", a.len());
-    for &v in a.iter() {
-        println!("> {}", v as char);
-    }
-}
-
-//impl String {
-//    fn fff(&self) {
-//        println!("asdf");
+//fn fun(a : &[u8]) {
+//    println!("len {}", a.len());
+//    for (i, &v) in a.iter().enumerate() {
+//        println!("{}", v as char);
+//
+//        if v == b'l' {
+//            fun1(&a[i+1..]);
+//        }
 //    }
 //}
+//
+//fn fun1(a : &[u8]) {
+//
+//    println!("=====");
+//    println!("len {}", a.len());
+//    for &v in a.iter() {
+//        println!("> {}", v as char);
+//    }
+//}
+
+fn the_loop(arg : &[u8]) {
+    let mut it = arg.iter();
+    while let Some(v) = it.next() {
+        println!("{}", *v as char);
+        it.nth(0);
+    }
+}
+
+
+fn inc(arg : &[u8]) -> &[u8] {
+    let r = &arg[1..];
+//    println!("{}", r.len());
+    r
+
+}
 
 mod bencode {
     pub enum Value {
         Int(i32),
-        List()
+        List(),
+//        Val(Value)
+        Val(Box<Value>)
     }
+
 
     impl Value {
         pub fn parse(arg: &[u8]) {
