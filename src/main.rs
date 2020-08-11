@@ -1,5 +1,8 @@
+use crate::bencode::Value;
+
 fn main() {
     println!("Hello, world!");
+    Value::parse(b"i4e").unwrap();
 }
 
 
@@ -7,7 +10,7 @@ mod bencode {
     #[derive(PartialEq, Debug)]
     pub enum Value {
         Int(i32),
-        Str(String),
+//        Str(String),
 //        List(),
 //        Val(Value)
 //        Val(Box<Value>)
@@ -39,11 +42,11 @@ mod bencode {
                 } else if *b == b'e' {
                     let num_str = match String::from_utf8(nums) {
                         Ok(v) => v,
-                        Err(e) => return Err("Unable convert bytes to string")
+                        Err(_e) => return Err("Unable convert bytes to string")
                     };
                     let num : i32 = match num_str.parse() {
                         Ok(v) => v,
-                        Err(e) => return Err("Unable convert string to int")
+                        Err(_e) => return Err("Unable convert string to int")
                     };
                     return Ok(Value::Int(num))
                 }
