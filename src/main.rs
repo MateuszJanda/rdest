@@ -1,7 +1,5 @@
 fn main() {
     println!("Hello, world!");
-
-
 }
 
 
@@ -17,36 +15,42 @@ mod bencode {
 
 
     impl Value {
-        pub fn parse(arg: &[u8]) -> Vec<Value> {
+        pub fn parse(arg: &[u8]) -> Result<Vec<Value>, &'static str> {
             let mut result = vec![];
             let mut it = arg.iter();
             while let Some(b) = it.next() {
                 if *b == b'i' {
-                    result.push(Value::parse_int(&mut it));
+                    let num = match Value::parse_int(&mut it) {
+                        Ok(v) => v,
+                        Err(desc) => return Err(desc)
+                    };
+                    result.push(num);
                 }
             }
 
-            result
+            Ok(result)
         }
 
-        fn parse_int(it : &mut std::slice::Iter<u8>) -> Value {
+        fn parse_int(it : &mut std::slice::Iter<u8>) -> Result<Value, &'static str> {
             let mut nums = vec![];
             while let Some(b) = it.next() {
                 if (*b >= b'0' && *b <= b'9') || *b == b'-' {
                     nums.push(*b);
                 } else if *b == b'e' {
-                    let nums_str = String::from_utf8(nums).unwrap();
-                    let int : i32 = nums_str.parse().unwrap();
-                    return Value::Int(int)
-
+                    let num_str = match String::from_utf8(nums) {
+                        Ok(v) => v,
+                        Err(e) => return Err("Unable convert bytes to string")
+                    };
+                    let num : i32 = match num_str.parse() {
+                        Ok(v) => v,
+                        Err(e) => return Err("Unable convert string to int")
+                    };
+                    return Ok(Value::Int(num))
                 }
-
             }
 
-            Value::Int(0)
-//            println!(i);
+            Err("Missing terminate character 'e' for int parsing")
         }
-
     }
 }
 
@@ -58,21 +62,51 @@ mod tests {
 
     #[test]
     fn empty_input() {
-        assert_eq!(Value::parse(b""), vec![]);
+        assert_eq!(Value::parse(b""), Ok(vec![]));
     }
 
     #[test]
+    fn parse_int_missing_e() {
+        assert_eq!(Value::parse(b"i"), Err("Missing terminate character 'e' for int parsing"));
+    }
+
+    #[test]
+    fn parse_int_missing_value() {
+        assert_eq!(Value::parse(b"ie"), Err("Unable convert string to int"));
+    }
+
+    #[test]
+    fn parse_int_incorrect_value1() {
+        assert_eq!(Value::parse(b"i-e"), Err("Unable convert string to int"));
+    }
+
+    #[test]
+    fn parse_int_incorrect_value2() {
+        assert_eq!(Value::parse(b"i--4e"), Err("Unable convert string to int"));
+    }
+
+    #[test]
+    fn parse_int_incorrect_value3() {
+        assert_eq!(Value::parse(b"i-4-e"), Err("Unable convert string to int"));
+    }
+
+//    #[test]
+//    fn parse_int_incorrect_value4() {
+//        assert_eq!(Value::parse(b"i+4e"), Err("Unable convert string to int"));
+//    }
+
+    #[test]
     fn positive_int() {
-        assert_eq!(Value::parse(b"i4e"), vec![Value::Int(4)]);
+        assert_eq!(Value::parse(b"i4e"), Ok(vec![Value::Int(4)]));
     }
 
     #[test]
     fn negative_int() {
-        assert_eq!(Value::parse(b"i-4e"), vec![Value::Int(-4)]);
+        assert_eq!(Value::parse(b"i-4e"), Ok(vec![Value::Int(-4)]));
     }
 
     #[test]
     fn two_ints() {
-        assert_eq!(Value::parse(b"i2ei-3e"), vec![Value::Int(2), Value::Int(-3)]);
+        assert_eq!(Value::parse(b"i2ei-3e"), Ok(vec![Value::Int(2), Value::Int(-3)]));
     }
 }
