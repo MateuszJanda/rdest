@@ -5,7 +5,6 @@ fn main() {
     BValue::parse(b"i4e").unwrap();
 }
 
-
 mod bencode {
     #[derive(PartialEq, Debug)]
     pub enum BValue {
@@ -15,7 +14,6 @@ mod bencode {
 //        Val(BValue)
 //        Val(Box<BValue>)
     }
-
 
     impl BValue {
         pub fn parse(arg: &[u8]) -> Result<Vec<BValue>, &'static str> {
@@ -50,15 +48,14 @@ mod bencode {
                     Err(_e) => return Err("Unable convert string to int")
                 };
                 return Ok(BValue::Int(num))
+            } else {
+                return Err("Incorrect character when converting string to int")
             }
         }
 
         Err("Missing terminate character 'e' for int parsing")
     }
 }
-
-
-
 
 #[cfg(test)]
 mod tests {
@@ -81,24 +78,24 @@ mod tests {
     }
 
     #[test]
-    fn parse_int_incorrect_value1() {
+    fn parse_int_incorrect_format1() {
         assert_eq!(BValue::parse(b"i-e"), Err("Unable convert string to int"));
     }
 
     #[test]
-    fn parse_int_incorrect_value2() {
+    fn parse_int_incorrect_format2() {
         assert_eq!(BValue::parse(b"i--4e"), Err("Unable convert string to int"));
     }
 
     #[test]
-    fn parse_int_incorrect_value3() {
+    fn parse_int_incorrect_format3() {
         assert_eq!(BValue::parse(b"i-4-e"), Err("Unable convert string to int"));
     }
 
-//    #[test]
-//    fn parse_int_incorrect_value4() {
-//        assert_eq!(BValue::parse(b"i+4e"), Err("Unable convert string to int"));
-//    }
+    #[test]
+    fn parse_int_incorrect_character() {
+        assert_eq!(BValue::parse(b"i+4e"), Err("Incorrect character when converting string to int"));
+    }
 
     #[test]
     fn positive_int() {
