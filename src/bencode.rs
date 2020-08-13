@@ -97,7 +97,7 @@ fn parse_int(it : &mut std::slice::Iter<u8>) -> Result<BValue, &'static str> {
         }
     }
 
-    Err("Missing terminate character 'e' for when parsing")
+    Err("Missing terminate character 'e' when parsing int")
 }
 
 
@@ -117,42 +117,42 @@ mod tests {
 
     #[test]
     fn parse_int_missing_e() {
-        assert_eq!(BValue::parse(b"i"), Err("Missing terminate character 'e' for int parsing"));
+        assert_eq!(BValue::parse(b"i"), Err("Missing terminate character 'e' when parsing int"));
     }
 
     #[test]
     fn parse_int_missing_value() {
-        assert_eq!(BValue::parse(b"ie"), Err("Unable convert string to int"));
+        assert_eq!(BValue::parse(b"ie"), Err("Unable convert int (string) to int"));
     }
 
     #[test]
     fn parse_int_incorrect_format1() {
-        assert_eq!(BValue::parse(b"i-e"), Err("Unable convert string to int"));
+        assert_eq!(BValue::parse(b"i-e"), Err("Unable convert int (string) to int"));
     }
 
     #[test]
     fn parse_int_incorrect_format2() {
-        assert_eq!(BValue::parse(b"i--4e"), Err("Unable convert string to int"));
+        assert_eq!(BValue::parse(b"i--4e"), Err("Unable convert int (string) to int"));
     }
 
     #[test]
     fn parse_int_incorrect_format3() {
-        assert_eq!(BValue::parse(b"i-4-e"), Err("Unable convert string to int"));
+        assert_eq!(BValue::parse(b"i-4-e"), Err("Unable convert int (string) to int"));
     }
 
     #[test]
     fn parse_int_incorrect_character() {
-        assert_eq!(BValue::parse(b"i+4e"), Err("Incorrect character when converting string to int"));
+        assert_eq!(BValue::parse(b"i+4e"), Err("Incorrect character when parsing int"));
     }
 
     #[test]
     fn parse_int_leading_zero() {
-        assert_eq!(BValue::parse(b"i01e"), Err("Leading zero when converting string to int"));
+        assert_eq!(BValue::parse(b"i01e"), Err("Leading zero when converting to int"));
     }
 
     #[test]
     fn parse_int_leading_zero_for_negative() {
-        assert_eq!(BValue::parse(b"i-01e"), Err("Leading zero when converting string to int"));
+        assert_eq!(BValue::parse(b"i-01e"), Err("Leading zero when converting to int"));
     }
 
     #[test]
@@ -167,11 +167,11 @@ mod tests {
 
     #[test]
     fn negative_int() {
-        assert_eq!(BValue::parse(b"i-4e"), Ok(vec![BValue::Int( -4)]));
+        assert_eq!(BValue::parse(b"i-4e"), Ok(vec![BValue::Int(-4)]));
     }
 
     #[test]
     fn two_ints() {
-        assert_eq!(BValue::parse(b"i2ei-3e"), Ok(vec![BValue::Int(2), BValue::Int( - 3)]));
+        assert_eq!(BValue::parse(b"i2ei-3e"), Ok(vec![BValue::Int(2), BValue::Int(-3)]));
     }
 }
