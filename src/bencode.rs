@@ -38,26 +38,30 @@ fn parse_str(it : &mut std::slice::Iter<u8>, first_num : &u8) -> Result<BValue, 
     while let Some(b) = it.next() {
         if *b >= b'0' && *b <= b'9' {
             len_bytes.push(*b);
-        }
-
-        else if *b == b':' {
+        } else if *b == b':' {
             let len_str = match String::from_utf8(len_bytes) {
                 Ok(v) => v,
                 Err(_) => return Err("Unable convert string len (bytes) to string")
             };
-
             let len : usize = match len_str.parse() {
                 Ok(v) => v,
-                Err(_e) => return Err("Unable convert string len (string) to int")
+                Err(_) => return Err("Unable convert string len (string) to int")
             };
 
-            let mut str_value = vec![];
-            while let Some((index, ch)) = it.enumerate().next() {
-                str_value.push(*ch);
+            if len == 0 {
+                return Ok(BValue::Str(String::from("")));
+            }
 
-                if index == len {
-                    break;
+            let mut str_value = vec![];
+            while let Some(ch) = it.next() {
+                str_value.push(*ch);
+                if str_value.len() == len {
+                    break
                 }
+            }
+
+            if str_value.len() != len {
+                return Err("Not enough characters when parsing string");
             }
 
             return match String::from_utf8(str_value) {
@@ -80,11 +84,11 @@ fn parse_int(it : &mut std::slice::Iter<u8>) -> Result<BValue, &'static str> {
         } else if *b == b'e' {
             let num_str = match String::from_utf8(num_bytes) {
                 Ok(v) => v,
-                Err(_e) => return Err("Unable convert int (bytes) to string")
+                Err(_) => return Err("Unable convert int (bytes) to string")
             };
             let num : i32 = match num_str.parse() {
                 Ok(v) => v,
-                Err(_e) => return Err("Unable convert int (string) to int")
+                Err(_) => return Err("Unable convert int (string) to int")
             };
 
             if num_str.len() >= 2 && num_str.starts_with("0") || num_str.starts_with("-0") {
@@ -113,6 +117,31 @@ mod tests {
     #[test]
     fn parse_str() {
         assert_eq!(BValue::parse(b"4:spam"), Ok(vec![BValue::Str(String::from("spam"))]));
+    }
+
+    #[test]
+    fn parse_str_unexpected_nd() {
+        assert_eq!(BValue::parse(b"4"), Err("String parsing end unexpectedly"));
+    }
+
+    #[test]
+    fn parse_str_missing_value() {
+        assert_eq!(BValue::parse(b"4:"), Err("Not enough characters when parsing string"));
+    }
+
+    #[test]
+    fn parse_str_not_nough_characters() {
+        assert_eq!(BValue::parse(b"4:spa"), Err("Not enough characters when parsing string"));
+    }
+
+    #[test]
+    fn parse_str_invalid_len_character() {
+        assert_eq!(BValue::parse(b"4+3:spa"), Err("Incorrect character when parsing string"));
+    }
+
+    #[test]
+    fn parse_str_zero_length() {
+        assert_eq!(BValue::parse(b"0:spa"), Ok(vec![BValue::Str(String::from(""))]));
     }
 
     #[test]
