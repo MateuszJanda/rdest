@@ -57,7 +57,6 @@ fn parse_int(it : &mut std::slice::Iter<u8>) -> Result<BValue, &'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bencode::*;
 
     # [test]
     fn empty_input() {
