@@ -34,12 +34,12 @@ mod bencode {
     }
 
     fn parse_int(it : &mut std::slice::Iter<u8>) -> Result<BValue, &'static str> {
-        let mut nums = vec![];
+        let mut num_bytes = vec![];
         while let Some(b) = it.next() {
             if (*b >= b'0' && *b <= b'9') || *b == b'-' {
-                nums.push(*b);
+                num_bytes.push(*b);
             } else if *b == b'e' {
-                let num_str = match String::from_utf8(nums) {
+                let num_str = match String::from_utf8(num_bytes) {
                     Ok(v) => v,
                     Err(_e) => return Err("Unable convert bytes to string")
                 };
@@ -47,6 +47,11 @@ mod bencode {
                     Ok(v) => v,
                     Err(_e) => return Err("Unable convert string to int")
                 };
+
+                if num_str.len() >= 2 && num_str.starts_with("0") || num_str.starts_with("-0") {
+                    return Err("Leading zero when converting string to int")
+                }
+
                 return Ok(BValue::Int(num))
             } else {
                 return Err("Incorrect character when converting string to int")
@@ -95,6 +100,21 @@ mod tests {
     #[test]
     fn parse_int_incorrect_character() {
         assert_eq!(BValue::parse(b"i+4e"), Err("Incorrect character when converting string to int"));
+    }
+
+    #[test]
+    fn parse_int_leading_zero() {
+        assert_eq!(BValue::parse(b"i01e"), Err("Leading zero when converting string to int"));
+    }
+
+    #[test]
+    fn parse_int_leading_zero_for_negative() {
+        assert_eq!(BValue::parse(b"i-01e"), Err("Leading zero when converting string to int"));
+    }
+
+    #[test]
+    fn parse_int_zero() {
+        assert_eq!(BValue::parse(b"i0e"), Ok(vec![BValue::Int(0)]));
     }
 
     #[test]
