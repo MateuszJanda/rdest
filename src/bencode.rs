@@ -19,13 +19,14 @@ impl BValue {
                     Err(desc) => return Err(desc)
                 };
                 result.push(s);
-            }
-            else if *b == b'i' {
+            } else if *b == b'i' {
                 let num = match parse_int(&mut it) {
                     Ok(v) => v,
                     Err(desc) => return Err(desc)
                 };
                 result.push(num);
+            } else {
+                return Err("Incorrect character when parsing bencode data")
             }
         }
 
@@ -141,7 +142,7 @@ mod tests {
 
     #[test]
     fn parse_str_zero_length() {
-        assert_eq!(BValue::parse(b"0:spa"), Ok(vec![BValue::Str(String::from(""))]));
+        assert_eq!(BValue::parse(b"0:"), Ok(vec![BValue::Str(String::from(""))]));
     }
 
     #[test]
@@ -202,5 +203,10 @@ mod tests {
     #[test]
     fn two_ints() {
         assert_eq!(BValue::parse(b"i2ei-3e"), Ok(vec![BValue::Int(2), BValue::Int(-3)]));
+    }
+
+    #[test]
+    fn empty_string_and_int() {
+        assert_eq!(BValue::parse(b"0:i4e"), Ok(vec![BValue::Str(String::from("")), BValue::Int(4)]));
     }
 }
