@@ -1,9 +1,11 @@
+use std::collections::HashMap;
 
 #[derive(PartialEq, Debug)]
 pub enum BValue {
     Int(i32),
     ByteStr(Vec<u8>),
     List(Vec<BValue>),
+    Dict(HashMap<Vec<u8>, BValue>)
 }
 
 impl BValue {
@@ -31,6 +33,12 @@ impl BValue {
                 result.push(num);
             } else if *b == b'l' {
                 let list = match Self::parse_list(&mut it) {
+                    Ok(v) => v,
+                    Err(desc) => return Err(desc)
+                };
+                result.push(list);
+            } else if *b == b'd' {
+                let list = match Self::parse_dict(&mut it) {
                     Ok(v) => v,
                     Err(desc) => return Err(desc)
                 };
@@ -115,9 +123,23 @@ impl BValue {
             Err(e) => Err(e)
         }
     }
+
+    fn parse_dict(it : &mut std::slice::Iter<u8>) -> Result<BValue, &'static str> {
+        if let d = Self::parse_values(it, Some(b'e')) {
+
+        }
+
+        Err("ddd")
+    }
 }
 
-
+macro_rules! hashmap {
+    ($( $key: expr => $val: expr ),*) => {{
+         let mut map = ::std::collections::HashMap::new();
+         $( map.insert($key, $val); )*
+         map
+    }}
+}
 
 #[cfg(test)]
 mod tests {
@@ -232,6 +254,14 @@ mod tests {
                    Ok(vec![BValue::List(vec![
                        BValue::Int(1),
                        BValue::Int(5)
+                   ])]));
+    }
+
+    #[test]
+    fn dict() {
+        assert_eq!(BValue::parse(b"li1ei5ee"),
+                   Ok(vec![BValue::List(vec![
+                       BValue::Dict(hashmap![vec![b'k'] => BValue::Int(1)]),
                    ])]));
     }
 
