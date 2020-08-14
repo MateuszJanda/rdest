@@ -4,8 +4,6 @@ pub enum BValue {
     Int(i32),
     Str(String),
     List(Vec<BValue>),
-//        Val(BValue)
-//        Val(Box<BValue>)
 }
 
 impl BValue {
@@ -20,7 +18,7 @@ impl BValue {
 
         while let Some(b) = it.next() {
             if *b >= b'0' && *b <= b'9' {
-                let s = match Self::parse_str(&mut it, b) {
+                let s = match Self::parse_byte_str(&mut it, b) {
                     Ok(v) => v,
                     Err(desc) => return Err(desc)
                 };
@@ -47,7 +45,7 @@ impl BValue {
         Ok(result)
     }
 
-    fn parse_str(it : &mut std::slice::Iter<u8>, first_num : &u8) -> Result<BValue, &'static str> {
+    fn parse_byte_str(it : &mut std::slice::Iter<u8>, first_num : &u8) -> Result<BValue, &'static str> {
         let mut len_bytes = vec![*first_num];
         while let Some(b) = it.next() {
             if *b >= b'0' && *b <= b'9' {
@@ -138,77 +136,77 @@ mod tests {
     }
 
     #[test]
-    fn parse_str() {
+    fn byte_str() {
         assert_eq!(BValue::parse(b"4:spam"), Ok(vec![BValue::Str(String::from("spam"))]));
     }
 
     #[test]
-    fn parse_str_unexpected_nd() {
+    fn byte_str_unexpected_nd() {
         assert_eq!(BValue::parse(b"4"), Err("String parsing end unexpectedly"));
     }
 
     #[test]
-    fn parse_str_missing_value() {
+    fn byte_str_missing_value() {
         assert_eq!(BValue::parse(b"4:"), Err("Not enough characters when parsing string"));
     }
 
     #[test]
-    fn parse_str_not_nough_characters() {
+    fn byte_str_not_nough_characters() {
         assert_eq!(BValue::parse(b"4:spa"), Err("Not enough characters when parsing string"));
     }
 
     #[test]
-    fn parse_str_invalid_len_character() {
+    fn byte_str_invalid_len_character() {
         assert_eq!(BValue::parse(b"4+3:spa"), Err("Incorrect character when parsing string"));
     }
 
     #[test]
-    fn parse_str_zero_length() {
+    fn byte_str_zero_length() {
         assert_eq!(BValue::parse(b"0:"), Ok(vec![BValue::Str(String::from(""))]));
     }
 
     #[test]
-    fn parse_int_missing_e() {
+    fn int_missing_e() {
         assert_eq!(BValue::parse(b"i"), Err("Missing terminate character 'e' when parsing int"));
     }
 
     #[test]
-    fn parse_int_missing_value() {
+    fn int_missing_value() {
         assert_eq!(BValue::parse(b"ie"), Err("Unable convert int (string) to int"));
     }
 
     #[test]
-    fn parse_int_incorrect_format1() {
+    fn int_incorrect_format1() {
         assert_eq!(BValue::parse(b"i-e"), Err("Unable convert int (string) to int"));
     }
 
     #[test]
-    fn parse_int_incorrect_format2() {
+    fn int_incorrect_format2() {
         assert_eq!(BValue::parse(b"i--4e"), Err("Unable convert int (string) to int"));
     }
 
     #[test]
-    fn parse_int_incorrect_format3() {
+    fn int_incorrect_format3() {
         assert_eq!(BValue::parse(b"i-4-e"), Err("Unable convert int (string) to int"));
     }
 
     #[test]
-    fn parse_int_incorrect_character() {
+    fn int_incorrect_character() {
         assert_eq!(BValue::parse(b"i+4e"), Err("Incorrect character when parsing int"));
     }
 
     #[test]
-    fn parse_int_leading_zero() {
+    fn int_leading_zero() {
         assert_eq!(BValue::parse(b"i01e"), Err("Leading zero when converting to int"));
     }
 
     #[test]
-    fn parse_int_leading_zero_for_negative() {
+    fn int_leading_zero_for_negative() {
         assert_eq!(BValue::parse(b"i-01e"), Err("Leading zero when converting to int"));
     }
 
     #[test]
-    fn parse_int_zero() {
+    fn int_zero() {
         assert_eq!(BValue::parse(b"i0e"), Ok(vec![BValue::Int(0)]));
     }
 
@@ -218,7 +216,7 @@ mod tests {
     }
 
     #[test]
-    fn positive_list_of_strings() {
+    fn list_of_strings() {
         assert_eq!(BValue::parse(b"l4:spam4:eggse"),
                    Ok(vec![BValue::List(vec![
                        BValue::Str(String::from("spam")),
@@ -227,7 +225,7 @@ mod tests {
     }
 
     #[test]
-    fn positive_list_of_ints() {
+    fn list_of_ints() {
         assert_eq!(BValue::parse(b"li1ei5ee"),
                    Ok(vec![BValue::List(vec![
                        BValue::Int(1)   ,
