@@ -19,13 +19,13 @@ impl BValue {
         let mut it = arg.iter();
         while let Some(b) = it.next() {
             if *b >= b'0' && *b <= b'9' {
-                let s = match parse_str(&mut it, b) {
+                let s = match Self::parse_str(&mut it, b) {
                     Ok(v) => v,
                     Err(desc) => return Err(desc)
                 };
                 result.push(s);
             } else if *b == b'i' {
-                let num = match parse_int(&mut it) {
+                let num = match Self::parse_int(&mut it) {
                     Ok(v) => v,
                     Err(desc) => return Err(desc)
                 };
@@ -39,77 +39,77 @@ impl BValue {
 
         Ok(result)
     }
-}
 
-fn parse_str(it : &mut std::slice::Iter<u8>, first_num : &u8) -> Result<BValue, &'static str> {
-    let mut len_bytes = vec![*first_num];
-    while let Some(b) = it.next() {
-        if *b >= b'0' && *b <= b'9' {
-            len_bytes.push(*b);
-        } else if *b == b':' {
-            let len_str = match String::from_utf8(len_bytes) {
-                Ok(v) => v,
-                Err(_) => return Err("Unable convert string len (bytes) to string")
-            };
-            let len : usize = match len_str.parse() {
-                Ok(v) => v,
-                Err(_) => return Err("Unable convert string len (string) to int")
-            };
+    fn parse_str(it : &mut std::slice::Iter<u8>, first_num : &u8) -> Result<BValue, &'static str> {
+        let mut len_bytes = vec![*first_num];
+        while let Some(b) = it.next() {
+            if *b >= b'0' && *b <= b'9' {
+                len_bytes.push(*b);
+            } else if *b == b':' {
+                let len_str = match String::from_utf8(len_bytes) {
+                    Ok(v) => v,
+                    Err(_) => return Err("Unable convert string len (bytes) to string")
+                };
+                let len : usize = match len_str.parse() {
+                    Ok(v) => v,
+                    Err(_) => return Err("Unable convert string len (string) to int")
+                };
 
-            if len == 0 {
-                return Ok(BValue::Str(String::from("")));
-            }
-
-            let mut str_value = vec![];
-            while let Some(ch) = it.next() {
-                str_value.push(*ch);
-                if str_value.len() == len {
-                    break
+                if len == 0 {
+                    return Ok(BValue::Str(String::from("")));
                 }
-            }
 
-            if str_value.len() != len {
-                return Err("Not enough characters when parsing string");
-            }
+                let mut str_value = vec![];
+                while let Some(ch) = it.next() {
+                    str_value.push(*ch);
+                    if str_value.len() == len {
+                        break
+                    }
+                }
 
-            return match String::from_utf8(str_value) {
-                Ok(v) => Ok(BValue::Str(v)),
-                Err(_) => Err("Unable convert string (bytes) to string")
-            };
-        } else {
-            return Err("Incorrect character when parsing string")
+                if str_value.len() != len {
+                    return Err("Not enough characters when parsing string");
+                }
+
+                return match String::from_utf8(str_value) {
+                    Ok(v) => Ok(BValue::Str(v)),
+                    Err(_) => Err("Unable convert string (bytes) to string")
+                };
+            } else {
+                return Err("Incorrect character when parsing string")
+            }
         }
+
+        Err("String parsing end unexpectedly")
     }
 
-    Err("String parsing end unexpectedly")
-}
+    fn parse_int(it : &mut std::slice::Iter<u8>) -> Result<BValue, &'static str> {
+        let mut num_bytes = vec![];
+        while let Some(b) = it.next() {
+            if (*b >= b'0' && *b <= b'9') || *b == b'-' {
+                num_bytes.push(*b);
+            } else if *b == b'e' {
+                let num_str = match String::from_utf8(num_bytes) {
+                    Ok(v) => v,
+                    Err(_) => return Err("Unable convert int (bytes) to string")
+                };
+                let num : i32 = match num_str.parse() {
+                    Ok(v) => v,
+                    Err(_) => return Err("Unable convert int (string) to int")
+                };
 
-fn parse_int(it : &mut std::slice::Iter<u8>) -> Result<BValue, &'static str> {
-    let mut num_bytes = vec![];
-    while let Some(b) = it.next() {
-        if (*b >= b'0' && *b <= b'9') || *b == b'-' {
-            num_bytes.push(*b);
-        } else if *b == b'e' {
-            let num_str = match String::from_utf8(num_bytes) {
-                Ok(v) => v,
-                Err(_) => return Err("Unable convert int (bytes) to string")
-            };
-            let num : i32 = match num_str.parse() {
-                Ok(v) => v,
-                Err(_) => return Err("Unable convert int (string) to int")
-            };
+                if num_str.len() >= 2 && num_str.starts_with("0") || num_str.starts_with("-0") {
+                    return Err("Leading zero when converting to int")
+                }
 
-            if num_str.len() >= 2 && num_str.starts_with("0") || num_str.starts_with("-0") {
-                return Err("Leading zero when converting to int")
+                return Ok(BValue::Int(num))
+            } else {
+                return Err("Incorrect character when parsing int")
             }
-
-            return Ok(BValue::Int(num))
-        } else {
-            return Err("Incorrect character when parsing int")
         }
-    }
 
-    Err("Missing terminate character 'e' when parsing int")
+        Err("Missing terminate character 'e' when parsing int")
+    }
 }
 
 fn parse_list(it : &mut std::slice::Iter<u8>) -> Result<BValue, &'static str> {
