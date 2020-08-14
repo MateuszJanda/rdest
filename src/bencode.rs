@@ -3,14 +3,19 @@
 pub enum BValue {
     Int(i32),
     Str(String),
-//        List(),
+    List(Vec<BValue>),
 //        Val(BValue)
 //        Val(Box<BValue>)
 }
 
 impl BValue {
     pub fn parse(arg: &[u8]) -> Result<Vec<BValue>, &'static str> {
+        Self::parse_values(arg, None)
+    }
+
+    fn parse_values(arg: &[u8], delimiter : Option<u8>) -> Result<Vec<BValue>, &'static str> {
         let mut result = vec![];
+        let (is_delim, delim) = delimiter.map_or((false, b' '), |v| (true, v));
         let mut it = arg.iter();
         while let Some(b) = it.next() {
             if *b >= b'0' && *b <= b'9' {
@@ -25,6 +30,8 @@ impl BValue {
                     Err(desc) => return Err(desc)
                 };
                 result.push(num);
+            } else if is_delim && *b == delim {
+                return Ok(result)
             } else {
                 return Err("Incorrect character when parsing bencode data")
             }
@@ -105,6 +112,35 @@ fn parse_int(it : &mut std::slice::Iter<u8>) -> Result<BValue, &'static str> {
     Err("Missing terminate character 'e' when parsing int")
 }
 
+fn parse_list(it : &mut std::slice::Iter<u8>) -> Result<BValue, &'static str> {
+//    let mut list = vec![];
+//    parse_
+
+//    while let Some(b) = it.next() {
+//        if (*b >= b'0' && *b <= b'9') || *b == b'-' {
+//            num_bytes.push(*b);
+//        } else if *b == b'e' {
+//            let num_str = match String::from_utf8(num_bytes) {
+//                Ok(v) => v,
+//                Err(_) => return Err("Unable convert int (bytes) to string")
+//            };
+//            let num : i32 = match num_str.parse() {
+//                Ok(v) => v,
+//                Err(_) => return Err("Unable convert int (string) to int")
+//            };
+//
+//            if num_str.len() >= 2 && num_str.starts_with("0") || num_str.starts_with("-0") {
+//                return Err("Leading zero when converting to int")
+//            }
+//
+//            return Ok(BValue::Int(num))
+//        } else {
+//            return Err("Incorrect character when parsing int")
+//        }
+//    }
+
+    Err("Missing terminate character 'e' when parsing int")
+}
 
 #[cfg(test)]
 mod tests {
