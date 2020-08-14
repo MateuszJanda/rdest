@@ -2,7 +2,7 @@
 #[derive(PartialEq, Debug)]
 pub enum BValue {
     Int(i32),
-    Str(String),
+    ByteStr(Vec<u8>),
     List(Vec<BValue>),
 }
 
@@ -61,25 +61,18 @@ impl BValue {
                 };
 
                 if len == 0 {
-                    return Ok(BValue::Str(String::from("")));
+                    return Ok(BValue::ByteStr(vec![]));
                 }
 
                 let mut str_value = vec![];
                 while let Some(ch) = it.next() {
                     str_value.push(*ch);
                     if str_value.len() == len {
-                        break
+                        return Ok(BValue::ByteStr(str_value));
                     }
                 }
 
-                if str_value.len() != len {
-                    return Err("Not enough characters when parsing string");
-                }
-
-                return match String::from_utf8(str_value) {
-                    Ok(v) => Ok(BValue::Str(v)),
-                    Err(_) => Err("Unable convert string (bytes) to string")
-                };
+                return Err("Not enough characters when parsing string");
             } else {
                 return Err("Incorrect character when parsing string")
             }
@@ -137,7 +130,9 @@ mod tests {
 
     #[test]
     fn byte_str() {
-        assert_eq!(BValue::parse(b"4:spam"), Ok(vec![BValue::Str(String::from("spam"))]));
+        assert_eq!(BValue::parse(b"4:spam"), Ok(vec![
+            BValue::ByteStr(vec![b's', b'p', b'a', b'm'])
+        ]));
     }
 
     #[test]
@@ -162,7 +157,9 @@ mod tests {
 
     #[test]
     fn byte_str_zero_length() {
-        assert_eq!(BValue::parse(b"0:"), Ok(vec![BValue::Str(String::from(""))]));
+        assert_eq!(BValue::parse(b"0:"), Ok(vec![
+            BValue::ByteStr(vec![])
+        ]));
     }
 
     #[test]
@@ -219,8 +216,8 @@ mod tests {
     fn list_of_strings() {
         assert_eq!(BValue::parse(b"l4:spam4:eggse"),
                    Ok(vec![BValue::List(vec![
-                       BValue::Str(String::from("spam")),
-                       BValue::Str(String::from("eggs"))
+                       BValue::ByteStr(vec![b's', b'p', b'a', b'm']),
+                       BValue::ByteStr(vec![b'e', b'g', b'g', b's'])
                    ])]));
     }
 
@@ -228,7 +225,7 @@ mod tests {
     fn list_of_ints() {
         assert_eq!(BValue::parse(b"li1ei5ee"),
                    Ok(vec![BValue::List(vec![
-                       BValue::Int(1)   ,
+                       BValue::Int(1),
                        BValue::Int(5)
                    ])]));
     }
@@ -245,6 +242,9 @@ mod tests {
 
     #[test]
     fn empty_string_and_int() {
-        assert_eq!(BValue::parse(b"0:i4e"), Ok(vec![BValue::Str(String::from("")), BValue::Int(4)]));
+        assert_eq!(BValue::parse(b"0:i4e"), Ok(vec![
+            BValue::ByteStr(vec![]),
+            BValue::Int(4)]
+        ));
     }
 }
