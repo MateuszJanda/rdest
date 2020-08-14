@@ -213,6 +213,11 @@ mod tests {
     }
 
     #[test]
+    fn negative_int() {
+        assert_eq!(BValue::parse(b"i-4e"), Ok(vec![BValue::Int(-4)]));
+    }
+
+    #[test]
     fn list_of_strings() {
         assert_eq!(BValue::parse(b"l4:spam4:eggse"),
                    Ok(vec![BValue::List(vec![
@@ -228,11 +233,6 @@ mod tests {
                        BValue::Int(1),
                        BValue::Int(5)
                    ])]));
-    }
-
-    #[test]
-    fn negative_int() {
-        assert_eq!(BValue::parse(b"i-4e"), Ok(vec![BValue::Int(-4)]));
     }
 
     #[test]
