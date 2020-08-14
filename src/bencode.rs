@@ -196,6 +196,24 @@ mod tests {
     }
 
     #[test]
+    fn positive_list_of_strings() {
+        assert_eq!(BValue::parse(b"l4:spam4:eggse"),
+                   Ok(vec![BValue::List(vec![
+                       BValue::Str(String::from("spam")),
+                       BValue::Str(String::from("eggs"))
+                   ])]));
+    }
+
+    #[test]
+    fn positive_list_of_ints() {
+        assert_eq!(BValue::parse(b"li1ei5ee"),
+                   Ok(vec![BValue::List(vec![
+                       BValue::Int(1)   ,
+                       BValue::Int(5)
+                   ])]));
+    }
+
+    #[test]
     fn negative_int() {
         assert_eq!(BValue::parse(b"i-4e"), Ok(vec![BValue::Int(-4)]));
     }
