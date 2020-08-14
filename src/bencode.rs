@@ -230,12 +230,12 @@ mod tests {
     }
 
     #[test]
-    fn positive_int() {
+    fn int_positive() {
         assert_eq!(BValue::parse(b"i4e"), Ok(vec![BValue::Int(4)]));
     }
 
     #[test]
-    fn negative_int() {
+    fn int_negative() {
         assert_eq!(BValue::parse(b"i-4e"), Ok(vec![BValue::Int(-4)]));
     }
 
