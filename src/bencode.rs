@@ -32,11 +32,11 @@ impl BValue {
                 };
                 result.push(num);
             } else if *b == b'l' {
-//                let list = match Self::parse_list(&mut it) {
-//                    Ok(v) => v,
-//                    Err(desc) => return Err(desc)
-//                };
-//                result.push(list);
+                let list = match Self::parse_list(&mut it) {
+                    Ok(v) => v,
+                    Err(desc) => return Err(desc)
+                };
+                result.push(list);
             } else if is_delim && *b == delim {
                 return Ok(result)
             } else {
@@ -118,12 +118,12 @@ impl BValue {
         Err("Missing terminate character 'e' when parsing int")
     }
 
-//    fn parse_list(it : &mut std::slice::Iter<u8>) -> Result<BValue, &'static str> {
-//        return match Self::parse_values(arg, Some(b'e')) {
-//            Ok(v) => Ok(BValue::List(v)),
-//            Err(e) => Err(e)
-//        }
-//    }
+    fn parse_list(it : &mut std::slice::Iter<u8>) -> Result<BValue, &'static str> {
+        return match Self::parse_values(it, Some(b'e')) {
+            Ok(v) => Ok(BValue::List(v)),
+            Err(e) => Err(e)
+        }
+    }
 }
 
 
