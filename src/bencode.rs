@@ -258,6 +258,18 @@ mod tests {
     }
 
     #[test]
+    fn list_of_nested_values() {
+        assert_eq!(BValue::parse(b"lli1ei5ee3:abce"),
+                   Ok(vec![BValue::List(vec![
+                       BValue::List(vec![
+                           BValue::Int(1),
+                           BValue::Int(5)
+                       ]),
+                       BValue::ByteStr(vec![b'a', b'b', b'c'])
+                   ])]));
+    }
+
+    #[test]
     fn dict() {
         assert_eq!(BValue::parse(b"li1ei5ee"),
                    Ok(vec![BValue::List(vec![
