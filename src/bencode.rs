@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 type Key = Vec<u8>;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum BValue {
     Int(i32),
     ByteStr(Vec<u8>),
@@ -142,7 +142,7 @@ impl BValue {
                 BValue::ByteStr(val) => val,
                 _ => return Err("ddd")
             };
-//            dict.insert(key.to_vec(), list[i+1]);
+            dict.insert(key.to_vec(), list[i+1].clone());
         }
 
         Ok(BValue::Dict(dict))
@@ -293,9 +293,9 @@ mod tests {
     #[test]
     fn dict() {
         assert_eq!(BValue::parse(b"d1:ki5ee"),
-                   Ok(vec![BValue::List(vec![
-                       BValue::Dict(hashmap![vec![b'k'] => BValue::Int(1)]),
-                   ])]));
+                   Ok(vec![
+                       BValue::Dict(hashmap![vec![b'k'] => BValue::Int(5)]),
+                   ]));
     }
 
     #[test]
