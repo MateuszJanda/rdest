@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 
+type Key = Vec<u8>;
+
 #[derive(PartialEq, Debug)]
 pub enum BValue {
     Int(i32),
     ByteStr(Vec<u8>),
     List(Vec<BValue>),
-    Dict(HashMap<Vec<u8>, BValue>)
+    Dict(HashMap<Key, BValue>)
 }
 
 impl BValue {
@@ -125,11 +127,25 @@ impl BValue {
     }
 
     fn parse_dict(it : &mut std::slice::Iter<u8>) -> Result<BValue, &'static str> {
-        if let d = Self::parse_values(it, Some(b'e')) {
+        let list = match Self::parse_values(it, Some(b'e')) {
+            Ok(v) => v,
+            Err(e) => return Err(e)
+        };
 
+        if list.len() % 2 != 0 {
+            return Err("Dict: odd number of elements")
         }
 
-        Err("ddd")
+        let mut dict : HashMap<Key, BValue> = HashMap::new();
+        for i in (0..list.len()).step_by(2) {
+            let key = match &list[i] {
+                BValue::ByteStr(val) => val,
+                _ => return Err("ddd")
+            };
+//            dict.insert(key.to_vec(), list[i+1]);
+        }
+
+        Ok(BValue::Dict(dict))
     }
 }
 
@@ -270,8 +286,13 @@ mod tests {
     }
 
     #[test]
+    fn dict_odd_number_of_elements() {
+        assert_eq!(BValue::parse(b"di1ee"), Err("Dict: odd number of elements"));
+    }
+
+    #[test]
     fn dict() {
-        assert_eq!(BValue::parse(b"li1ei5ee"),
+        assert_eq!(BValue::parse(b"d1:ki5ee"),
                    Ok(vec![BValue::List(vec![
                        BValue::Dict(hashmap![vec![b'k'] => BValue::Int(1)]),
                    ])]));
