@@ -53,13 +53,11 @@ impl BValue {
         first_num: &u8,
     ) -> Result<BValue, ParseError> {
         let mut len_bytes = vec![*first_num];
-        let mut rest_len_bytes : Vec<u8> = it.take_while(|&&b| b != b':')
-            .map(|&b| b)
-            .collect();
+        let mut rest_len_bytes: Vec<u8> = it.take_while(|&&b| b != b':').map(|&b| b).collect();
         len_bytes.append(&mut rest_len_bytes);
 
         if !len_bytes.iter().all(|&b| b >= b'0' && b <= b'9') {
-            return Err(format!("ByteStr [{}]: Incorrect character", pos))
+            return Err(format!("ByteStr [{}]: Incorrect character", pos));
         }
 
         let len_str = match String::from_utf8(len_bytes) {
