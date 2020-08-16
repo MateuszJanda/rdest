@@ -21,15 +21,15 @@ impl BValue {
         let mut result = vec![];
         let (is_delim, delim) = delimiter.map_or((false, b' '), |v| (true, v));
 
-        while let Some(b) = it.next() {
+        while let Some((pos, b)) = it.enumerate().next() {
             if *b >= b'0' && *b <= b'9' {
-                let s = match Self::parse_byte_str(&mut it, b) {
+                let s = match Self::parse_byte_str(&mut it, pos,b) {
                     Ok(v) => v,
                     Err(desc) => return Err(desc)
                 };
                 result.push(s);
             } else if *b == b'i' {
-                let num = match Self::parse_int(&mut it) {
+                let num = match Self::parse_int(&mut it, pos) {
                     Ok(v) => v,
                     Err(desc) => return Err(desc)
                 };
@@ -56,7 +56,7 @@ impl BValue {
         Ok(result)
     }
 
-    fn parse_byte_str(it : &mut std::slice::Iter<u8>, first_num : &u8) -> Result<BValue, ParseError> {
+    fn parse_byte_str(it : &mut std::slice::Iter<u8>, pos: usize, first_num : &u8) -> Result<BValue, ParseError> {
         let mut len_bytes = vec![*first_num];
         while let Some(b) = it.next() {
             if *b >= b'0' && *b <= b'9' {
@@ -92,25 +92,24 @@ impl BValue {
         Err(format!("String parsing end unexpectedly"))
     }
 
-    fn parse_int(it : &mut std::slice::Iter<u8>) -> Result<BValue, ParseError> {
-        let (pos, _) = it.size_hint();
+    fn parse_int(it : &mut std::slice::Iter<u8>, pos : usize) -> Result<BValue, ParseError> {
         let mut it_start = it.clone();
         let num_bytes = Self::extract_int(it)?;
 
         if let None = it_start.nth(num_bytes.len()) {
-            return Err(format!("Missing terminate character 'e' when parsing int"));
+            return Err(format!("Int [{}]: Missing terminate character 'e'", pos));
         }
         let num_str = match String::from_utf8(num_bytes) {
             Ok(v) => v,
-            Err(_) => return Err(format!("Unable convert int (bytes) to string"))
+            Err(_) => return Err(format!("Int [{}]: Unable convert to string", pos))
         };
         let num : i32 = match num_str.parse() {
             Ok(v) => v,
-            Err(_) => return Err(format!("Unable convert int (string) to int"))
+            Err(_) => return Err(format!("Int [{}]: Unable convert int", pos))
         };
 
         if num_str.len() >= 2 && num_str.starts_with("0") || num_str.starts_with("-0") {
-            return Err(format!("Leading zero when converting to int"))
+            return Err(format!("Int [{}]: Leading zero", pos))
         }
 
         return Ok(BValue::Int(num))
@@ -211,27 +210,28 @@ mod tests {
 
     #[test]
     fn int_missing_e() {
-        assert_eq!(BValue::parse(b"i"), Err(String::from("Missing terminate character 'e' when parsing int")));
+        assert_eq!(BValue::parse(b"i"),
+                   Err(String::from("Int [0]: Missing terminate character 'e'")));
     }
 
     #[test]
     fn int_missing_value() {
-        assert_eq!(BValue::parse(b"ie"), Err(String::from("Unable convert int (string) to int")));
+        assert_eq!(BValue::parse(b"ie"), Err(String::from("Int [0]: Unable convert int")));
     }
 
     #[test]
     fn int_incorrect_format1() {
-        assert_eq!(BValue::parse(b"i-e"), Err(String::from("Unable convert int (string) to int")));
+        assert_eq!(BValue::parse(b"i-e"), Err(String::from("Int [0]: Unable convert int")));
     }
 
     #[test]
     fn int_incorrect_format2() {
-        assert_eq!(BValue::parse(b"i--4e"), Err(String::from("Unable convert int (string) to int")));
+        assert_eq!(BValue::parse(b"i--4e"), Err(String::from("Int [0]: Unable convert int")));
     }
 
     #[test]
     fn int_incorrect_format3() {
-        assert_eq!(BValue::parse(b"i-4-e"), Err(String::from("Unable convert int (string) to int")));
+        assert_eq!(BValue::parse(b"i-4-e"), Err(String::from("Int [0]: Unable convert int")));
     }
 
     #[test]
@@ -241,12 +241,12 @@ mod tests {
 
     #[test]
     fn int_leading_zero() {
-        assert_eq!(BValue::parse(b"i01e"), Err(String::from("Leading zero when converting to int")));
+        assert_eq!(BValue::parse(b"i01e"), Err(String::from("Int [0]: Leading zero")));
     }
 
     #[test]
     fn int_leading_zero_for_negative() {
-        assert_eq!(BValue::parse(b"i-01e"), Err(String::from("Leading zero when converting to int")));
+        assert_eq!(BValue::parse(b"i-01e"), Err(String::from("Int [0]: Leading zero")));
     }
 
     #[test]
