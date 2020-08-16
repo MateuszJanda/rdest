@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 type Key = Vec<u8>;
+type ParseError = String;
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum BValue {
@@ -11,12 +12,12 @@ pub enum BValue {
 }
 
 impl BValue {
-    pub fn parse(arg: &[u8]) -> Result<Vec<BValue>, &'static str> {
+    pub fn parse(arg: &[u8]) -> Result<Vec<BValue>, ParseError> {
         let mut it = arg.iter();
         Self::parse_values(&mut it, None)
     }
 
-    fn parse_values(mut it: &mut std::slice::Iter<u8>, delimiter : Option<u8>) -> Result<Vec<BValue>, &'static str> {
+    fn parse_values(mut it: &mut std::slice::Iter<u8>, delimiter : Option<u8>) -> Result<Vec<BValue>, ParseError> {
         let mut result = vec![];
         let (is_delim, delim) = delimiter.map_or((false, b' '), |v| (true, v));
 
@@ -48,14 +49,14 @@ impl BValue {
             } else if is_delim && *b == delim {
                 return Ok(result)
             } else {
-                return Err("Incorrect character when parsing bencode data")
+                return Err(format!("Incorrect character when parsing bencode data"))
             }
         }
 
         Ok(result)
     }
 
-    fn parse_byte_str(it : &mut std::slice::Iter<u8>, first_num : &u8) -> Result<BValue, &'static str> {
+    fn parse_byte_str(it : &mut std::slice::Iter<u8>, first_num : &u8) -> Result<BValue, ParseError> {
         let mut len_bytes = vec![*first_num];
         while let Some(b) = it.next() {
             if *b >= b'0' && *b <= b'9' {
@@ -63,11 +64,11 @@ impl BValue {
             } else if *b == b':' {
                 let len_str = match String::from_utf8(len_bytes) {
                     Ok(v) => v,
-                    Err(_) => return Err("Unable convert string len (bytes) to string")
+                    Err(_) => return Err(format!("Unable convert string len (bytes) to string"))
                 };
                 let len : usize = match len_str.parse() {
                     Ok(v) => v,
-                    Err(_) => return Err("Unable convert string len (string) to int")
+                    Err(_) => return Err(format!("Unable convert string len (string) to int"))
                 };
 
                 if len == 0 {
@@ -82,97 +83,73 @@ impl BValue {
                     }
                 }
 
-                return Err("Not enough characters when parsing string");
+                return Err(format!("Not enough characters when parsing string"));
             } else {
-                return Err("Incorrect character when parsing string")
+                return Err(format!("Incorrect character when parsing string"))
             }
         }
 
-        Err("String parsing end unexpectedly")
+        Err(format!("String parsing end unexpectedly"))
     }
 
-    fn parse_int(it : &mut std::slice::Iter<u8>) -> Result<BValue, &'static str> {
+    fn parse_int(it : &mut std::slice::Iter<u8>) -> Result<BValue, ParseError> {
+        let (pos, _) = it.size_hint();
         let mut it_start = it.clone();
         let num_bytes = Self::extract_int(it)?;
 
         if let None = it_start.nth(num_bytes.len()) {
-            return Err("Missing terminate character 'e' when parsing int");
+            return Err(format!("Missing terminate character 'e' when parsing int"));
+        }
+        let num_str = match String::from_utf8(num_bytes) {
+            Ok(v) => v,
+            Err(_) => return Err(format!("Unable convert int (bytes) to string"))
+        };
+        let num : i32 = match num_str.parse() {
+            Ok(v) => v,
+            Err(_) => return Err(format!("Unable convert int (string) to int"))
+        };
+
+        if num_str.len() >= 2 && num_str.starts_with("0") || num_str.starts_with("-0") {
+            return Err(format!("Leading zero when converting to int"))
         }
 
-//        let num_bytes: Result<Vec<_>, _>= it
-//            .take_while(|&&b| b != b'e')
-//            .map(|&b| {
-//                if (b >= b'0' && b <= b'9') || b == b'-' {
-//                    Ok(b)
-//                } else {
-//                    Err("Incorrect character when parsing int")
-//                }
-//            })
-////            .map(|b| )
-//            .collect();
-//        num_bytes?;
-//        let mut num_bytes = vec![];
-//        while let Some(b) = it.next() {
-//            if (*b >= b'0' && *b <= b'9') || *b == b'-' {
-//                num_bytes.push(*b);
-//            } else if *b == b'e' {
-                let num_str = match String::from_utf8(num_bytes) {
-                    Ok(v) => v,
-                    Err(_) => return Err("Unable convert int (bytes) to string")
-                };
-                let num : i32 = match num_str.parse() {
-                    Ok(v) => v,
-                    Err(_) => return Err("Unable convert int (string) to int")
-                };
-
-                if num_str.len() >= 2 && num_str.starts_with("0") || num_str.starts_with("-0") {
-                    return Err("Leading zero when converting to int")
-                }
-
-                return Ok(BValue::Int(num))
-//            } else {
-//                return Err("Incorrect character when parsing int")
-//            }
-//        }
-//
-//        Err("Missing terminate character 'e' when parsing int")
-
+        return Ok(BValue::Int(num))
     }
 
-    fn extract_int(it : &mut std::slice::Iter<u8>) -> Result<Vec<u8>, &'static str> {
+    fn extract_int(it : &mut std::slice::Iter<u8>) -> Result<Vec<u8>, ParseError> {
         it.take_while(|&&b| b != b'e')
             .map(|&b| {
                 if (b >= b'0' && b <= b'9') || b == b'-' {
                     Ok(b)
                 } else {
-                    Err("Incorrect character when parsing int")
+                    Err(format!("Incorrect character when parsing int"))
                 }
             })
             .collect()
     }
 
-    fn parse_list(it : &mut std::slice::Iter<u8>) -> Result<BValue, &'static str> {
+    fn parse_list(it : &mut std::slice::Iter<u8>) -> Result<BValue, ParseError> {
         return match Self::parse_values(it, Some(b'e')) {
             Ok(v) => Ok(BValue::List(v)),
             Err(e) => Err(e)
         }
     }
 
-    fn parse_dict(it : &mut std::slice::Iter<u8>) -> Result<BValue, &'static str> {
+    fn parse_dict(it : &mut std::slice::Iter<u8>) -> Result<BValue, ParseError> {
         let list = match Self::parse_values(it, Some(b'e')) {
             Ok(v) => v,
             Err(e) => return Err(e)
         };
 
         if list.len() % 2 != 0 {
-            return Err("Dict: odd number of elements")
+            return  Err(format!("Dict: odd number of elements"))
         }
 
         let mut dict : HashMap<Key, BValue> = HashMap::new();
         for i in (0..list.len()).step_by(2) {
             let key = match &list[i] {
                 BValue::ByteStr(val) => val,
-                _ => return Err("ddd")
+                _ => return Err(format!("ddd"))
             };
             dict.insert(key.to_vec(), list[i+1].clone());
         }
@@ -207,22 +184,22 @@ mod tests {
 
     #[test]
     fn byte_str_unexpected_nd() {
-        assert_eq!(BValue::parse(b"4"), Err("String parsing end unexpectedly"));
+        assert_eq!(BValue::parse(b"4"), Err(String::from("String parsing end unexpectedly")));
     }
 
     #[test]
     fn byte_str_missing_value() {
-        assert_eq!(BValue::parse(b"4:"), Err("Not enough characters when parsing string"));
+        assert_eq!(BValue::parse(b"4:"), Err(String::from("Not enough characters when parsing string")));
     }
 
     #[test]
     fn byte_str_not_nough_characters() {
-        assert_eq!(BValue::parse(b"4:spa"), Err("Not enough characters when parsing string"));
+        assert_eq!(BValue::parse(b"4:spa"), Err(String::from("Not enough characters when parsing string")));
     }
 
     #[test]
     fn byte_str_invalid_len_character() {
-        assert_eq!(BValue::parse(b"4+3:spa"), Err("Incorrect character when parsing string"));
+        assert_eq!(BValue::parse(b"4+3:spa"), Err(String::from("Incorrect character when parsing string")));
     }
 
     #[test]
@@ -234,42 +211,42 @@ mod tests {
 
     #[test]
     fn int_missing_e() {
-        assert_eq!(BValue::parse(b"i"), Err("Missing terminate character 'e' when parsing int"));
+        assert_eq!(BValue::parse(b"i"), Err(String::from("Missing terminate character 'e' when parsing int")));
     }
 
     #[test]
     fn int_missing_value() {
-        assert_eq!(BValue::parse(b"ie"), Err("Unable convert int (string) to int"));
+        assert_eq!(BValue::parse(b"ie"), Err(String::from("Unable convert int (string) to int")));
     }
 
     #[test]
     fn int_incorrect_format1() {
-        assert_eq!(BValue::parse(b"i-e"), Err("Unable convert int (string) to int"));
+        assert_eq!(BValue::parse(b"i-e"), Err(String::from("Unable convert int (string) to int")));
     }
 
     #[test]
     fn int_incorrect_format2() {
-        assert_eq!(BValue::parse(b"i--4e"), Err("Unable convert int (string) to int"));
+        assert_eq!(BValue::parse(b"i--4e"), Err(String::from("Unable convert int (string) to int")));
     }
 
     #[test]
     fn int_incorrect_format3() {
-        assert_eq!(BValue::parse(b"i-4-e"), Err("Unable convert int (string) to int"));
+        assert_eq!(BValue::parse(b"i-4-e"), Err(String::from("Unable convert int (string) to int")));
     }
 
     #[test]
     fn int_incorrect_character() {
-        assert_eq!(BValue::parse(b"i+4e"), Err("Incorrect character when parsing int"));
+        assert_eq!(BValue::parse(b"i+4e"), Err(String::from("Incorrect character when parsing int")));
     }
 
     #[test]
     fn int_leading_zero() {
-        assert_eq!(BValue::parse(b"i01e"), Err("Leading zero when converting to int"));
+        assert_eq!(BValue::parse(b"i01e"), Err(String::from("Leading zero when converting to int")));
     }
 
     #[test]
     fn int_leading_zero_for_negative() {
-        assert_eq!(BValue::parse(b"i-01e"), Err("Leading zero when converting to int"));
+        assert_eq!(BValue::parse(b"i-01e"), Err(String::from("Leading zero when converting to int")));
     }
 
     #[test]
@@ -319,7 +296,7 @@ mod tests {
 
     #[test]
     fn dict_odd_number_of_elements() {
-        assert_eq!(BValue::parse(b"di1ee"), Err("Dict: odd number of elements"));
+        assert_eq!(BValue::parse(b"di1ee"), Err(String::from("Dict: odd number of elements")));
     }
 
     #[test]
