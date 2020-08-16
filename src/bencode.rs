@@ -53,35 +53,34 @@ impl BValue {
         first_num: &u8,
     ) -> Result<BValue, ParseError> {
         let mut len_bytes = vec![*first_num];
-        while let Some(b) = it.next() {
-            if *b >= b'0' && *b <= b'9' {
-                len_bytes.push(*b);
-            } else if *b == b':' {
-                let len_str = match String::from_utf8(len_bytes) {
-                    Ok(v) => v,
-                    Err(_) => return Err(format!("ByteStr [{}]: Unable convert to string", pos)),
-                };
-                let len: usize = match len_str.parse() {
-                    Ok(v) => v,
-                    Err(_) => return Err(format!("ByteStr [{}]: Unable convert to int", pos)),
-                };
+        let mut rest_len_bytes : Vec<u8> = it.take_while(|&&b| b != b':')
+            .map(|&b| b)
+            .collect();
+        len_bytes.append(&mut rest_len_bytes);
 
-                if len == 0 {
-                    return Ok(BValue::ByteStr(vec![]));
-                }
-
-                let str_value: Vec<u8> = it.take(len).map(|&b| b).collect();
-                if str_value.len() != len {
-                    return Err(format!("ByteStr [{}]: Not enough characters", pos));
-                }
-
-                return Ok(BValue::ByteStr(str_value));
-            } else {
-                return Err(format!("ByteStr [{}]: Incorrect character", pos));
-            }
+        if !len_bytes.iter().all(|&b| b >= b'0' && b <= b'9') {
+            return Err(format!("ByteStr [{}]: Incorrect character", pos))
         }
 
-        Err(format!("ByteStr [{}]: Parsing end unexpectedly", pos))
+        let len_str = match String::from_utf8(len_bytes) {
+            Ok(v) => v,
+            Err(_) => return Err(format!("ByteStr [{}]: Unable convert to string", pos)),
+        };
+        let len: usize = match len_str.parse() {
+            Ok(v) => v,
+            Err(_) => return Err(format!("ByteStr [{}]: Unable convert to int", pos)),
+        };
+
+        if len == 0 {
+            return Ok(BValue::ByteStr(vec![]));
+        }
+
+        let str_value: Vec<u8> = it.take(len).map(|&b| b).collect();
+        if str_value.len() != len {
+            return Err(format!("ByteStr [{}]: Not enough characters", pos));
+        }
+
+        return Ok(BValue::ByteStr(str_value));
     }
 
     fn parse_int(it: &mut std::slice::Iter<u8>, pos: usize) -> Result<BValue, ParseError> {
@@ -182,7 +181,7 @@ mod tests {
     fn byte_str_unexpected_nd() {
         assert_eq!(
             BValue::parse(b"4"),
-            Err(String::from("ByteStr [0]: Parsing end unexpectedly"))
+            Err(String::from("ByteStr [0]: Not enough characters"))
         );
     }
 
