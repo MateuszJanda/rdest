@@ -37,7 +37,7 @@ impl BValue {
             } else if is_delim && *b == delim {
                 return Ok(result)
             } else {
-                return Err(format!("Incorrect character when parsing bencode data"))
+                return Err(format!("Main [{}] Incorrect character", pos))
             }
         }
 
@@ -160,6 +160,11 @@ mod tests {
     #[test]
     fn empty_input() {
         assert_eq!(BValue::parse(b""), Ok(vec![]));
+    }
+
+    #[test]
+    fn incorrect_character() {
+        assert_eq!(BValue::parse(b"x"), Err(String::from("Main [0] Incorrect character")));
     }
 
     #[test]
