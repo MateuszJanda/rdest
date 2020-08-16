@@ -37,7 +37,7 @@ impl BValue {
             } else if is_delim && *b == delim {
                 return Ok(result)
             } else {
-                return Err(format!("Main [{}] Incorrect character", pos))
+                return Err(format!("Main [{}]: Incorrect character", pos))
             }
         }
 
@@ -52,11 +52,11 @@ impl BValue {
             } else if *b == b':' {
                 let len_str = match String::from_utf8(len_bytes) {
                     Ok(v) => v,
-                    Err(_) => return Err(format!("Unable convert string len (bytes) to string"))
+                    Err(_) => return Err(format!("ByteStr [{}]: Unable convert to string", pos))
                 };
                 let len : usize = match len_str.parse() {
                     Ok(v) => v,
-                    Err(_) => return Err(format!("Unable convert string len (string) to int"))
+                    Err(_) => return Err(format!("ByteStr [{}]: Unable convert to int", pos))
                 };
 
                 if len == 0 {
@@ -71,13 +71,13 @@ impl BValue {
                     }
                 }
 
-                return Err(format!("Not enough characters when parsing string"));
+                return Err(format!("ByteStr [{}]: Not enough characters", pos));
             } else {
-                return Err(format!("Incorrect character when parsing string"))
+                return Err(format!("ByteStr [{}]: Incorrect character", pos))
             }
         }
 
-        Err(format!("String parsing end unexpectedly"))
+        Err(format!("ByteStr [{}]: Parsing end unexpectedly", pos))
     }
 
     fn parse_int(it : &mut std::slice::Iter<u8>, pos : usize) -> Result<BValue, ParseError> {
@@ -164,7 +164,7 @@ mod tests {
 
     #[test]
     fn incorrect_character() {
-        assert_eq!(BValue::parse(b"x"), Err(String::from("Main [0] Incorrect character")));
+        assert_eq!(BValue::parse(b"x"), Err(String::from("Main [0]: Incorrect character")));
     }
 
     #[test]
@@ -176,22 +176,22 @@ mod tests {
 
     #[test]
     fn byte_str_unexpected_nd() {
-        assert_eq!(BValue::parse(b"4"), Err(String::from("String parsing end unexpectedly")));
+        assert_eq!(BValue::parse(b"4"), Err(String::from("ByteStr [0]: Parsing end unexpectedly")));
     }
 
     #[test]
     fn byte_str_missing_value() {
-        assert_eq!(BValue::parse(b"4:"), Err(String::from("Not enough characters when parsing string")));
+        assert_eq!(BValue::parse(b"4:"), Err(String::from("ByteStr [0]: Not enough characters")));
     }
 
     #[test]
     fn byte_str_not_nough_characters() {
-        assert_eq!(BValue::parse(b"4:spa"), Err(String::from("Not enough characters when parsing string")));
+        assert_eq!(BValue::parse(b"4:spa"), Err(String::from("ByteStr [0]: Not enough characters")));
     }
 
     #[test]
     fn byte_str_invalid_len_character() {
-        assert_eq!(BValue::parse(b"4+3:spa"), Err(String::from("Incorrect character when parsing string")));
+        assert_eq!(BValue::parse(b"4+3:spa"), Err(String::from("ByteStr [0]: Incorrect character")));
     }
 
     #[test]
