@@ -136,7 +136,7 @@ impl BValue {
         for i in (0..list.len()).step_by(2) {
             let key = match &list[i] {
                 BValue::ByteStr(val) => val,
-                _ => return Err(format!("ddd"))
+                _ => return Err(format!("Dict [{}]: Key not string", pos))
             };
             dict.insert(key.to_vec(), list[i+1].clone());
         }
@@ -290,6 +290,11 @@ mod tests {
     #[test]
     fn dict_odd_number_of_elements() {
         assert_eq!(BValue::parse(b"di1ee"), Err(String::from("Dict [0]: Odd number of elements")));
+    }
+
+    #[test]
+    fn dict_key_not_string() {
+        assert_eq!(BValue::parse(b"di1ei1ee"), Err(String::from("Dict [0]: Key not string")));
     }
 
     #[test]
