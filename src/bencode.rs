@@ -23,28 +23,16 @@ impl BValue {
 
         while let Some((pos, b)) = it.enumerate().next() {
             if *b >= b'0' && *b <= b'9' {
-                let s = match Self::parse_byte_str(&mut it, pos,b) {
-                    Ok(v) => v,
-                    Err(desc) => return Err(desc)
-                };
+                let s = Self::parse_byte_str(&mut it, pos,b)?;
                 result.push(s);
             } else if *b == b'i' {
-                let num = match Self::parse_int(&mut it, pos) {
-                    Ok(v) => v,
-                    Err(desc) => return Err(desc)
-                };
+                let num = Self::parse_int(&mut it, pos)?;
                 result.push(num);
             } else if *b == b'l' {
-                let list = match Self::parse_list(&mut it) {
-                    Ok(v) => v,
-                    Err(desc) => return Err(desc)
-                };
+                let list = Self::parse_list(&mut it)?;
                 result.push(list);
             } else if *b == b'd' {
-                let list = match Self::parse_dict(&mut it) {
-                    Ok(v) => v,
-                    Err(desc) => return Err(desc)
-                };
+                let list = Self::parse_dict(&mut it)?;
                 result.push(list);
             } else if is_delim && *b == delim {
                 return Ok(result)
