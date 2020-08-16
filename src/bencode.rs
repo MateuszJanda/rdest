@@ -92,11 +92,30 @@ impl BValue {
     }
 
     fn parse_int(it : &mut std::slice::Iter<u8>) -> Result<BValue, &'static str> {
-        let mut num_bytes = vec![];
-        while let Some(b) = it.next() {
-            if (*b >= b'0' && *b <= b'9') || *b == b'-' {
-                num_bytes.push(*b);
-            } else if *b == b'e' {
+        let mut it_start = it.clone();
+        let num_bytes = Self::extract_int(it)?;
+
+        if let None = it_start.nth(num_bytes.len()) {
+            return Err("Missing terminate character 'e' when parsing int");
+        }
+
+//        let num_bytes: Result<Vec<_>, _>= it
+//            .take_while(|&&b| b != b'e')
+//            .map(|&b| {
+//                if (b >= b'0' && b <= b'9') || b == b'-' {
+//                    Ok(b)
+//                } else {
+//                    Err("Incorrect character when parsing int")
+//                }
+//            })
+////            .map(|b| )
+//            .collect();
+//        num_bytes?;
+//        let mut num_bytes = vec![];
+//        while let Some(b) = it.next() {
+//            if (*b >= b'0' && *b <= b'9') || *b == b'-' {
+//                num_bytes.push(*b);
+//            } else if *b == b'e' {
                 let num_str = match String::from_utf8(num_bytes) {
                     Ok(v) => v,
                     Err(_) => return Err("Unable convert int (bytes) to string")
@@ -111,12 +130,25 @@ impl BValue {
                 }
 
                 return Ok(BValue::Int(num))
-            } else {
-                return Err("Incorrect character when parsing int")
-            }
-        }
+//            } else {
+//                return Err("Incorrect character when parsing int")
+//            }
+//        }
+//
+//        Err("Missing terminate character 'e' when parsing int")
 
-        Err("Missing terminate character 'e' when parsing int")
+    }
+
+    fn extract_int(it : &mut std::slice::Iter<u8>) -> Result<Vec<u8>, &'static str> {
+        it.take_while(|&&b| b != b'e')
+            .map(|&b| {
+                if (b >= b'0' && b <= b'9') || b == b'-' {
+                    Ok(b)
+                } else {
+                    Err("Incorrect character when parsing int")
+                }
+            })
+            .collect()
     }
 
     fn parse_list(it : &mut std::slice::Iter<u8>) -> Result<BValue, &'static str> {
