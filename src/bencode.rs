@@ -123,11 +123,7 @@ impl BValue {
     }
 
     fn parse_dict(it : &mut std::slice::Iter<u8>, pos : usize) -> Result<BValue, ParseError> {
-        let list = match Self::parse_values(it, Some(b'e')) {
-            Ok(v) => v,
-            Err(e) => return Err(e)
-        };
-
+        let list = Self::parse_values(it, Some(b'e'))?;
         if list.len() % 2 != 0 {
             return  Err(format!("Dict [{}]: Odd number of elements", pos))
         }
