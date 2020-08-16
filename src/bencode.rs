@@ -63,15 +63,12 @@ impl BValue {
                     return Ok(BValue::ByteStr(vec![]));
                 }
 
-                let mut str_value = vec![];
-                while let Some(ch) = it.next() {
-                    str_value.push(*ch);
-                    if str_value.len() == len {
-                        return Ok(BValue::ByteStr(str_value));
-                    }
+                let str_value: Vec<u8> = it.take(len).map(|&b| b).collect();
+                if str_value.len() != len {
+                    return Err(format!("ByteStr [{}]: Not enough characters", pos));
                 }
 
-                return Err(format!("ByteStr [{}]: Not enough characters", pos));
+                return Ok(BValue::ByteStr(str_value));
             } else {
                 return Err(format!("ByteStr [{}]: Incorrect character", pos))
             }
