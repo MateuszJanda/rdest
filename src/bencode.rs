@@ -56,7 +56,7 @@ impl BValue {
         let mut rest_len_bytes: Vec<u8> = it.take_while(|&&b| b != b':').map(|&b| b).collect();
         len_bytes.append(&mut rest_len_bytes);
 
-        if !len_bytes.iter().all(|&b| b >= b'0' && b <= b'9') {
+        if !len_bytes.iter().all(|b| (b'0'..b'9').contains(b)) {
             return Err(format!("ByteStr [{}]: Incorrect character", pos));
         }
 
@@ -106,9 +106,9 @@ impl BValue {
 
     fn extract_int(it: &mut std::slice::Iter<u8>, pos: usize) -> Result<Vec<u8>, ParseError> {
         it.take_while(|&&b| b != b'e')
-            .map(|&b| {
-                if (b >= b'0' && b <= b'9') || b == b'-' {
-                    Ok(b)
+            .map(|b| {
+                if (b'0'..b'9').contains(b) || *b == b'-' {
+                    Ok(*b)
                 } else {
                     Err(format!("Int [{}]: Incorrect character", pos))
                 }
