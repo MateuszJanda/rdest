@@ -32,12 +32,12 @@ impl BValue {
                 let list = Self::parse_list(&mut it)?;
                 result.push(list);
             } else if *b == b'd' {
-                let list = Self::parse_dict(&mut it)?;
+                let list = Self::parse_dict(&mut it, pos)?;
                 result.push(list);
             } else if is_delim && *b == delim {
                 return Ok(result)
             } else {
-                return Err(format!("Main [{}]: Incorrect character", pos))
+                return Err(format!("Loop [{}]: Incorrect character", pos))
             }
         }
 
@@ -122,14 +122,14 @@ impl BValue {
         }
     }
 
-    fn parse_dict(it : &mut std::slice::Iter<u8>) -> Result<BValue, ParseError> {
+    fn parse_dict(it : &mut std::slice::Iter<u8>, pos : usize) -> Result<BValue, ParseError> {
         let list = match Self::parse_values(it, Some(b'e')) {
             Ok(v) => v,
             Err(e) => return Err(e)
         };
 
         if list.len() % 2 != 0 {
-            return  Err(format!("Dict: odd number of elements"))
+            return  Err(format!("Dict [{}]: Odd number of elements", pos))
         }
 
         let mut dict : HashMap<Key, BValue> = HashMap::new();
@@ -164,7 +164,7 @@ mod tests {
 
     #[test]
     fn incorrect_character() {
-        assert_eq!(BValue::parse(b"x"), Err(String::from("Main [0]: Incorrect character")));
+        assert_eq!(BValue::parse(b"x"), Err(String::from("Loop [0]: Incorrect character")));
     }
 
     #[test]
@@ -289,7 +289,7 @@ mod tests {
 
     #[test]
     fn dict_odd_number_of_elements() {
-        assert_eq!(BValue::parse(b"di1ee"), Err(String::from("Dict: odd number of elements")));
+        assert_eq!(BValue::parse(b"di1ee"), Err(String::from("Dict [0]: Odd number of elements")));
     }
 
     #[test]
