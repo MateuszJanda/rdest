@@ -82,7 +82,7 @@ impl BValue {
 
     fn parse_int(it : &mut std::slice::Iter<u8>, pos : usize) -> Result<BValue, ParseError> {
         let mut it_start = it.clone();
-        let num_bytes = Self::extract_int(it)?;
+        let num_bytes = Self::extract_int(it, pos)?;
 
         if let None = it_start.nth(num_bytes.len()) {
             return Err(format!("Int [{}]: Missing terminate character 'e'", pos));
@@ -103,13 +103,13 @@ impl BValue {
         return Ok(BValue::Int(num))
     }
 
-    fn extract_int(it : &mut std::slice::Iter<u8>) -> Result<Vec<u8>, ParseError> {
+    fn extract_int(it : &mut std::slice::Iter<u8>, pos : usize) -> Result<Vec<u8>, ParseError> {
         it.take_while(|&&b| b != b'e')
             .map(|&b| {
                 if (b >= b'0' && b <= b'9') || b == b'-' {
                     Ok(b)
                 } else {
-                    Err(format!("Incorrect character when parsing int"))
+                    Err(format!("Int [{}]: Incorrect character", pos))
                 }
             })
             .collect()
@@ -229,7 +229,7 @@ mod tests {
 
     #[test]
     fn int_incorrect_character() {
-        assert_eq!(BValue::parse(b"i+4e"), Err(String::from("Incorrect character when parsing int")));
+        assert_eq!(BValue::parse(b"i+4e"), Err(String::from("Int [0]: Incorrect character")));
     }
 
     #[test]
