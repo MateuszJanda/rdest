@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 type Key = Vec<u8>;
-type ParseError = String;
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum BValue {
@@ -12,7 +11,7 @@ pub enum BValue {
 }
 
 impl BValue {
-    pub fn parse(arg: &[u8]) -> Result<Vec<BValue>, ParseError> {
+    pub fn parse(arg: &[u8]) -> Result<Vec<BValue>, String> {
         let mut it = arg.iter();
         Self::parse_values(&mut it, None)
     }
@@ -20,7 +19,7 @@ impl BValue {
     fn parse_values(
         mut it: &mut std::slice::Iter<u8>,
         delimiter: Option<u8>,
-    ) -> Result<Vec<BValue>, ParseError> {
+    ) -> Result<Vec<BValue>, String> {
         let mut result = vec![];
         let (is_delim, delim) = delimiter.map_or((false, b' '), |v| (true, v));
 
@@ -51,7 +50,7 @@ impl BValue {
         it: &mut std::slice::Iter<u8>,
         pos: usize,
         first_num: &u8,
-    ) -> Result<BValue, ParseError> {
+    ) -> Result<BValue, String> {
         let mut len_bytes = vec![*first_num];
         let mut rest_len_bytes: Vec<u8> = it.take_while(|&&b| b != b':').map(|&b| b).collect();
         len_bytes.append(&mut rest_len_bytes);
@@ -81,7 +80,7 @@ impl BValue {
         return Ok(BValue::ByteStr(str_value));
     }
 
-    fn parse_int(it: &mut std::slice::Iter<u8>, pos: usize) -> Result<BValue, ParseError> {
+    fn parse_int(it: &mut std::slice::Iter<u8>, pos: usize) -> Result<BValue, String> {
         let mut it_start = it.clone();
         let num_bytes = Self::extract_int(it, pos)?;
 
@@ -104,7 +103,7 @@ impl BValue {
         return Ok(BValue::Int(num));
     }
 
-    fn extract_int(it: &mut std::slice::Iter<u8>, pos: usize) -> Result<Vec<u8>, ParseError> {
+    fn extract_int(it: &mut std::slice::Iter<u8>, pos: usize) -> Result<Vec<u8>, String> {
         it.take_while(|&&b| b != b'e')
             .map(|b| {
                 if (b'0'..b'9').contains(b) || *b == b'-' {
@@ -116,14 +115,14 @@ impl BValue {
             .collect()
     }
 
-    fn parse_list(it: &mut std::slice::Iter<u8>) -> Result<BValue, ParseError> {
+    fn parse_list(it: &mut std::slice::Iter<u8>) -> Result<BValue, String> {
         return match Self::parse_values(it, Some(b'e')) {
             Ok(v) => Ok(BValue::List(v)),
             Err(e) => Err(e),
         };
     }
 
-    fn parse_dict(it: &mut std::slice::Iter<u8>, pos: usize) -> Result<BValue, ParseError> {
+    fn parse_dict(it: &mut std::slice::Iter<u8>, pos: usize) -> Result<BValue, String> {
         let list = Self::parse_values(it, Some(b'e'))?;
         if list.len() % 2 != 0 {
             return Err(format!("Dict [{}]: Odd number of elements", pos));
