@@ -52,7 +52,7 @@ impl BValue {
         first_num: &u8,
     ) -> Result<BValue, String> {
         let mut len_bytes = vec![*first_num];
-        let mut rest_len_bytes: Vec<u8> = it.take_while(|&&b| b != b':').map(|&b| b).collect();
+        let mut rest_len_bytes: Vec<_> = it.take_while(|&&b| b != b':').map(|&b| b).collect();
         len_bytes.append(&mut rest_len_bytes);
 
         if !len_bytes.iter().all(|b| (b'0'..b'9').contains(b)) {
@@ -72,7 +72,7 @@ impl BValue {
             return Ok(BValue::ByteStr(vec![]));
         }
 
-        let str_value: Vec<u8> = it.take(len).map(|&b| b).collect();
+        let str_value: Vec<_> = it.take(len).map(|&b| b).collect();
         if str_value.len() != len {
             return Err(format!("ByteStr [{}]: Not enough characters", pos));
         }
