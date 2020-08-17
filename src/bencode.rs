@@ -367,4 +367,12 @@ mod tests {
             Ok(vec![BValue::ByteStr(vec![]), BValue::Int(4)])
         );
     }
+
+    #[test]
+    fn incorrect_value_after_correct() {
+        assert_eq!(
+            BValue::parse(b"i1ei2ei01e"),
+            Err(String::from("Int [6]: Leading zero"))
+        );
+    }
 }
