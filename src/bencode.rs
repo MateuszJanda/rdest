@@ -128,16 +128,62 @@ impl BValue {
             return Err(format!("Dict [{}]: Odd number of elements", pos));
         }
 
-        let mut dict: HashMap<Key, BValue> = HashMap::new();
-        for i in (0..list.len()).step_by(2) {
-            let key = match &list[i] {
-                BValue::ByteStr(val) => val,
-                _ => return Err(format!("Dict [{}]: Key not string", pos)),
-            };
-            dict.insert(key.to_vec(), list[i + 1].clone());
-        }
+        let keys = Self::extract_dict_keys(&list, pos)?;
+
+//        list.iter()
+//            .map(|v| match v {
+//                BValue::ByteStr(vec) => vec,
+//                _ => Err("asdf")
+//            })
+//            .collect();
+
+
+//        let i1 = list.iter()
+//     let v: Vec<_>  = i1.skip(1).step_by(2).collect();
+//
+//     let i2 = a.iter();
+//     let z: Vec<_> = i2.skip(0).step_by(2).zip(v.iter()).collect();
+//     println!("{:?}", v);
+//     println!("{:?}", z);
+
+
+//        let mut dict: HashMap<Key, BValue> = HashMap::new();
+        let dict: HashMap<_, _>  = keys
+            .iter()
+            .map(|k| k.clone())
+            .zip(list
+                .iter().skip(1).step_by(2).map(|v| v.clone())
+        )
+            .collect();
+
+//        let tuples = vec![("one", 1), ("two", 2), ("three", 3)];
+//        let tuples = list.skip(0).step_by(2).zip(list.skip(1).step_by(2));
+//        let dict: HashMap<_, _> = tuples.into_iter().collect();
+//        println!("{:?}", m);
+
+//        for i in (0..list.len()).step_by(2) {
+//            let key = match &list[i] {
+//                BValue::ByteStr(val) => val,
+//                _ => return Err(format!("Dict [{}]: Key not string", pos)),
+//            };
+//            dict.insert(key.to_vec(), list[i + 1].clone());
+//        }
 
         Ok(BValue::Dict(dict))
+    }
+
+    fn extract_dict_keys(list : &Vec<BValue>, pos: usize) -> Result<Vec<Key>, String> {
+//        let x: Result<Vec<_>, _>  =
+            list
+                .iter()
+                .step_by(2)
+            .map(|v| match v {
+                BValue::ByteStr(vec) => Ok(vec.clone()),
+                _ => Err(format!("Dict [{}]: Key not string", pos))
+            })
+//                .map(|v| v)
+            .collect()
+//        x
     }
 }
 
