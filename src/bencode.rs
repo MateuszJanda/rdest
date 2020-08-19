@@ -17,7 +17,7 @@ impl BValue {
     }
 
     fn parse_values(
-        mut it: &mut std::slice::Iter<u8>,
+        it: &mut std::slice::Iter<u8>,
         delimiter: Option<u8>,
     ) -> Result<Vec<BValue>, String> {
         let mut result = vec![];
@@ -25,16 +25,16 @@ impl BValue {
 
         while let Some((pos, b)) = it.enumerate().next() {
             if *b >= b'0' && *b <= b'9' {
-                let s = Self::parse_byte_str(&mut it, pos, b)?;
+                let s = Self::parse_byte_str(it, pos, b)?;
                 result.push(s);
             } else if *b == b'i' {
-                let num = Self::parse_int(&mut it, pos)?;
+                let num = Self::parse_int(it, pos)?;
                 result.push(num);
             } else if *b == b'l' {
-                let list = Self::parse_list(&mut it)?;
+                let list = Self::parse_list(it)?;
                 result.push(list);
             } else if *b == b'd' {
-                let list = Self::parse_dict(&mut it, pos)?;
+                let list = Self::parse_dict(it, pos)?;
                 result.push(list);
             } else if is_delim && *b == delim {
                 return Ok(result);
