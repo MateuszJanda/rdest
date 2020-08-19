@@ -128,7 +128,7 @@ impl BValue {
             return Err(format!("Dict [{}]: Odd number of elements", pos));
         }
 
-        let keys = Self::extract_dict_keys(&list, pos)?;
+        let keys = Self::get_keys_from_list(&list, pos)?;
         let dict: HashMap<_, _> = keys
             .iter()
             .map(|k| k.clone())
@@ -138,7 +138,7 @@ impl BValue {
         Ok(BValue::Dict(dict))
     }
 
-    fn extract_dict_keys(list: &Vec<BValue>, pos: usize) -> Result<Vec<Key>, String> {
+    fn get_keys_from_list(list: &Vec<BValue>, pos: usize) -> Result<Vec<Key>, String> {
         list.iter()
             .step_by(2)
             .map(|v| match v {
@@ -300,15 +300,15 @@ mod tests {
     }
 
     // TODO
-//    #[test]
-//    fn int_above_i32() {
-//        assert_eq!(BValue::parse(b"i2147483648e"), Ok(vec![BValue::Int(2147483648)]));
-//    }
+    //    #[test]
+    //    fn int_above_i32() {
+    //        assert_eq!(BValue::parse(b"i2147483648e"), Ok(vec![BValue::Int(2147483648)]));
+    //    }
 
     // TODO
-//    fn int_above_i64() {
-//        assert_eq!(BValue::parse(b"i9223372036854775808e"), Ok(vec![BValue::Int(9223372036854775808)]));
-//    }
+    //    fn int_above_i64() {
+    //        assert_eq!(BValue::parse(b"i9223372036854775808e"), Ok(vec![BValue::Int(9223372036854775808)]));
+    //    }
 
     #[test]
     fn list_of_strings() {
