@@ -52,7 +52,10 @@ impl BValue {
         first_num: &u8,
     ) -> Result<BValue, String> {
         let mut len_bytes = vec![*first_num];
-        let mut rest_len_bytes: Vec<_> = it.take_while(|(_, &b)| b != b':').map(|(_, &b)| b).collect();
+        let mut rest_len_bytes: Vec<_> = it
+            .take_while(|(_, &b)| b != b':')
+            .map(|(_, &b)| b)
+            .collect();
         len_bytes.append(&mut rest_len_bytes);
 
         if !len_bytes.iter().all(|b| (b'0'..b'9').contains(b)) {
@@ -80,7 +83,10 @@ impl BValue {
         return Ok(BValue::ByteStr(str_value));
     }
 
-    fn parse_int(it: &mut std::iter::Enumerate<std::slice::Iter<u8>>, pos: usize) -> Result<BValue, String> {
+    fn parse_int(
+        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        pos: usize,
+    ) -> Result<BValue, String> {
         let mut it_start = it.clone();
         let num_bytes = Self::extract_int(it, pos)?;
 
@@ -103,7 +109,10 @@ impl BValue {
         return Ok(BValue::Int(num));
     }
 
-    fn extract_int(it: &mut std::iter::Enumerate<std::slice::Iter<u8>>, pos: usize) -> Result<Vec<u8>, String> {
+    fn extract_int(
+        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        pos: usize,
+    ) -> Result<Vec<u8>, String> {
         it.take_while(|(_, &b)| b != b'e')
             .map(|(_, b)| {
                 if (b'0'..b'9').contains(b) || *b == b'-' {
@@ -122,7 +131,10 @@ impl BValue {
         };
     }
 
-    fn parse_dict(it: &mut std::iter::Enumerate<std::slice::Iter<u8>>, pos: usize) -> Result<BValue, String> {
+    fn parse_dict(
+        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        pos: usize,
+    ) -> Result<BValue, String> {
         let list = Self::parse_values(it, Some(b'e'))?;
         if list.len() % 2 != 0 {
             return Err(format!("Dict [{}]: Odd number of elements", pos));
