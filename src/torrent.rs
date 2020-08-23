@@ -1,4 +1,5 @@
 use crate::BValue;
+use std::collections::HashMap;
 
 #[derive(PartialEq, Debug)]
 pub struct Torrent {
@@ -23,7 +24,11 @@ pub struct File {
 
 impl Torrent {
     pub fn from_bytes(arg: &[u8]) -> Result<Torrent, String> {
+        for val in BValue::parse(arg)? {
+            if let BValue::Dict(d) = val {
 
+            }
+        }
         Err(format!("Nope"))
     }
 }
@@ -35,5 +40,10 @@ mod tests {
     #[test]
     fn empty_input() {
         assert_eq!(Torrent::from_bytes(b""), Err(String::from("Nope")));
+    }
+
+    #[test]
+    fn incorrect_bencode() {
+        assert_eq!(Torrent::from_bytes(b"12"), Err(String::from("ByteStr [0]: Not enough characters")));
     }
 }
