@@ -20,30 +20,26 @@ impl BValue {
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         delimiter: Option<u8>,
     ) -> Result<Vec<BValue>, String> {
-        let mut result = vec![];
+        let mut values = vec![];
         let (is_delim, delim) = delimiter.map_or((false, b' '), |v| (true, v));
 
         while let Some((pos, b)) = it.next() {
             if *b >= b'0' && *b <= b'9' {
-                let s = Self::parse_byte_str(it, pos, b)?;
-                result.push(s);
+                values.push(Self::parse_byte_str(it, pos, b)?);
             } else if *b == b'i' {
-                let num = Self::parse_int(it, pos)?;
-                result.push(num);
+                values.push(Self::parse_int(it, pos)?);
             } else if *b == b'l' {
-                let list = Self::parse_list(it)?;
-                result.push(list);
+                values.push(Self::parse_list(it)?);
             } else if *b == b'd' {
-                let list = Self::parse_dict(it, pos)?;
-                result.push(list);
+                values.push(Self::parse_dict(it, pos)?);
             } else if is_delim && *b == delim {
-                return Ok(result);
+                return Ok(values);
             } else {
                 return Err(format!("Loop [{}]: Incorrect character", pos));
             }
         }
 
-        Ok(result)
+        Ok(values)
     }
 
     fn parse_byte_str(

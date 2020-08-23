@@ -4,7 +4,6 @@ use crate::BValue;
 pub struct Torrent {
     announce : String,
     info : Info,
-
 }
 
 #[derive(PartialEq, Clone, Debug)]
