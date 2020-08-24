@@ -43,6 +43,18 @@ impl Torrent {
     pub fn is_valid(&self) -> bool {
         false
     }
+
+    pub fn announce(&self) -> String {
+        for val in &self.bvalues {
+            match val {
+                BValue::Dict(d) => (),
+                _ => ()
+            }
+        }
+
+        String::from("Nope")
+    }
+
 }
 
 #[cfg(test)]
