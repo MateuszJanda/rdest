@@ -3,8 +3,7 @@ use std::collections::HashMap;
 
 #[derive(PartialEq, Debug)]
 pub struct Torrent {
-    announce : String,
-    info : Info,
+    bvalues : Vec<BValue>
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -24,12 +23,15 @@ pub struct File {
 
 impl Torrent {
     pub fn from_bytes(arg: &[u8]) -> Result<Torrent, String> {
-        for val in BValue::parse(arg)? {
-            if let BValue::Dict(d) = val {
+        let bvalues = BValue::parse(arg)?;
 
-            }
+        if bvalues.is_empty() {
+            return Err(format!("Empty torrent"));
         }
-        Err(format!("Nope"))
+
+        Ok(Torrent {
+            bvalues
+        })
     }
 }
 
@@ -39,7 +41,7 @@ mod tests {
 
     #[test]
     fn empty_input() {
-        assert_eq!(Torrent::from_bytes(b""), Err(String::from("Nope")));
+        assert_eq!(Torrent::from_bytes(b""), Err(String::from("Empty torrent")));
     }
 
     #[test]
