@@ -22,16 +22,26 @@ pub struct File {
 }
 
 impl Torrent {
-    pub fn from_bytes(arg: &[u8]) -> Result<Torrent, String> {
+    pub fn from_bencode(arg: &[u8]) -> Result<Torrent, String> {
         let bvalues = BValue::parse(arg)?;
 
         if bvalues.is_empty() {
             return Err(format!("Empty torrent"));
         }
 
-        Ok(Torrent {
+        let torrent = Torrent {
             bvalues
-        })
+        };
+
+        if !torrent.is_valid() {
+            return Err(format!("Todo"));
+        }
+
+        Ok(torrent)
+    }
+
+    pub fn is_valid(&self) -> bool {
+        false
     }
 }
 
@@ -41,11 +51,11 @@ mod tests {
 
     #[test]
     fn empty_input() {
-        assert_eq!(Torrent::from_bytes(b""), Err(String::from("Empty torrent")));
+        assert_eq!(Torrent::from_bencode(b""), Err(String::from("Empty torrent")));
     }
 
     #[test]
     fn incorrect_bencode() {
-        assert_eq!(Torrent::from_bytes(b"12"), Err(String::from("ByteStr [0]: Not enough characters")));
+        assert_eq!(Torrent::from_bencode(b"12"), Err(String::from("ByteStr [0]: Not enough characters")));
     }
 }
