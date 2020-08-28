@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 #[derive(PartialEq, Debug)]
 pub struct Torrent {
-    bvalues : Vec<BValue>
+    announce : String,
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -29,32 +29,23 @@ impl Torrent {
             return Err(format!("Empty torrent"));
         }
 
-        let torrent = Torrent {
-            bvalues
-        };
-
-        if !torrent.is_valid() {
-            return Err(format!("Todo"));
-        }
-
-        Ok(torrent)
-    }
-
-    pub fn is_valid(&self) -> bool {
-        false
-    }
-
-    pub fn announce(&self) -> String {
-        for val in &self.bvalues {
+        for val in bvalues {
             match val {
-                BValue::Dict(d) => (),
+                BValue::Dict(dict) => {
+                    return Ok(Torrent{
+                        announce : Self::get_announce(dict)?,
+                    })
+                },
                 _ => ()
             }
         }
 
-        String::from("Nope")
+        Err(format!("Torrent data not found"))
     }
 
+    fn get_announce(dict : HashMap<Vec<u8>, BValue>) -> Result<String, String> {
+        Err(format!("nope"))
+    }
 }
 
 #[cfg(test)]
