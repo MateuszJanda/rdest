@@ -52,7 +52,10 @@ impl Torrent {
     }
 
     fn get_announce(dict : HashMap<Vec<u8>, BValue>) -> Result<String, String> {
-        Err(format!("nope"))
+        match dict.get(&b"announce".to_vec()) {
+            Some(BValue::ByteStr(b)) => Ok(format!("asdf")),
+            _ => Err(format!("aaa"))
+        }
     }
 }
 
@@ -68,5 +71,17 @@ mod tests {
     #[test]
     fn incorrect_bencode() {
         assert_eq!(Torrent::from_bencode(b"12"), Err(String::from("ByteStr [0]: Not enough characters")));
+    }
+
+    #[test]
+    fn torrent1() {
+        assert_eq!(Torrent::from_bencode(b"d8:announce3:abce"),
+                   Err(String::from("ByteStr [0]: Not enough characters")));
+    }
+
+    #[test]
+    fn torrent2() {
+        assert_eq!(Torrent::from_bencode(b"d8:announcei1ee"),
+                   Err(String::from("ByteStr [0]: Not enough characters")));
     }
 }
