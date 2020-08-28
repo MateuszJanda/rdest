@@ -32,15 +32,23 @@ impl Torrent {
         for val in bvalues {
             match val {
                 BValue::Dict(dict) => {
-                    return Ok(Torrent{
-                        announce : Self::get_announce(dict)?,
-                    })
+                    match Self::create_torrent(dict) {
+                        Ok(torrent) => return Ok(torrent),
+                        Err(_) => ()
+                    }
                 },
                 _ => ()
             }
         }
 
         Err(format!("Torrent data not found"))
+    }
+
+    fn create_torrent(dict : HashMap<Vec<u8>, BValue>) -> Result<Torrent, String> {
+        Ok(Torrent{
+            // announce : format!("asdf"),
+            announce : Self::get_announce(dict)?,
+        })
     }
 
     fn get_announce(dict : HashMap<Vec<u8>, BValue>) -> Result<String, String> {
