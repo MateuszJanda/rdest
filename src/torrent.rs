@@ -33,8 +33,8 @@ impl Torrent {
             match val {
                 BValue::Dict(dict) => {
                     match Self::create_torrent(dict) {
-                        Ok(torrent) => return Ok(torrent),
-                        Err(_) => ()
+                        Some(torrent) => return Ok(torrent),
+                        None => ()
                     }
                 },
                 _ => ()
@@ -44,17 +44,16 @@ impl Torrent {
         Err(format!("Torrent data not found"))
     }
 
-    fn create_torrent(dict : HashMap<Vec<u8>, BValue>) -> Result<Torrent, String> {
-        Ok(Torrent{
-            // announce : format!("asdf"),
+    fn create_torrent(dict : HashMap<Vec<u8>, BValue>) -> Option<Torrent> {
+        Some(Torrent{
             announce : Self::get_announce(dict)?,
         })
     }
 
-    fn get_announce(dict : HashMap<Vec<u8>, BValue>) -> Result<String, String> {
+    fn get_announce(dict : HashMap<Vec<u8>, BValue>) -> Option<String> {
         match dict.get(&b"announce".to_vec()) {
-            Some(BValue::ByteStr(b)) => Ok(format!("asdf")),
-            _ => Err(format!("aaa"))
+            Some(BValue::ByteStr(b)) => String::from_utf8(b.to_vec()).ok(),
+            _ => None
         }
     }
 }
@@ -74,14 +73,16 @@ mod tests {
     }
 
     #[test]
-    fn torrent1() {
-        assert_eq!(Torrent::from_bencode(b"d8:announce3:abce"),
-                   Err(String::from("ByteStr [0]: Not enough characters")));
+    fn torrent_incorrect_announce() {
+        assert_eq!(Torrent::from_bencode(b"d8:announcei1ee"),
+                   Err(String::from("Torrent data not found")));
     }
 
     #[test]
-    fn torrent2() {
-        assert_eq!(Torrent::from_bencode(b"d8:announcei1ee"),
-                   Err(String::from("ByteStr [0]: Not enough characters")));
+    fn torrent_correct() {
+        assert_eq!(Torrent::from_bencode(b"d8:announce3:abce"),
+                   Ok(Torrent {
+                       announce: "abc".to_string(),
+                   }));
     }
 }
