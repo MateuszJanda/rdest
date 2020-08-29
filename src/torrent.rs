@@ -1,5 +1,6 @@
 use crate::BValue;
 use std::collections::HashMap;
+use super::hashmap;
 
 #[derive(PartialEq, Debug)]
 pub struct Torrent {
@@ -109,6 +110,18 @@ impl Torrent {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn get_announce_missing() {
+        assert_eq!(Torrent::get_announce(&hashmap![b"announce".to_vec() => BValue::Int(5)]),
+                   Err(String::from("Incorrect or missing 'announce' value")));
+    }
+
+    #[test]
+    fn get_announce_ok() {
+        assert_eq!(Torrent::get_announce(&hashmap![b"announce".to_vec() => BValue::ByteStr(b"asdf".to_vec())]),
+                   Ok(format!("asdf")));
+    }
 
     #[test]
     fn empty_input() {

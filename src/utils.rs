@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 #[allow(unused_macros)]
 #[macro_export]
 macro_rules! hashmap {
