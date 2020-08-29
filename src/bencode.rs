@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+// #[allow(unused_imports)]
+use super::hashmap;
 
 type Key = Vec<u8>;
 
@@ -155,15 +157,6 @@ impl BValue {
             })
             .collect()
     }
-}
-
-#[allow(unused_macros)]
-macro_rules! hashmap {
-    ($( $key: expr => $val: expr ),*) => {{
-         let mut map = ::std::collections::HashMap::new();
-         $( map.insert($key, $val); )*
-         map
-    }}
 }
 
 #[cfg(test)]
