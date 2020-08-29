@@ -5,6 +5,7 @@ use std::collections::HashMap;
 pub struct Torrent {
     announce : String,
     name : String,
+    piece_length : i32,
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -42,19 +43,20 @@ impl Torrent {
             }
         }
 
-        Err(format!("Torrent data not found"))
+        Err(format!("Missing data"))
     }
 
     fn create_torrent(dict : &HashMap<Vec<u8>, BValue>) -> Option<Torrent> {
         Some(Torrent{
             announce : Self::get_announce(dict)?,
-            name : Self::get_name(dict)?
+            name : Self::get_name(dict)?,
+            piece_length : Self::get_piece_length(dict)?
         })
     }
 
     fn get_announce(dict : &HashMap<Vec<u8>, BValue>) -> Option<String> {
         match dict.get(&b"announce".to_vec()) {
-            Some(BValue::ByteStr(b)) => String::from_utf8(b.to_vec()).ok(),
+            Some(BValue::ByteStr(val)) => String::from_utf8(val.to_vec()).ok(),
             _ => None
         }
     }
@@ -62,7 +64,19 @@ impl Torrent {
     fn get_name(dict : &HashMap<Vec<u8>, BValue>) -> Option<String> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"name".to_vec()) {
-                Some(BValue::ByteStr(b)) => String::from_utf8(b.to_vec()).ok(),
+                Some(BValue::ByteStr(val)) => String::from_utf8(val.to_vec()).ok(),
+                _ => None
+            }
+            _ => None
+        }
+    }
+
+    fn get_piece_length(dict : &HashMap<Vec<u8>, BValue>) -> Option<i32> {
+        match dict.get(&b"info".to_vec()) {
+            Some(BValue::Dict(info)) => match info.get(&b"piece length".to_vec()) {
+                Some(BValue::Int(length)) => {
+                    Some(*length)
+                },
                 _ => None
             }
             _ => None
@@ -87,15 +101,16 @@ mod tests {
     #[test]
     fn torrent_incorrect_announce() {
         assert_eq!(Torrent::from_bencode(b"d8:announcei1ee"),
-                   Err(String::from("Torrent data not found")));
+                   Err(String::from("Missing data")));
     }
 
     #[test]
     fn torrent_correct() {
-        assert_eq!(Torrent::from_bencode(b"d8:announce3:URL4:infod4:name4:NAMEee"),
+        assert_eq!(Torrent::from_bencode(b"d8:announce3:URL4:infod4:name4:NAME12:piece lengthi999eee"),
                    Ok(Torrent {
                        announce: "URL".to_string(),
                        name : "NAME".to_string(),
+                       piece_length : 999
                    }));
     }
 }
