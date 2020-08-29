@@ -6,6 +6,7 @@ pub struct Torrent {
     announce : String,
     name : String,
     piece_length : i32,
+    pieces : Vec<Vec<u8>>,
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -50,7 +51,8 @@ impl Torrent {
         Some(Torrent{
             announce : Self::get_announce(dict)?,
             name : Self::get_name(dict)?,
-            piece_length : Self::get_piece_length(dict)?
+            piece_length : Self::get_piece_length(dict)?,
+            pieces : Self::get_pieces(dict)?,
         })
     }
 
@@ -74,8 +76,21 @@ impl Torrent {
     fn get_piece_length(dict : &HashMap<Vec<u8>, BValue>) -> Option<i32> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"piece length".to_vec()) {
-                Some(BValue::Int(length)) => {
-                    Some(*length)
+                Some(BValue::Int(length)) => Some(*length),
+                _ => None
+            }
+            _ => None
+        }
+    }
+
+    fn get_pieces(dict : &HashMap<Vec<u8>, BValue>) -> Option<Vec<Vec<u8>>> {
+        match dict.get(&b"info".to_vec()) {
+            Some(BValue::Dict(info)) => match info.get(&b"pieces".to_vec()) {
+                Some(BValue::ByteStr(pieces)) => {
+                    if pieces.len() % 20 != 0 {
+                        return None
+                    }
+                    None
                 },
                 _ => None
             }
@@ -110,7 +125,8 @@ mod tests {
                    Ok(Torrent {
                        announce: "URL".to_string(),
                        name : "NAME".to_string(),
-                       piece_length : 999
+                       piece_length : 999,
+                       pieces : vec![b"aaaaabbbbbcccccddddd".to_vec()],
                    }));
     }
 }
