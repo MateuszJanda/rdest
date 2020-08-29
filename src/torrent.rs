@@ -4,6 +4,7 @@ use std::collections::HashMap;
 #[derive(PartialEq, Debug)]
 pub struct Torrent {
     announce : String,
+    name : String,
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -32,7 +33,7 @@ impl Torrent {
         for val in bvalues {
             match val {
                 BValue::Dict(dict) => {
-                    match Self::create_torrent(dict) {
+                    match Self::create_torrent(&dict) {
                         Some(torrent) => return Ok(torrent),
                         None => ()
                     }
@@ -44,15 +45,26 @@ impl Torrent {
         Err(format!("Torrent data not found"))
     }
 
-    fn create_torrent(dict : HashMap<Vec<u8>, BValue>) -> Option<Torrent> {
+    fn create_torrent(dict : &HashMap<Vec<u8>, BValue>) -> Option<Torrent> {
         Some(Torrent{
             announce : Self::get_announce(dict)?,
+            name : Self::get_name(dict)?
         })
     }
 
-    fn get_announce(dict : HashMap<Vec<u8>, BValue>) -> Option<String> {
+    fn get_announce(dict : &HashMap<Vec<u8>, BValue>) -> Option<String> {
         match dict.get(&b"announce".to_vec()) {
             Some(BValue::ByteStr(b)) => String::from_utf8(b.to_vec()).ok(),
+            _ => None
+        }
+    }
+
+    fn get_name(dict : &HashMap<Vec<u8>, BValue>) -> Option<String> {
+        match dict.get(&b"info".to_vec()) {
+            Some(BValue::Dict(info)) => match info.get(&b"name".to_vec()) {
+                Some(BValue::ByteStr(b)) => String::from_utf8(b.to_vec()).ok(),
+                _ => None
+            }
             _ => None
         }
     }
@@ -80,9 +92,10 @@ mod tests {
 
     #[test]
     fn torrent_correct() {
-        assert_eq!(Torrent::from_bencode(b"d8:announce3:abce"),
+        assert_eq!(Torrent::from_bencode(b"d8:announce3:URL4:infod4:name4:NAMEee"),
                    Ok(Torrent {
-                       announce: "abc".to_string(),
+                       announce: "URL".to_string(),
+                       name : "NAME".to_string(),
                    }));
     }
 }
