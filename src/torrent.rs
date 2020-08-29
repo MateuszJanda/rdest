@@ -32,23 +32,24 @@ impl Torrent {
             return Err(format!("Empty torrent"));
         }
 
+        let mut err = Err(format!("aaa"));
         for val in bvalues {
             match val {
                 BValue::Dict(dict) => {
                     match Self::create_torrent(&dict) {
-                        Some(torrent) => return Ok(torrent),
-                        None => ()
+                        Ok(torrent) => return Ok(torrent),
+                        Err(e) => err = Err(e)
                     }
                 },
                 _ => ()
             }
         }
 
-        Err(format!("Missing data"))
+        err
     }
 
-    fn create_torrent(dict : &HashMap<Vec<u8>, BValue>) -> Option<Torrent> {
-        Some(Torrent{
+    fn create_torrent(dict : &HashMap<Vec<u8>, BValue>) -> Result<Torrent, String> {
+        Ok(Torrent{
             announce : Self::get_announce(dict)?,
             name : Self::get_name(dict)?,
             piece_length : Self::get_piece_length(dict)?,
@@ -56,45 +57,51 @@ impl Torrent {
         })
     }
 
-    fn get_announce(dict : &HashMap<Vec<u8>, BValue>) -> Option<String> {
+    fn get_announce(dict : &HashMap<Vec<u8>, BValue>) -> Result<String, String> {
         match dict.get(&b"announce".to_vec()) {
-            Some(BValue::ByteStr(val)) => String::from_utf8(val.to_vec()).ok(),
-            _ => None
+            Some(BValue::ByteStr(val)) => match String::from_utf8(val.to_vec()) {
+                Ok(s) => Ok(s),
+                Err(_) => Err(format!("asdf"))
+            }
+            _ => Err(format!("asdf"))
         }
     }
 
-    fn get_name(dict : &HashMap<Vec<u8>, BValue>) -> Option<String> {
+    fn get_name(dict : &HashMap<Vec<u8>, BValue>) -> Result<String, String> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"name".to_vec()) {
-                Some(BValue::ByteStr(val)) => String::from_utf8(val.to_vec()).ok(),
-                _ => None
+               Some(BValue::ByteStr(val)) => match String::from_utf8(val.to_vec()) {
+                    Ok(s) => Ok(s),
+                    Err(_) => Err(format!("asdf"))
+                }
+                _ => Err(format!("asdf"))
             }
-            _ => None
+            _ => Err(format!("asdf"))
         }
     }
 
-    fn get_piece_length(dict : &HashMap<Vec<u8>, BValue>) -> Option<i32> {
+    fn get_piece_length(dict : &HashMap<Vec<u8>, BValue>) -> Result<i32, String> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"piece length".to_vec()) {
-                Some(BValue::Int(length)) => Some(*length),
-                _ => None
+                Some(BValue::Int(length)) => Ok(*length),
+                _ => Err(format!("asdf"))
             }
-            _ => None
+            _ => Err(format!("asdf"))
         }
     }
 
-    fn get_pieces(dict : &HashMap<Vec<u8>, BValue>) -> Option<Vec<Vec<u8>>> {
+    fn get_pieces(dict : &HashMap<Vec<u8>, BValue>) -> Result<Vec<Vec<u8>>, String> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"pieces".to_vec()) {
                 Some(BValue::ByteStr(pieces)) => {
                     if pieces.len() % 20 != 0 {
-                        return None
+                        return Err(format!("asdf"))
                     }
-                    None
+                    Err(format!("asdf"))
                 },
-                _ => None
+                _ => Err(format!("asdf"))
             }
-            _ => None
+            _ => Err(format!("asdf"))
         }
     }
 }
