@@ -95,13 +95,13 @@ impl Torrent {
             Some(BValue::Dict(info)) => match info.get(&b"pieces".to_vec()) {
                 Some(BValue::ByteStr(pieces)) => {
                     if pieces.len() % 20 != 0 {
-                        return Err(format!("asdf"))
+                        return Err(format!("'pieces' not divisible by 20"))
                     }
-                    Err(format!("asdf"))
+                    Ok(pieces.chunks(20).map(|chunk| chunk.to_vec()).collect())
                 },
-                _ => Err(format!("asdf"))
+                _ => Err(format!("Incorrect or missing 'pieces' value"))
             }
-            _ => Err(format!("asdf"))
+            _ => Err(format!("Incorrect or missing 'info/pieces' value"))
         }
     }
 }
@@ -127,8 +127,14 @@ mod tests {
     }
 
     #[test]
+    fn torrent_incorrect() {
+        assert_eq!(Torrent::from_bencode(b"i12e"),
+                   Err(String::from("Missing data")));
+    }
+
+    #[test]
     fn torrent_correct() {
-        assert_eq!(Torrent::from_bencode(b"d8:announce3:URL4:infod4:name4:NAME12:piece lengthi999eee"),
+        assert_eq!(Torrent::from_bencode(b"d8:announce3:URL4:infod4:name4:NAME12:piece lengthi999e6:pieces20:aaaaabbbbbcccccdddddee"),
                    Ok(Torrent {
                        announce: "URL".to_string(),
                        name : "NAME".to_string(),
