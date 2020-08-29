@@ -54,7 +54,7 @@ impl BValue {
             .collect();
         len_bytes.append(&mut rest_len_bytes);
 
-        if !len_bytes.iter().all(|b| (b'0'..b'9').contains(b)) {
+        if !len_bytes.iter().all(|b| (b'0'..=b'9').contains(b)) {
             return Err(format!("ByteStr [{}]: Incorrect character", pos));
         }
 
@@ -186,8 +186,8 @@ mod tests {
     #[test]
     fn byte_str() {
         assert_eq!(
-            BValue::parse(b"4:spam"),
-            Ok(vec![BValue::ByteStr(vec![b's', b'p', b'a', b'm'])])
+            BValue::parse(b"9:spamIsLoL"),
+            Ok(vec![BValue::ByteStr(vec![b's', b'p', b'a', b'm', b'I', b's', b'L', b'o', b'L'])])
         );
     }
 
