@@ -180,7 +180,9 @@ mod tests {
     fn byte_str() {
         assert_eq!(
             BValue::parse(b"9:spamIsLoL"),
-            Ok(vec![BValue::ByteStr(vec![b's', b'p', b'a', b'm', b'I', b's', b'L', b'o', b'L'])])
+            Ok(vec![BValue::ByteStr(vec![
+                b's', b'p', b'a', b'm', b'I', b's', b'L', b'o', b'L'
+            ])])
         );
     }
 
