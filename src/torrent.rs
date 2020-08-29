@@ -32,7 +32,7 @@ impl Torrent {
             return Err(format!("Empty torrent"));
         }
 
-        let mut err = Err(format!("aaa"));
+        let mut err = Err(format!("Missing data"));
         for val in bvalues {
             match val {
                 BValue::Dict(dict) => {
@@ -61,9 +61,9 @@ impl Torrent {
         match dict.get(&b"announce".to_vec()) {
             Some(BValue::ByteStr(val)) => match String::from_utf8(val.to_vec()) {
                 Ok(s) => Ok(s),
-                Err(_) => Err(format!("asdf"))
+                Err(_) => Err(format!("Can't convert 'announce' to UTF-8"))
             }
-            _ => Err(format!("asdf"))
+            _ => Err(format!("Incorrect or missing 'announce' value"))
         }
     }
 
@@ -72,11 +72,11 @@ impl Torrent {
             Some(BValue::Dict(info)) => match info.get(&b"name".to_vec()) {
                Some(BValue::ByteStr(val)) => match String::from_utf8(val.to_vec()) {
                     Ok(s) => Ok(s),
-                    Err(_) => Err(format!("asdf"))
+                    Err(_) => Err(format!("Can't convert 'name' to UTF-8"))
                 }
-                _ => Err(format!("asdf"))
+                _ => Err(format!("Incorrect or missing 'name' value"))
             }
-            _ => Err(format!("asdf"))
+            _ => Err(format!("Incorrect or missing 'info/name') value"))
         }
     }
 
@@ -84,9 +84,9 @@ impl Torrent {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"piece length".to_vec()) {
                 Some(BValue::Int(length)) => Ok(*length),
-                _ => Err(format!("asdf"))
+                _ => Err(format!("Incorrect or missing 'piece length' value"))
             }
-            _ => Err(format!("asdf"))
+            _ => Err(format!("Incorrect or missing 'info/piece length' value"))
         }
     }
 
@@ -121,9 +121,9 @@ mod tests {
     }
 
     #[test]
-    fn torrent_incorrect_announce() {
+    fn missing_announce() {
         assert_eq!(Torrent::from_bencode(b"d8:announcei1ee"),
-                   Err(String::from("Missing data")));
+                   Err(String::from("Incorrect or missing 'announce' value")));
     }
 
     #[test]
