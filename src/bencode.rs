@@ -111,7 +111,7 @@ impl BValue {
     ) -> Result<Vec<u8>, String> {
         it.take_while(|(_, &b)| b != b'e')
             .map(|(_, b)| {
-                if (b'0'..b'9').contains(b) || *b == b'-' {
+                if (b'0'..=b'9').contains(b) || *b == b'-' {
                     Ok(*b)
                 } else {
                     Err(format!("Int [{}]: Incorrect character", pos))
@@ -332,8 +332,8 @@ mod tests {
     #[test]
     fn list_of_ints() {
         assert_eq!(
-            BValue::parse(b"li1ei5ee"),
-            Ok(vec![BValue::List(vec![BValue::Int(1), BValue::Int(5)])])
+            BValue::parse(b"li1ei9ee"),
+            Ok(vec![BValue::List(vec![BValue::Int(1), BValue::Int(9)])])
         );
     }
 
