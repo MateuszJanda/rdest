@@ -103,7 +103,7 @@ impl BValue {
         num_str
             .parse::<i64>()
             .map(|num| BValue::Int(num))
-            .or(Err(format!("Int [{}]: Unable convert int", pos)))
+            .or(Err(format!("Int [{}]: Unable convert to int", pos)))
     }
 
     fn extract_int(
@@ -234,7 +234,7 @@ mod tests {
     fn int_missing_value() {
         assert_eq!(
             BValue::parse(b"ie"),
-            Err(String::from("Int [0]: Unable convert int"))
+            Err(String::from("Int [0]: Unable convert to int"))
         );
     }
 
@@ -242,7 +242,7 @@ mod tests {
     fn int_incorrect_format1() {
         assert_eq!(
             BValue::parse(b"i-e"),
-            Err(String::from("Int [0]: Unable convert int"))
+            Err(String::from("Int [0]: Unable convert to int"))
         );
     }
 
@@ -250,7 +250,7 @@ mod tests {
     fn int_incorrect_format2() {
         assert_eq!(
             BValue::parse(b"i--4e"),
-            Err(String::from("Int [0]: Unable convert int"))
+            Err(String::from("Int [0]: Unable convert to int"))
         );
     }
 
@@ -258,7 +258,7 @@ mod tests {
     fn int_incorrect_format3() {
         assert_eq!(
             BValue::parse(b"i-4-e"),
-            Err(String::from("Int [0]: Unable convert int"))
+            Err(String::from("Int [0]: Unable convert to int"))
         );
     }
 
