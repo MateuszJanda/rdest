@@ -75,7 +75,7 @@ impl Torrent {
                 },
                 _ => Err(format!("Incorrect or missing 'name' value")),
             },
-            _ => Err(format!("Incorrect or missing 'info/name') value")),
+            _ => Err(format!("Incorrect or missing 'info' value")),
         }
     }
 
@@ -85,7 +85,7 @@ impl Torrent {
                 Some(BValue::Int(length)) => Ok(*length),
                 _ => Err(format!("Incorrect or missing 'piece length' value")),
             },
-            _ => Err(format!("Incorrect or missing 'info/piece length' value")),
+            _ => Err(format!("Incorrect or missing 'info' value")),
         }
     }
 
@@ -100,7 +100,7 @@ impl Torrent {
                 }
                 _ => Err(format!("Incorrect or missing 'pieces' value")),
             },
-            _ => Err(format!("Incorrect or missing 'info/pieces' value")),
+            _ => Err(format!("Incorrect or missing 'info' value")),
         }
     }
 }
@@ -110,7 +110,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn get_announce_missing() {
+    fn get_announce_incorrect() {
         assert_eq!(
             Torrent::get_announce(&hashmap![b"announce".to_vec() => BValue::Int(5)]),
             Err(String::from("Incorrect or missing 'announce' value"))
@@ -121,14 +121,62 @@ mod tests {
     fn get_announce_ok() {
         assert_eq!(
             Torrent::get_announce(
-                &hashmap![b"announce".to_vec() => BValue::ByteStr(b"asdf".to_vec())]
+                &hashmap![b"announce".to_vec() => BValue::ByteStr(b"ANN".to_vec())]
             ),
-            Ok(format!("asdf"))
+            Ok(format!("ANN"))
         );
     }
 
     #[test]
-    fn empty_input() {
+    fn get_name_incorrect() {
+        assert_eq!(
+            Torrent::get_name(&hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"name".to_vec() => BValue::Int(12)])]),
+            Err(String::from("Incorrect or missing 'name' value"))
+        );
+    }
+
+    #[test]
+    fn get_name_incorrect_info() {
+        assert_eq!(
+            Torrent::get_name(&hashmap![b"info".to_vec() => BValue::Int(12)]),
+            Err(String::from("Incorrect or missing 'info' value"))
+        );
+    }
+
+    #[test]
+    fn get_name_ok() {
+        assert_eq!(
+            Torrent::get_name(&hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"name".to_vec() => BValue::ByteStr(b"INFO".to_vec())])]),
+            Ok(format!("INFO"))
+        );
+    }
+
+    #[test]
+    fn get_piece_length_incorrect() {
+        assert_eq!(
+            Torrent::get_piece_length(&hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"piece length".to_vec() => BValue::ByteStr(b"BAD".to_vec())])]),
+            Err(String::from("Incorrect or missing 'piece length' value"))
+        );
+    }
+
+    #[test]
+    fn get_piece_length_incorrect_info() {
+        assert_eq!(
+            Torrent::get_piece_length(&hashmap![b"info".to_vec() => BValue::Int(12)]),
+            Err(String::from("Incorrect or missing 'info' value"))
+        );
+    }
+
+    #[test]
+    fn get_piece_length_ok() {
+        assert_eq!(
+            Torrent::get_piece_length(&hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"piece length".to_vec() => BValue::Int(12)])]),
+            Ok(12)
+        );
+    }
+
+    #[test]
+    fn empty_input_incorrect() {
         assert_eq!(
             Torrent::from_bencode(b""),
             Err(String::from("Empty torrent"))
