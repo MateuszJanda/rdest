@@ -95,16 +95,15 @@ impl BValue {
             Ok(v) => v,
             Err(_) => return Err(format!("Int [{}]: Unable convert to string", pos)),
         };
-        let num: i64 = match num_str.parse() {
-            Ok(v) => v,
-            Err(_) => return Err(format!("Int [{}]: Unable convert int", pos)),
-        };
 
         if num_str.len() >= 2 && num_str.starts_with("0") || num_str.starts_with("-0") {
             return Err(format!("Int [{}]: Leading zero", pos));
         }
 
-        return Ok(BValue::Int(num));
+        num_str
+            .parse::<i64>()
+            .map(|num| BValue::Int(num))
+            .or(Err(format!("Int [{}]: Unable convert int", pos)))
     }
 
     fn extract_int(
