@@ -10,21 +10,13 @@ pub struct Torrent {
     piece_length: u64,
     pieces: Vec<Vec<u8>>,
     length: Option<u64>,
-}
-
-#[derive(PartialEq, Clone, Debug)]
-pub struct Info {
-    name: String,
-    piece_length: i32,
-    pieces: String,
-    length: Option<i32>,
     files: Option<Vec<File>>,
 }
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct File {
-    length: i32,
-    path: Vec<String>,
+    length: u64,
+    path: String,
 }
 
 impl Torrent {
@@ -56,6 +48,7 @@ impl Torrent {
             piece_length: Self::get_piece_length(dict)?,
             pieces: Self::get_pieces(dict)?,
             length: Self::get_length(dict),
+            files: Self::get_files(dict),
         })
     }
 
@@ -113,6 +106,38 @@ impl Torrent {
             },
             _ => None,
         }
+    }
+
+    fn get_files(dict: &HashMap<Vec<u8>, BValue>) -> Option<Vec<File>> {
+        match dict.get(&b"info".to_vec()) {
+            Some(BValue::Dict(info)) => match info.get(&b"files".to_vec()) {
+                Some(BValue::List(list)) => Some(Self::get_files_list(list)),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    fn get_files_list(list: &Vec<BValue>) -> Vec<File> {
+        let mut res = vec![];
+        for elem in list {
+            match elem {
+                BValue::Dict(dict) => {
+                    match (dict.get(&b"length".to_vec()), dict.get(&b"path".to_vec())) {
+                        (Some(BValue::Int(length)), Some(BValue::ByteStr(path))) => {
+                            match (u64::try_from(*length), String::from_utf8(path.to_vec())) {
+                                (Ok(l), Ok(p)) => res.push(File { length: l, path: p }),
+                                _ => (),
+                            }
+                        }
+                        _ => (),
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        return res;
     }
 }
 
@@ -325,6 +350,7 @@ mod tests {
                 piece_length : 999,
                 pieces : vec![b"aaaaabbbbbcccccddddd".to_vec()],
                 length : None,
+                files: None,
             }));
     }
 }
