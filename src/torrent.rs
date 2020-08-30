@@ -410,6 +410,58 @@ mod tests {
     }
 
     #[test]
+    fn length_only() {
+        let torrent = Torrent {
+            announce: "URL".to_string(),
+            name : "NAME".to_string(),
+            piece_length : 999,
+            pieces : vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
+            length : Some(111),
+            files: None,
+        };
+        assert_eq!(torrent.is_valid(), true);
+    }
+
+    #[test]
+    fn missing_length_and_files() {
+        let torrent = Torrent {
+            announce: "URL".to_string(),
+            name : "NAME".to_string(),
+            piece_length : 999,
+            pieces : vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
+            length : None,
+            files: None,
+        };
+        assert_eq!(torrent.is_valid(), false);
+    }
+
+    #[test]
+    fn files_only() {
+        let torrent = Torrent {
+            announce: "URL".to_string(),
+            name : "NAME".to_string(),
+            piece_length : 999,
+            pieces : vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
+            length : None,
+            files: Some(vec![]),
+        };
+        assert_eq!(torrent.is_valid(), true);
+    }
+
+    #[test]
+    fn both_length_and_files() {
+        let torrent = Torrent {
+            announce: "URL".to_string(),
+            name : "NAME".to_string(),
+            piece_length : 999,
+            pieces : vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
+            length : Some(111),
+            files: Some(vec![]),
+        };
+        assert_eq!(torrent.is_valid(), false);
+    }
+
+    #[test]
     fn empty_input_incorrect() {
         assert_eq!(
             Torrent::from_bencode(b""),
@@ -438,6 +490,14 @@ mod tests {
         assert_eq!(
             Torrent::from_bencode(b"i12e"),
             Err(String::from("Missing data"))
+        );
+    }
+
+    #[test]
+    fn torrent_missing_length_and_files() {
+        assert_eq!(
+            Torrent::from_bencode(b"d8:announce3:URL4:infod4:name4:NAME12:piece lengthi999e6:pieces20:AAAAABBBBBCCCCCDDDDDee"),
+            Err(String::from("Conflicting values 'length' and 'files'. Only one is allowed"))
         );
     }
 
