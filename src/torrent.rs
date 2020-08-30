@@ -309,6 +309,89 @@ mod tests {
     }
 
     #[test]
+    fn get_files_incorrect() {
+        assert_eq!(
+            Torrent::get_files(
+                &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"files".to_vec() => BValue::ByteStr(b"BAD".to_vec())])]
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn get_files_empty_list() {
+        assert_eq!(
+            Torrent::get_files(
+                &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"files".to_vec() => BValue::List(vec![])])]
+            ),
+            Some(vec![])
+        );
+    }
+
+    #[test]
+    fn get_files_invalid_dict() {
+        assert_eq!(
+            Torrent::get_files(&hashmap![b"info".to_vec() =>
+                BValue::Dict(hashmap![b"files".to_vec() =>
+                    BValue::List(vec![
+                        BValue::Dict(hashmap![b"a".to_vec() => BValue::Int(12),
+                                              b"b".to_vec() => BValue::ByteStr(b"PATH".to_vec())])
+                    ])
+                ])
+            ]),
+            Some(vec![])
+        );
+    }
+
+    #[test]
+    fn get_files_invalid_dict_length() {
+        assert_eq!(
+            Torrent::get_files(&hashmap![b"info".to_vec() =>
+                BValue::Dict(hashmap![b"files".to_vec() =>
+                    BValue::List(vec![
+                        BValue::Dict(hashmap![b"length".to_vec() => BValue::Int(-12),
+                                              b"path".to_vec() => BValue::ByteStr(b"PATH".to_vec())])
+                    ])
+                ])
+            ]),
+            Some(vec![])
+        );
+    }
+
+    #[test]
+    fn get_files_invalid_dict_path() {
+        assert_eq!(
+            Torrent::get_files(&hashmap![b"info".to_vec() =>
+                BValue::Dict(hashmap![b"files".to_vec() =>
+                    BValue::List(vec![
+                        BValue::Dict(hashmap![b"length".to_vec() => BValue::Int(1),
+                                              b"path".to_vec() => BValue::Int(2)])
+                    ])
+                ])
+            ]),
+            Some(vec![])
+        );
+    }
+
+    #[test]
+    fn get_files_valid_and_invalid_dict() {
+        assert_eq!(
+            Torrent::get_files(&hashmap![b"info".to_vec() =>
+                BValue::Dict(hashmap![b"files".to_vec() =>
+                    BValue::List(vec![
+                        BValue::Dict(hashmap![b"length".to_vec() => BValue::Int(1),
+                                              b"path".to_vec() => BValue::Int(2)]),
+                        BValue::Dict(hashmap![b"length".to_vec() => BValue::Int(12),
+                                              b"path".to_vec() => BValue::ByteStr(b"PATH".to_vec())]),
+                    ])
+                ])
+            ]),
+            Some(vec![File{length: 12, path: format!("PATH")}])
+        );
+    }
+
+
+    #[test]
     fn empty_input_incorrect() {
         assert_eq!(
             Torrent::from_bencode(b""),
