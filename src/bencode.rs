@@ -6,7 +6,7 @@ type Key = Vec<u8>;
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum BValue {
-    Int(i32),
+    Int(i64),
     ByteStr(Vec<u8>),
     List(Vec<BValue>),
     Dict(HashMap<Key, BValue>),
@@ -95,7 +95,7 @@ impl BValue {
             Ok(v) => v,
             Err(_) => return Err(format!("Int [{}]: Unable convert to string", pos)),
         };
-        let num: i32 = match num_str.parse() {
+        let num: i64 = match num_str.parse() {
             Ok(v) => v,
             Err(_) => return Err(format!("Int [{}]: Unable convert int", pos)),
         };
@@ -302,11 +302,10 @@ mod tests {
         assert_eq!(BValue::parse(b"i-4e"), Ok(vec![BValue::Int(-4)]));
     }
 
-    // TODO: bit int support needed
-    //    #[test]
-    //    fn int_above_i32() {
-    //        assert_eq!(BValue::parse(b"i2147483648e"), Ok(vec![BValue::Int(2147483648)]));
-    //    }
+   #[test]
+   fn int_above_u32() {
+       assert_eq!(BValue::parse(b"i4294967297e"), Ok(vec![BValue::Int(4294967297)]));
+   }
 
     // TODO: bit int support needed
     //    fn int_above_i64() {

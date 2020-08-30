@@ -6,8 +6,9 @@ use std::collections::HashMap;
 pub struct Torrent {
     announce: String,
     name: String,
-    piece_length: i32,
+    piece_length: i64,
     pieces: Vec<Vec<u8>>,
+    // length: Option<i64>,
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -79,7 +80,7 @@ impl Torrent {
         }
     }
 
-    fn get_piece_length(dict: &HashMap<Vec<u8>, BValue>) -> Result<i32, String> {
+    fn get_piece_length(dict: &HashMap<Vec<u8>, BValue>) -> Result<i64, String> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"piece length".to_vec()) {
                 Some(BValue::Int(length)) => Ok(*length),
