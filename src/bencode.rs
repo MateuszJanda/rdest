@@ -202,7 +202,7 @@ mod tests {
     }
 
     #[test]
-    fn byte_str_not_nough_characters() {
+    fn byte_str_not_enough_characters() {
         assert_eq!(
             BValue::parse(b"4:spa"),
             Err(String::from("ByteStr [0]: Not enough characters"))
