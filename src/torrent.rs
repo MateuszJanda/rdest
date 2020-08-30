@@ -42,14 +42,20 @@ impl Torrent {
     }
 
     fn create_torrent(dict: &HashMap<Vec<u8>, BValue>) -> Result<Torrent, String> {
-        Ok(Torrent {
+        let torrent = Torrent {
             announce: Self::get_announce(dict)?,
             name: Self::get_name(dict)?,
             piece_length: Self::get_piece_length(dict)?,
             pieces: Self::get_pieces(dict)?,
             length: Self::get_length(dict),
             files: Self::get_files(dict),
-        })
+        };
+
+        if !torrent.is_valid() {
+            return Err(format!("Conflicting values 'length' and 'files'. Only one is allowed"))
+        }
+
+        Ok(torrent)
     }
 
     fn get_announce(dict: &HashMap<Vec<u8>, BValue>) -> Result<String, String> {
@@ -138,6 +144,16 @@ impl Torrent {
         }
 
         return res;
+    }
+
+    fn is_valid(&self) -> bool {
+        if self.length.is_some() && self.files.is_some() {
+            return false;
+        } else if self.length.is_none() && self.files.is_none() {
+            return false;
+        }
+
+        return true;
     }
 }
 
@@ -386,10 +402,12 @@ mod tests {
                     ])
                 ])
             ]),
-            Some(vec![File{length: 12, path: format!("PATH")}])
+            Some(vec![File {
+                length: 12,
+                path: format!("PATH")
+            }])
         );
     }
-
 
     #[test]
     fn empty_input_incorrect() {
@@ -426,13 +444,13 @@ mod tests {
     #[test]
     fn torrent_correct() {
         assert_eq!(
-            Torrent::from_bencode(b"d8:announce3:URL4:infod4:name4:NAME12:piece lengthi999e6:pieces20:aaaaabbbbbcccccdddddee"),
+            Torrent::from_bencode(b"d8:announce3:URL4:infod4:name4:NAME12:piece lengthi999e6:pieces20:AAAAABBBBBCCCCCDDDDD6:lengthi111eee"),
             Ok(Torrent {
                 announce: "URL".to_string(),
                 name : "NAME".to_string(),
                 piece_length : 999,
-                pieces : vec![b"aaaaabbbbbcccccddddd".to_vec()],
-                length : None,
+                pieces : vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
+                length : Some(111),
                 files: None,
             }));
     }
