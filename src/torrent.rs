@@ -176,6 +176,38 @@ mod tests {
     }
 
     #[test]
+    fn get_pieces_incorrect() {
+        assert_eq!(
+            Torrent::get_pieces(&hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"pieces".to_vec() => BValue::Int(12)])]),
+            Err(String::from("Incorrect or missing 'pieces' value"))
+        );
+    }
+
+    #[test]
+    fn get_pieces_not_divisible() {
+        assert_eq!(
+            Torrent::get_pieces(&hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"pieces".to_vec() => BValue::ByteStr(b"aaa".to_vec())])]),
+            Err(String::from("'pieces' not divisible by 20"))
+        );
+    }
+
+    #[test]
+    fn get_pieces_incorrect_info() {
+        assert_eq!(
+            Torrent::get_pieces(&hashmap![b"info".to_vec() => BValue::Int(12)]),
+            Err(String::from("Incorrect or missing 'info' value"))
+        );
+    }
+
+    #[test]
+    fn get_pieces_ok() {
+        assert_eq!(
+            Torrent::get_pieces(&hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"pieces".to_vec() => BValue::ByteStr(b"aaaaabbbbbcccccdddddAAAAABBBBBCCCCCDDDDD".to_vec())])]),
+            Ok(vec![b"aaaaabbbbbcccccddddd".to_vec(), b"AAAAABBBBBCCCCCDDDDD".to_vec()])
+        );
+    }
+
+    #[test]
     fn empty_input_incorrect() {
         assert_eq!(
             Torrent::from_bencode(b""),
