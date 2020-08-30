@@ -130,7 +130,9 @@ mod tests {
     #[test]
     fn get_name_incorrect() {
         assert_eq!(
-            Torrent::get_name(&hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"name".to_vec() => BValue::Int(12)])]),
+            Torrent::get_name(
+                &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"name".to_vec() => BValue::Int(12)])]
+            ),
             Err(String::from("Incorrect or missing 'name' value"))
         );
     }
@@ -146,7 +148,9 @@ mod tests {
     #[test]
     fn get_name_ok() {
         assert_eq!(
-            Torrent::get_name(&hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"name".to_vec() => BValue::ByteStr(b"INFO".to_vec())])]),
+            Torrent::get_name(
+                &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"name".to_vec() => BValue::ByteStr(b"INFO".to_vec())])]
+            ),
             Ok(format!("INFO"))
         );
     }
@@ -154,7 +158,9 @@ mod tests {
     #[test]
     fn get_piece_length_incorrect() {
         assert_eq!(
-            Torrent::get_piece_length(&hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"piece length".to_vec() => BValue::ByteStr(b"BAD".to_vec())])]),
+            Torrent::get_piece_length(
+                &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"piece length".to_vec() => BValue::ByteStr(b"BAD".to_vec())])]
+            ),
             Err(String::from("Incorrect or missing 'piece length' value"))
         );
     }
@@ -170,7 +176,9 @@ mod tests {
     #[test]
     fn get_piece_length_ok() {
         assert_eq!(
-            Torrent::get_piece_length(&hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"piece length".to_vec() => BValue::Int(12)])]),
+            Torrent::get_piece_length(
+                &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"piece length".to_vec() => BValue::Int(12)])]
+            ),
             Ok(12)
         );
     }
@@ -178,7 +186,9 @@ mod tests {
     #[test]
     fn get_pieces_incorrect() {
         assert_eq!(
-            Torrent::get_pieces(&hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"pieces".to_vec() => BValue::Int(12)])]),
+            Torrent::get_pieces(
+                &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"pieces".to_vec() => BValue::Int(12)])]
+            ),
             Err(String::from("Incorrect or missing 'pieces' value"))
         );
     }
@@ -186,7 +196,9 @@ mod tests {
     #[test]
     fn get_pieces_not_divisible() {
         assert_eq!(
-            Torrent::get_pieces(&hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"pieces".to_vec() => BValue::ByteStr(b"aaa".to_vec())])]),
+            Torrent::get_pieces(
+                &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"pieces".to_vec() => BValue::ByteStr(b"aaa".to_vec())])]
+            ),
             Err(String::from("'pieces' not divisible by 20"))
         );
     }
@@ -202,8 +214,13 @@ mod tests {
     #[test]
     fn get_pieces_ok() {
         assert_eq!(
-            Torrent::get_pieces(&hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"pieces".to_vec() => BValue::ByteStr(b"aaaaabbbbbcccccdddddAAAAABBBBBCCCCCDDDDD".to_vec())])]),
-            Ok(vec![b"aaaaabbbbbcccccddddd".to_vec(), b"AAAAABBBBBCCCCCDDDDD".to_vec()])
+            Torrent::get_pieces(
+                &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"pieces".to_vec() => BValue::ByteStr(b"aaaaabbbbbcccccdddddAAAAABBBBBCCCCCDDDDD".to_vec())])]
+            ),
+            Ok(vec![
+                b"aaaaabbbbbcccccddddd".to_vec(),
+                b"AAAAABBBBBCCCCCDDDDD".to_vec()
+            ])
         );
     }
 
