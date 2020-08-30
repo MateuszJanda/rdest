@@ -1,12 +1,13 @@
 use super::hashmap;
 use crate::BValue;
 use std::collections::HashMap;
+use std::convert::TryFrom;
 
 #[derive(PartialEq, Debug)]
 pub struct Torrent {
     announce: String,
     name: String,
-    piece_length: i64,
+    piece_length: u64,
     pieces: Vec<Vec<u8>>,
     // length: Option<i64>,
 }
@@ -76,10 +77,12 @@ impl Torrent {
         }
     }
 
-    fn get_piece_length(dict: &HashMap<Vec<u8>, BValue>) -> Result<i64, String> {
+    fn get_piece_length(dict: &HashMap<Vec<u8>, BValue>) -> Result<u64, String> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"piece length".to_vec()) {
-                Some(BValue::Int(length)) => Ok(*length),
+                Some(BValue::Int(length)) => {
+                    u64::try_from(*length).or(Err(format!("Can't convert 'piece length' to u64")))
+                }
                 _ => Err(format!("Incorrect or missing 'piece length' value")),
             },
             _ => Err(format!("Incorrect or missing 'info' value")),
@@ -159,6 +162,16 @@ mod tests {
                 &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"piece length".to_vec() => BValue::ByteStr(b"BAD".to_vec())])]
             ),
             Err(String::from("Incorrect or missing 'piece length' value"))
+        );
+    }
+
+    #[test]
+    fn get_piece_length_negative() {
+        assert_eq!(
+            Torrent::get_piece_length(
+                &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"piece length".to_vec() => BValue::Int(-12)])]
+            ),
+            Err(String::from("Can't convert 'piece length' to u64"))
         );
     }
 
