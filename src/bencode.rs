@@ -302,10 +302,13 @@ mod tests {
         assert_eq!(BValue::parse(b"i-4e"), Ok(vec![BValue::Int(-4)]));
     }
 
-   #[test]
-   fn int_above_u32() {
-       assert_eq!(BValue::parse(b"i4294967297e"), Ok(vec![BValue::Int(4294967297)]));
-   }
+    #[test]
+    fn int_above_u32() {
+        assert_eq!(
+            BValue::parse(b"i4294967297e"),
+            Ok(vec![BValue::Int(4294967297)])
+        );
+    }
 
     // TODO: bit int support needed
     //    fn int_above_i64() {

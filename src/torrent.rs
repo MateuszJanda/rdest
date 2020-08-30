@@ -59,10 +59,8 @@ impl Torrent {
 
     fn get_announce(dict: &HashMap<Vec<u8>, BValue>) -> Result<String, String> {
         match dict.get(&b"announce".to_vec()) {
-            Some(BValue::ByteStr(val)) => match String::from_utf8(val.to_vec()) {
-                Ok(s) => Ok(s),
-                Err(_) => Err(format!("Can't convert 'announce' to UTF-8")),
-            },
+            Some(BValue::ByteStr(val)) => String::from_utf8(val.to_vec())
+                .or(Err(format!("Can't convert 'announce' to UTF-8"))),
             _ => Err(format!("Incorrect or missing 'announce' value")),
         }
     }
@@ -70,10 +68,8 @@ impl Torrent {
     fn get_name(dict: &HashMap<Vec<u8>, BValue>) -> Result<String, String> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"name".to_vec()) {
-                Some(BValue::ByteStr(val)) => match String::from_utf8(val.to_vec()) {
-                    Ok(s) => Ok(s),
-                    Err(_) => Err(format!("Can't convert 'name' to UTF-8")),
-                },
+                Some(BValue::ByteStr(val)) => String::from_utf8(val.to_vec())
+                    .or(Err(format!("Can't convert 'name' to UTF-8"))),
                 _ => Err(format!("Incorrect or missing 'name' value")),
             },
             _ => Err(format!("Incorrect or missing 'info' value")),
