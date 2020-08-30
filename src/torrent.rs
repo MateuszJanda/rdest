@@ -9,7 +9,7 @@ pub struct Torrent {
     name: String,
     piece_length: u64,
     pieces: Vec<Vec<u8>>,
-    // length: Option<i64>,
+    length: Option<u64>,
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -55,6 +55,7 @@ impl Torrent {
             name: Self::get_name(dict)?,
             piece_length: Self::get_piece_length(dict)?,
             pieces: Self::get_pieces(dict)?,
+            length: Self::get_length(dict),
         })
     }
 
@@ -101,6 +102,16 @@ impl Torrent {
                 _ => Err(format!("Incorrect or missing 'pieces' value")),
             },
             _ => Err(format!("Incorrect or missing 'info' value")),
+        }
+    }
+
+    fn get_length(dict: &HashMap<Vec<u8>, BValue>) -> Option<u64> {
+        match dict.get(&b"info".to_vec()) {
+            Some(BValue::Dict(info)) => match info.get(&b"length".to_vec()) {
+                Some(BValue::Int(length)) => u64::try_from(*length).ok(),
+                _ => None,
+            },
+            _ => None,
         }
     }
 }
@@ -235,6 +246,44 @@ mod tests {
     }
 
     #[test]
+    fn get_length_incorrect() {
+        assert_eq!(
+            Torrent::get_length(
+                &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"length".to_vec() => BValue::ByteStr(b"BAD".to_vec())])]
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn get_length_negative() {
+        assert_eq!(
+            Torrent::get_length(
+                &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"length".to_vec() => BValue::Int(-12)])]
+            ),
+            None
+        );
+    }
+
+    #[test]
+    fn get_length_incorrect_info() {
+        assert_eq!(
+            Torrent::get_length(&hashmap![b"info".to_vec() => BValue::Int(12)]),
+            None
+        );
+    }
+
+    #[test]
+    fn get_length_ok() {
+        assert_eq!(
+            Torrent::get_length(
+                &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"length".to_vec() => BValue::Int(12)])]
+            ),
+            Some(12)
+        );
+    }
+
+    #[test]
     fn empty_input_incorrect() {
         assert_eq!(
             Torrent::from_bencode(b""),
@@ -271,10 +320,11 @@ mod tests {
         assert_eq!(
             Torrent::from_bencode(b"d8:announce3:URL4:infod4:name4:NAME12:piece lengthi999e6:pieces20:aaaaabbbbbcccccdddddee"),
             Ok(Torrent {
-               announce: "URL".to_string(),
-               name : "NAME".to_string(),
-               piece_length : 999,
-               pieces : vec![b"aaaaabbbbbcccccddddd".to_vec()],
+                announce: "URL".to_string(),
+                name : "NAME".to_string(),
+                piece_length : 999,
+                pieces : vec![b"aaaaabbbbbcccccddddd".to_vec()],
+                length : None,
             }));
     }
 }
