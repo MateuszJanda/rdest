@@ -1,3 +1,4 @@
+use std::fs;
 use super::hashmap;
 use crate::BValue;
 use std::collections::HashMap;
@@ -20,6 +21,13 @@ pub struct File {
 }
 
 impl Torrent {
+    pub fn from_file(path: String) -> Result<Torrent, String> {
+        match &fs::read(path) {
+            Ok(val) => Self::from_bencode(val),
+            Err(_) => Err(format!("File not found"))
+        }
+    }
+
     pub fn from_bencode(arg: &[u8]) -> Result<Torrent, String> {
         let bvalues = BValue::parse(arg)?;
 
