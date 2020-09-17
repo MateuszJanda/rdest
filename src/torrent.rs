@@ -1,4 +1,5 @@
 use std::fs;
+#[cfg(test)]
 use super::hashmap;
 use crate::BValue;
 use std::collections::HashMap;

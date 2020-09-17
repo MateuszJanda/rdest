@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-// #[allow(unused_imports)]
+#[cfg(test)]
 use super::hashmap;
 
 type Key = Vec<u8>;
