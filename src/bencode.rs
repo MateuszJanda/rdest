@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 #[cfg(test)]
 use super::hashmap;
+use std::collections::HashMap;
 
 type Key = Vec<u8>;
 

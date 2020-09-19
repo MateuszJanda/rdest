@@ -1,9 +1,9 @@
-use std::fs;
 #[cfg(test)]
 use super::hashmap;
 use crate::BValue;
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::fs;
 
 #[derive(PartialEq, Debug)]
 pub struct Torrent {
@@ -25,7 +25,7 @@ impl Torrent {
     pub fn from_file(path: String) -> Result<Torrent, String> {
         match &fs::read(path) {
             Ok(val) => Self::from_bencode(val),
-            Err(_) => Err(format!("File not found"))
+            Err(_) => Err(format!("File not found")),
         }
     }
 
@@ -61,7 +61,9 @@ impl Torrent {
         };
 
         if !torrent.is_valid() {
-            return Err(format!("Conflicting values 'length' and 'files'. Only one is allowed"))
+            return Err(format!(
+                "Conflicting values 'length' and 'files'. Only one is allowed"
+            ));
         }
 
         Ok(torrent)
@@ -134,25 +136,26 @@ impl Torrent {
     }
 
     fn get_files_list(list: &Vec<BValue>) -> Vec<File> {
-        let mut res = vec![];
-        for elem in list {
-            match elem {
-                BValue::Dict(dict) => {
-                    match (dict.get(&b"length".to_vec()), dict.get(&b"path".to_vec())) {
-                        (Some(BValue::Int(length)), Some(BValue::ByteStr(path))) => {
-                            match (u64::try_from(*length), String::from_utf8(path.to_vec())) {
-                                (Ok(l), Ok(p)) => res.push(File { length: l, path: p }),
-                                _ => (),
-                            }
-                        }
-                        _ => (),
+        list.iter()
+            .filter_map(|elem| match elem {
+                BValue::Dict(dict) => Some(dict),
+                _ => None,
+            })
+            .filter_map(
+                |dict| match (dict.get(&b"length".to_vec()), dict.get(&b"path".to_vec())) {
+                    (Some(BValue::Int(length)), Some(BValue::ByteStr(path))) => {
+                        Some((length, path))
                     }
+                    _ => None,
+                },
+            )
+            .filter_map(|(length, path)| {
+                match (u64::try_from(*length), String::from_utf8(path.to_vec())) {
+                    (Ok(l), Ok(p)) => Some(File { length: l, path: p }),
+                    _ => None,
                 }
-                _ => (),
-            }
-        }
-
-        return res;
+            })
+            .collect()
     }
 
     fn is_valid(&self) -> bool {
@@ -422,10 +425,10 @@ mod tests {
     fn length_only() {
         let torrent = Torrent {
             announce: "URL".to_string(),
-            name : "NAME".to_string(),
-            piece_length : 999,
-            pieces : vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
-            length : Some(111),
+            name: "NAME".to_string(),
+            piece_length: 999,
+            pieces: vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
+            length: Some(111),
             files: None,
         };
         assert_eq!(torrent.is_valid(), true);
@@ -435,10 +438,10 @@ mod tests {
     fn missing_length_and_files() {
         let torrent = Torrent {
             announce: "URL".to_string(),
-            name : "NAME".to_string(),
-            piece_length : 999,
-            pieces : vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
-            length : None,
+            name: "NAME".to_string(),
+            piece_length: 999,
+            pieces: vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
+            length: None,
             files: None,
         };
         assert_eq!(torrent.is_valid(), false);
@@ -448,10 +451,10 @@ mod tests {
     fn files_only() {
         let torrent = Torrent {
             announce: "URL".to_string(),
-            name : "NAME".to_string(),
-            piece_length : 999,
-            pieces : vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
-            length : None,
+            name: "NAME".to_string(),
+            piece_length: 999,
+            pieces: vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
+            length: None,
             files: Some(vec![]),
         };
         assert_eq!(torrent.is_valid(), true);
@@ -461,10 +464,10 @@ mod tests {
     fn both_length_and_files() {
         let torrent = Torrent {
             announce: "URL".to_string(),
-            name : "NAME".to_string(),
-            piece_length : 999,
-            pieces : vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
-            length : Some(111),
+            name: "NAME".to_string(),
+            piece_length: 999,
+            pieces: vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
+            length: Some(111),
             files: Some(vec![]),
         };
         assert_eq!(torrent.is_valid(), false);

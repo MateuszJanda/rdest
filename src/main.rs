@@ -10,13 +10,12 @@ fn main() {
     // get_http().await;
     match get_http() {
         Ok(_) => println!("Http Ok"),
-        _ => println!("Http Problem")
+        _ => println!("Http Problem"),
     }
 }
 
 // async fn get_http() -> Result<(), reqwest::Error> {
 fn get_http() -> Result<(), reqwest::Error> {
-
     // netcat -l 127.0.0.1 8080
     // let body = reqwest::get("http://127.0.0.1:8080")
     //     .await?
