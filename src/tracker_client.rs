@@ -12,7 +12,13 @@ impl TrackerClient {
         //     .text()
         //     .await?;
 
-        let body = reqwest::blocking::get("http://127.0.0.1:8080")?.text();
+        let params = [("info_hash", "")];
+        let client = reqwest::blocking::Client::new();
+        let body = client
+            .get("http://127.0.0.1:8080")
+            .form(&params)
+            .send()?
+            .text();
         println!("body = {:?}", body);
 
         Ok(())
