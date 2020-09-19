@@ -52,12 +52,12 @@ impl Torrent {
 
     fn create_torrent(dict: &HashMap<Vec<u8>, BValue>) -> Result<Torrent, String> {
         let torrent = Torrent {
-            announce: Self::get_announce(dict)?,
-            name: Self::get_name(dict)?,
-            piece_length: Self::get_piece_length(dict)?,
-            pieces: Self::get_pieces(dict)?,
-            length: Self::get_length(dict),
-            files: Self::get_files(dict),
+            announce: Self::find_announce(dict)?,
+            name: Self::find_name(dict)?,
+            piece_length: Self::find_piece_length(dict)?,
+            pieces: Self::find_pieces(dict)?,
+            length: Self::find_length(dict),
+            files: Self::find_files(dict),
         };
 
         if !torrent.is_valid() {
@@ -69,7 +69,7 @@ impl Torrent {
         Ok(torrent)
     }
 
-    fn get_announce(dict: &HashMap<Vec<u8>, BValue>) -> Result<String, String> {
+    fn find_announce(dict: &HashMap<Vec<u8>, BValue>) -> Result<String, String> {
         match dict.get(&b"announce".to_vec()) {
             Some(BValue::ByteStr(val)) => String::from_utf8(val.to_vec())
                 .or(Err(format!("Can't convert 'announce' to UTF-8"))),
@@ -77,7 +77,7 @@ impl Torrent {
         }
     }
 
-    fn get_name(dict: &HashMap<Vec<u8>, BValue>) -> Result<String, String> {
+    fn find_name(dict: &HashMap<Vec<u8>, BValue>) -> Result<String, String> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"name".to_vec()) {
                 Some(BValue::ByteStr(val)) => String::from_utf8(val.to_vec())
@@ -88,7 +88,7 @@ impl Torrent {
         }
     }
 
-    fn get_piece_length(dict: &HashMap<Vec<u8>, BValue>) -> Result<u64, String> {
+    fn find_piece_length(dict: &HashMap<Vec<u8>, BValue>) -> Result<u64, String> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"piece length".to_vec()) {
                 Some(BValue::Int(length)) => {
@@ -100,7 +100,7 @@ impl Torrent {
         }
     }
 
-    fn get_pieces(dict: &HashMap<Vec<u8>, BValue>) -> Result<Vec<Vec<u8>>, String> {
+    fn find_pieces(dict: &HashMap<Vec<u8>, BValue>) -> Result<Vec<Vec<u8>>, String> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"pieces".to_vec()) {
                 Some(BValue::ByteStr(pieces)) => {
@@ -115,7 +115,7 @@ impl Torrent {
         }
     }
 
-    fn get_length(dict: &HashMap<Vec<u8>, BValue>) -> Option<u64> {
+    fn find_length(dict: &HashMap<Vec<u8>, BValue>) -> Option<u64> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"length".to_vec()) {
                 Some(BValue::Int(length)) => u64::try_from(*length).ok(),
@@ -125,17 +125,17 @@ impl Torrent {
         }
     }
 
-    fn get_files(dict: &HashMap<Vec<u8>, BValue>) -> Option<Vec<File>> {
+    fn find_files(dict: &HashMap<Vec<u8>, BValue>) -> Option<Vec<File>> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"files".to_vec()) {
-                Some(BValue::List(list)) => Some(Self::get_files_list(list)),
+                Some(BValue::List(list)) => Some(Self::find_files_list(list)),
                 _ => None,
             },
             _ => None,
         }
     }
 
-    fn get_files_list(list: &Vec<BValue>) -> Vec<File> {
+    fn find_files_list(list: &Vec<BValue>) -> Vec<File> {
         list.iter()
             .filter_map(|elem| match elem {
                 BValue::Dict(dict) => Some(dict),
@@ -174,17 +174,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn get_announce_incorrect() {
+    fn find_announce_incorrect() {
         assert_eq!(
-            Torrent::get_announce(&hashmap![b"announce".to_vec() => BValue::Int(5)]),
+            Torrent::find_announce(&hashmap![b"announce".to_vec() => BValue::Int(5)]),
             Err(String::from("Incorrect or missing 'announce' value"))
         );
     }
 
     #[test]
-    fn get_announce_ok() {
+    fn find_announce_ok() {
         assert_eq!(
-            Torrent::get_announce(
+            Torrent::find_announce(
                 &hashmap![b"announce".to_vec() => BValue::ByteStr(b"ANN".to_vec())]
             ),
             Ok(format!("ANN"))
@@ -192,9 +192,9 @@ mod tests {
     }
 
     #[test]
-    fn get_name_incorrect() {
+    fn find_name_incorrect() {
         assert_eq!(
-            Torrent::get_name(
+            Torrent::find_name(
                 &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"name".to_vec() => BValue::Int(12)])]
             ),
             Err(String::from("Incorrect or missing 'name' value"))
@@ -202,17 +202,17 @@ mod tests {
     }
 
     #[test]
-    fn get_name_incorrect_info() {
+    fn find_name_incorrect_info() {
         assert_eq!(
-            Torrent::get_name(&hashmap![b"info".to_vec() => BValue::Int(12)]),
+            Torrent::find_name(&hashmap![b"info".to_vec() => BValue::Int(12)]),
             Err(String::from("Incorrect or missing 'info' value"))
         );
     }
 
     #[test]
-    fn get_name_ok() {
+    fn find_name_ok() {
         assert_eq!(
-            Torrent::get_name(
+            Torrent::find_name(
                 &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"name".to_vec() => BValue::ByteStr(b"INFO".to_vec())])]
             ),
             Ok(format!("INFO"))
@@ -220,9 +220,9 @@ mod tests {
     }
 
     #[test]
-    fn get_piece_length_incorrect() {
+    fn find_piece_length_incorrect() {
         assert_eq!(
-            Torrent::get_piece_length(
+            Torrent::find_piece_length(
                 &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"piece length".to_vec() => BValue::ByteStr(b"BAD".to_vec())])]
             ),
             Err(String::from("Incorrect or missing 'piece length' value"))
@@ -230,9 +230,9 @@ mod tests {
     }
 
     #[test]
-    fn get_piece_length_negative() {
+    fn find_piece_length_negative() {
         assert_eq!(
-            Torrent::get_piece_length(
+            Torrent::find_piece_length(
                 &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"piece length".to_vec() => BValue::Int(-12)])]
             ),
             Err(String::from("Can't convert 'piece length' to u64"))
@@ -240,17 +240,17 @@ mod tests {
     }
 
     #[test]
-    fn get_piece_length_incorrect_info() {
+    fn find_piece_length_incorrect_info() {
         assert_eq!(
-            Torrent::get_piece_length(&hashmap![b"info".to_vec() => BValue::Int(12)]),
+            Torrent::find_piece_length(&hashmap![b"info".to_vec() => BValue::Int(12)]),
             Err(String::from("Incorrect or missing 'info' value"))
         );
     }
 
     #[test]
-    fn get_piece_length_ok() {
+    fn find_piece_length_ok() {
         assert_eq!(
-            Torrent::get_piece_length(
+            Torrent::find_piece_length(
                 &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"piece length".to_vec() => BValue::Int(12)])]
             ),
             Ok(12)
@@ -258,9 +258,9 @@ mod tests {
     }
 
     #[test]
-    fn get_pieces_incorrect() {
+    fn find_pieces_incorrect() {
         assert_eq!(
-            Torrent::get_pieces(
+            Torrent::find_pieces(
                 &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"pieces".to_vec() => BValue::Int(12)])]
             ),
             Err(String::from("Incorrect or missing 'pieces' value"))
@@ -268,9 +268,9 @@ mod tests {
     }
 
     #[test]
-    fn get_pieces_not_divisible() {
+    fn find_pieces_not_divisible() {
         assert_eq!(
-            Torrent::get_pieces(
+            Torrent::find_pieces(
                 &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"pieces".to_vec() => BValue::ByteStr(b"aaa".to_vec())])]
             ),
             Err(String::from("'pieces' not divisible by 20"))
@@ -278,17 +278,17 @@ mod tests {
     }
 
     #[test]
-    fn get_pieces_incorrect_info() {
+    fn find_pieces_incorrect_info() {
         assert_eq!(
-            Torrent::get_pieces(&hashmap![b"info".to_vec() => BValue::Int(12)]),
+            Torrent::find_pieces(&hashmap![b"info".to_vec() => BValue::Int(12)]),
             Err(String::from("Incorrect or missing 'info' value"))
         );
     }
 
     #[test]
-    fn get_pieces_ok() {
+    fn find_pieces_ok() {
         assert_eq!(
-            Torrent::get_pieces(
+            Torrent::find_pieces(
                 &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"pieces".to_vec() => BValue::ByteStr(b"aaaaabbbbbcccccdddddAAAAABBBBBCCCCCDDDDD".to_vec())])]
             ),
             Ok(vec![
@@ -299,9 +299,9 @@ mod tests {
     }
 
     #[test]
-    fn get_length_incorrect() {
+    fn find_length_incorrect() {
         assert_eq!(
-            Torrent::get_length(
+            Torrent::find_length(
                 &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"length".to_vec() => BValue::ByteStr(b"BAD".to_vec())])]
             ),
             None
@@ -309,9 +309,9 @@ mod tests {
     }
 
     #[test]
-    fn get_length_negative() {
+    fn find_length_negative() {
         assert_eq!(
-            Torrent::get_length(
+            Torrent::find_length(
                 &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"length".to_vec() => BValue::Int(-12)])]
             ),
             None
@@ -319,17 +319,17 @@ mod tests {
     }
 
     #[test]
-    fn get_length_incorrect_info() {
+    fn find_length_incorrect_info() {
         assert_eq!(
-            Torrent::get_length(&hashmap![b"info".to_vec() => BValue::Int(12)]),
+            Torrent::find_length(&hashmap![b"info".to_vec() => BValue::Int(12)]),
             None
         );
     }
 
     #[test]
-    fn get_length_ok() {
+    fn find_length_ok() {
         assert_eq!(
-            Torrent::get_length(
+            Torrent::find_length(
                 &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"length".to_vec() => BValue::Int(12)])]
             ),
             Some(12)
@@ -337,9 +337,9 @@ mod tests {
     }
 
     #[test]
-    fn get_files_incorrect() {
+    fn find_files_incorrect() {
         assert_eq!(
-            Torrent::get_files(
+            Torrent::find_files(
                 &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"files".to_vec() => BValue::ByteStr(b"BAD".to_vec())])]
             ),
             None
@@ -347,9 +347,9 @@ mod tests {
     }
 
     #[test]
-    fn get_files_empty_list() {
+    fn find_files_empty_list() {
         assert_eq!(
-            Torrent::get_files(
+            Torrent::find_files(
                 &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"files".to_vec() => BValue::List(vec![])])]
             ),
             Some(vec![])
@@ -357,9 +357,9 @@ mod tests {
     }
 
     #[test]
-    fn get_files_invalid_dict() {
+    fn find_files_invalid_dict() {
         assert_eq!(
-            Torrent::get_files(&hashmap![b"info".to_vec() =>
+            Torrent::find_files(&hashmap![b"info".to_vec() =>
                 BValue::Dict(hashmap![b"files".to_vec() =>
                     BValue::List(vec![
                         BValue::Dict(hashmap![b"a".to_vec() => BValue::Int(12),
@@ -372,9 +372,9 @@ mod tests {
     }
 
     #[test]
-    fn get_files_invalid_dict_length() {
+    fn find_files_invalid_dict_length() {
         assert_eq!(
-            Torrent::get_files(&hashmap![b"info".to_vec() =>
+            Torrent::find_files(&hashmap![b"info".to_vec() =>
                 BValue::Dict(hashmap![b"files".to_vec() =>
                     BValue::List(vec![
                         BValue::Dict(hashmap![b"length".to_vec() => BValue::Int(-12),
@@ -387,9 +387,9 @@ mod tests {
     }
 
     #[test]
-    fn get_files_invalid_dict_path() {
+    fn find_files_invalid_dict_path() {
         assert_eq!(
-            Torrent::get_files(&hashmap![b"info".to_vec() =>
+            Torrent::find_files(&hashmap![b"info".to_vec() =>
                 BValue::Dict(hashmap![b"files".to_vec() =>
                     BValue::List(vec![
                         BValue::Dict(hashmap![b"length".to_vec() => BValue::Int(1),
@@ -402,9 +402,9 @@ mod tests {
     }
 
     #[test]
-    fn get_files_valid_and_invalid_dict() {
+    fn find_files_valid_and_invalid_dict() {
         assert_eq!(
-            Torrent::get_files(&hashmap![b"info".to_vec() =>
+            Torrent::find_files(&hashmap![b"info".to_vec() =>
                 BValue::Dict(hashmap![b"files".to_vec() =>
                     BValue::List(vec![
                         BValue::Dict(hashmap![b"length".to_vec() => BValue::Int(1),
