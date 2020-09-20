@@ -21,7 +21,7 @@ impl BValue {
     pub fn find_raw_value(key: &str, arg: &[u8]) -> Option<Vec<u8>> {
         println!("Tutaj");
         let mut it = arg.iter().enumerate();
-        match Self::extract_value(false, &mut it, Some(key),  None) {
+        match Self::extract_value(false, &mut it, Some(key.as_bytes()),  None) {
             Ok(val) if val.len() > 0 => Some(val),
             _ => None
         }
@@ -30,7 +30,7 @@ impl BValue {
     fn extract_value(
         force_extract : bool,
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
-        key: Option<&str>,
+        key: Option<&[u8]>,
         delimiter: Option<u8>,
     ) -> Result<Vec<u8>, String> {
         let mut values = vec![];
@@ -38,7 +38,7 @@ impl BValue {
 
         while let Some((pos, b)) = it.next() {
             if *b >= b'0' && *b <= b'9' {
-                let mut val = &mut Self::extract_byte_str(it, pos, b)?;
+                let mut val = &mut Self::parse_byte_str(it, pos, b)?.1;
 
                 if force_extract {
                     values.append(&mut val);
@@ -106,7 +106,7 @@ impl BValue {
 
         while let Some((pos, b)) = it.next() {
             match b {
-                b'0'..=b'9' => values.push(Self::parse_byte_str(it, pos, b)?),
+                b'0'..=b'9' => values.push(Self::value_byte_str(it, pos, b)?),
                 b'i' => values.push(Self::parse_int(it, pos)?),
                 b'l' => values.push(Self::parse_list(it)?),
                 b'd' => values.push(Self::parse_dict(it, pos)?),
@@ -118,26 +118,28 @@ impl BValue {
         Ok(values)
     }
 
-    fn parse_byte_str(
+    fn value_byte_str(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         pos: usize,
         first_num: &u8,
     ) -> Result<BValue, String> {
-        let str_value = Self::extract_byte_str(it, pos, first_num)?;
+        let (str_value, _) = Self::parse_byte_str(it, pos, first_num)?;
         return Ok(BValue::ByteStr(str_value));
     }
 
-    fn extract_byte_str(
+    fn parse_byte_str(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         pos: usize,
         first_num: &u8,
-    ) -> Result<Vec<u8>, String> {
+    ) -> Result<(Vec<u8>, Vec<u8>), String> {
         let mut len_bytes = vec![*first_num];
         let mut rest_len_bytes: Vec<_> = it
             .take_while(|(_, &b)| b != b':')
             .map(|(_, &b)| b)
             .collect();
         len_bytes.append(&mut rest_len_bytes);
+        let mut str_raw = len_bytes.clone();
+        str_raw.push(b':');
 
         if !len_bytes.iter().all(|b| (b'0'..=b'9').contains(b)) {
             return Err(format!("ByteStr [{}]: Incorrect character", pos));
@@ -157,7 +159,8 @@ impl BValue {
             return Err(format!("ByteStr [{}]: Not enough characters", pos));
         }
 
-        return Ok(str_value);
+        str_raw.append(&mut str_value.clone());
+        return Ok((str_value, str_raw));
     }
 
     fn parse_int(
@@ -198,6 +201,8 @@ impl BValue {
                 }
             })
             .collect()
+
+
     }
 
     fn parse_list(it: &mut std::iter::Enumerate<std::slice::Iter<u8>>) -> Result<BValue, String> {
@@ -229,7 +234,7 @@ impl BValue {
     fn extract_dict(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         pos: usize,
-        key: &str,
+        key: &[u8],
     ) -> Result<Vec<u8>, String> {
         let mut values = vec![];
         // let (is_delim, delim) = delimiter.map_or((false, b' '), |v| (true, v));
@@ -238,10 +243,9 @@ impl BValue {
         let mut key_turn = true;
         while let Some((pos, b)) = it.next() {
             if key_turn && *b >= b'0' && *b <= b'9' {
-                // let key = Self::ppp(it, b, pos);
-                println!("Sprawdzam klucz");
-                if let BValue::ByteStr(k) = Self::parse_byte_str(it, pos, b)? {
-                    if key == String::from_utf8(k).unwrap() {
+                if let k = Self::parse_byte_str(it, pos, b)?.1 {
+                    println!("Sprawdzam klucz {:?}", k);
+                    if key == &*k {
                         println!("klucz sie zgadza");
                         extract = true;
                     }
@@ -262,20 +266,6 @@ impl BValue {
         }
 
         Ok(values)
-
-        // let list = Self::extract_values(it, Some(b'e'))?;
-        // if list.len() % 2 != 0 {
-        //     return Err(format!("Dict [{}]: Odd number of elements", pos));
-        // }
-        //
-        // let keys = Self::get_keys_from_list(&list, pos)?;
-        // let dict: HashMap<_, _> = keys
-        //     .iter()
-        //     .map(|k| k.clone())
-        //     .zip(list.iter().skip(1).step_by(2).map(|v| v.clone()))
-        //     .collect();
-        //
-        // Ok(BValue::Dict(dict))
     }
 
     fn ppp(
@@ -288,7 +278,7 @@ impl BValue {
 
         if *b >= b'0' && *b <= b'9' {
             println!("ppp str");
-            values.append(&mut Self::extract_byte_str(it, pos, b)?);
+            values.append(&mut Self::parse_byte_str(it, pos, b)?.1);
         } else if *b == b'i' {
             println!("ppp int");
             values.push(b'i');
@@ -351,7 +341,7 @@ mod tests {
     }
 
     #[test]
-    fn byte_str_unexpected_nd() {
+    fn byte_str_unexpected_end() {
         assert_eq!(
             BValue::parse(b"4"),
             Err(String::from("ByteStr [0]: Not enough characters"))
@@ -558,10 +548,26 @@ mod tests {
     }
 
     #[test]
-    fn find_raw() {
+    fn find_raw_int_value() {
         assert_eq!(
-            BValue::find_raw_value("k", b"d1:ki5ee"),
-            Some(vec![b'i', b'5', b'e'])
+            BValue::find_raw_value("1:k", b"d1:ki-5ee"),
+            Some(vec![b'i', b'-', b'5', b'e'])
         );
     }
+
+    // #[test]
+    // fn find_raw_str_value() {
+    //     assert_eq!(
+    //         BValue::find_raw_value("k", b"d1:k4:spame"),
+    //         Some(vec![b'4', b':', b's', b'p', b'a', b'm'])
+    //     );
+    // }
+
+    // #[test]
+    // fn find_raw_str_value() {
+    //     assert_eq!(
+    //         BValue::find_raw_value("k", b"d1:k4:spame"),
+    //         Some(vec![b'4', b':', b's', b'p', b'a', b'm'])
+    //     );
+    // }
 }
