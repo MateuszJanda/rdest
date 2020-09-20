@@ -123,8 +123,7 @@ impl BValue {
         pos: usize,
         first_num: &u8,
     ) -> Result<BValue, String> {
-        let (str_value, _) = Self::parse_byte_str(it, pos, first_num)?;
-        return Ok(BValue::ByteStr(str_value));
+        Ok(BValue::ByteStr(Self::parse_byte_str(it, pos, first_num)?.0))
     }
 
     fn parse_byte_str(
