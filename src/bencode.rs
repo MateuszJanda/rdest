@@ -40,11 +40,12 @@ impl BValue {
             if *b >= b'0' && *b <= b'9' {
                 values.append(&mut Self::raw_byte_str(it, pos, b, extract)?);
             } else if *b == b'i' {
-                let mut val =  &mut Self::extract_int(it, pos)?;
+                // let mut val =  &mut Self::extract_int(it, pos)?;
+                values.append(&mut Self::raw_int(it, pos, extract)?);
 
-                if extract {
-                    values.append(&mut val);
-                }
+                // if extract {
+                //     values.append(&mut val);
+                // }
 
 
             } else if *b == b'l' {
@@ -101,7 +102,7 @@ impl BValue {
         while let Some((pos, b)) = it.next() {
             match b {
                 b'0'..=b'9' => values.push(Self::value_byte_str(it, pos, b)?),
-                b'i' => values.push(Self::parse_int(it, pos)?),
+                b'i' => values.push(Self::value_int(it, pos)?),
                 b'l' => values.push(Self::parse_list(it)?),
                 b'd' => values.push(Self::parse_dict(it, pos)?),
                 delim if delimiter.is_some() => return Ok(values),
@@ -132,7 +133,6 @@ impl BValue {
             false => Ok(vec![])
         }
     }
-
 
     fn parse_byte_str(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
@@ -170,12 +170,35 @@ impl BValue {
         return Ok((str_value, str_raw));
     }
 
-    fn parse_int(
+    fn value_int(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         pos: usize,
     ) -> Result<BValue, String> {
+        Ok(BValue::Int(Self::parse_int(it, pos)?.0))
+    }
+
+    fn raw_int(
+        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        pos: usize,
+        extract: bool,
+    ) -> Result<Vec<u8>, String> {
+        let val = Self::parse_int(it, pos)?.1;
+        match extract {
+            true => Ok(val),
+            false => Ok(vec![])
+        }
+    }
+
+    fn parse_int(
+        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        pos: usize,
+    ) -> Result<(i64, Vec<u8>), String> {
         let mut it_start = it.clone();
         let num_as_bytes = Self::extract_int(it, pos)?;
+
+        let mut raw_num = vec![b'i'];
+        raw_num.append(&mut num_as_bytes.clone());
+        raw_num.push(b'e');
 
         if let None = it_start.nth(num_as_bytes.len()) {
             return Err(format!("Int [{}]: Missing terminate character 'e'", pos));
@@ -189,10 +212,11 @@ impl BValue {
             return Err(format!("Int [{}]: Leading zero", pos));
         }
 
-        num_as_str
+        let num = num_as_str
             .parse::<i64>()
-            .map(|num| BValue::Int(num))
-            .or(Err(format!("Int [{}]: Unable convert to int", pos)))
+            .or(Err(format!("Int [{}]: Unable convert to int", pos)))?;
+
+        Ok((num, raw_num))
     }
 
     fn extract_int(
@@ -208,8 +232,6 @@ impl BValue {
                 }
             })
             .collect()
-
-
     }
 
     fn parse_list(it: &mut std::iter::Enumerate<std::slice::Iter<u8>>) -> Result<BValue, String> {
