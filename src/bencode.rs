@@ -131,7 +131,7 @@ impl BValue {
         delimiter: Option<u8>,
     ) -> Result<Vec<BValue>, String> {
         let mut values = vec![];
-        let  delim = delimiter.map_or(b' ', |v| v);
+        // let delim = delimiter.map_or(b' ', |v| v);
 
         while let Some((pos, b)) = it.next() {
             match b {
@@ -139,7 +139,7 @@ impl BValue {
                 b'i' => values.push(Self::value_int(it, pos)?),
                 b'l' => values.push(Self::parse_list(it)?),
                 b'd' => values.push(Self::parse_dict(it, pos)?),
-                delim if delimiter.is_some() => return Ok(values),
+                d if delimiter.is_some() && delimiter.unwrap() == *d => return Ok(values),
                 _ => return Err(format!("Loop [{}]: Incorrect character", pos))
             }
         }
