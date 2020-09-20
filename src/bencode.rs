@@ -19,6 +19,7 @@ impl BValue {
     }
 
     pub fn find_raw_value(key: &str, arg: &[u8]) -> Option<Vec<u8>> {
+        println!("Tutaj");
         let mut it = arg.iter().enumerate();
         match Self::extract_value(false, &mut it, Some(key),  None) {
             Ok(val) if val.len() > 0 => Some(val),
@@ -62,19 +63,29 @@ impl BValue {
             }
             else if key.is_some() && *b == b'd' {
                 // values.append(Self::parse_dict(it, pos)?);
-                let mut val =  &mut Self::extract_dict(it, pos, key.unwrap())?;
+                println!("Slownik i some");
+                let val = Self::extract_dict(it, pos, key.unwrap())?;
 
-                if force_extract {
-                    values.append(&mut val);
+                    println!("extract_value dict {:?}", val);
+                if val.len() > 0 {
+                    return Ok(val);
                 }
+                    // values.append(&mut val);
 
             }
             else if key.is_none() && *b == b'd' {
-                values.append(&mut Self::extract_value(force_extract, it, None, delimiter)?);
+                let mut val = &mut Self::extract_value(force_extract, it, None, delimiter)?;
+
+                if force_extract {
+                    println!("extract_value nont dict {:?}", val);
+                    values.append(&mut val);
+                }
             }
             else if is_delim && *b == delim {
+                println!("delimiter");
                 return Ok(values);
             } else {
+                println!("err {:?}", b);
                 return Err(format!("Loop [{}]: Incorrect character", pos));
             }
 
@@ -82,8 +93,8 @@ impl BValue {
 
         }
 
-
-        Ok(vec![])
+        println!("koniec ");
+        Ok(values)
     }
 
     fn parse_values(
@@ -228,8 +239,10 @@ impl BValue {
         while let Some((pos, b)) = it.next() {
             if key_turn && *b >= b'0' && *b <= b'9' {
                 // let key = Self::ppp(it, b, pos);
+                println!("Sprawdzam klucz");
                 if let BValue::ByteStr(k) = Self::parse_byte_str(it, pos, b)? {
                     if key == String::from_utf8(k).unwrap() {
+                        println!("klucz sie zgadza");
                         extract = true;
                     }
                 }
@@ -238,8 +251,10 @@ impl BValue {
                 break;
 
             } else {
+                println!("jest wartosc");
                 let value = Self::ppp(extract, it, b, pos);
                 if extract {
+                    println!("zwracam wartosc {:?}", value);
                     return value;
                 }
             }
@@ -272,9 +287,13 @@ impl BValue {
         let mut values = vec![];
 
         if *b >= b'0' && *b <= b'9' {
+            println!("ppp str");
             values.append(&mut Self::extract_byte_str(it, pos, b)?);
         } else if *b == b'i' {
+            println!("ppp int");
+            values.push(b'i');
             values.append(&mut Self::extract_int(it, pos)?);
+            values.push(b'e')
         } else if *b == b'l' {
             values.append(&mut Self::extract_value(force_extract, it, None, Some(b'e'))?);
         }
@@ -289,7 +308,8 @@ impl BValue {
             return Err(format!("Loop [{}]: Incorrect character", pos));
         }
 
-        Ok(vec![])
+        // Ok(vec![])
+        Ok(values)
     }
 
     fn get_keys_from_list(list: &Vec<BValue>, pos: usize) -> Result<Vec<Key>, String> {
@@ -537,11 +557,11 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn find_raw() {
-    //     assert_eq!(
-    //         BValue::find_raw_value("k", b"d1:ki5ee"),
-    //         Some(vec![b'i', b'5', b'e'])
-    //     );
-    // }
+    #[test]
+    fn find_raw() {
+        assert_eq!(
+            BValue::find_raw_value("k", b"d1:ki5ee"),
+            Some(vec![b'i', b'5', b'e'])
+        );
+    }
 }
