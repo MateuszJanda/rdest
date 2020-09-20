@@ -18,6 +18,7 @@ impl BValue {
         Self::parse_values(&mut it, None)
     }
 
+
     fn parse_values(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         delimiter: Option<u8>,

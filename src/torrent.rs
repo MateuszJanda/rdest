@@ -5,6 +5,8 @@ use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fs;
 
+extern crate sha1;
+
 #[derive(PartialEq, Debug)]
 pub struct Torrent {
     announce: String,
@@ -31,6 +33,7 @@ impl Torrent {
 
     pub fn from_bencode(arg: &[u8]) -> Result<Torrent, String> {
         let bvalues = BValue::parse(arg)?;
+        // let raw_info = BValue::cut_raw_info(arg)?;
 
         if bvalues.is_empty() {
             return Err(format!("Empty torrent"));
@@ -65,6 +68,7 @@ impl Torrent {
                 "Conflicting values 'length' and 'files'. Only one is allowed"
             ));
         }
+
 
         Ok(torrent)
     }
@@ -166,6 +170,22 @@ impl Torrent {
         }
 
         return true;
+    }
+
+    pub fn get_url(&self) -> String {
+        self.announce.clone()
+    }
+
+    pub fn get_info_hash(&self) -> String {
+
+        let mut m = sha1::Sha1::new();
+
+        let v: Vec<u8> = vec![1, 2, 3];
+
+        // m.update(b"Hello World!");
+        m.update(v.as_ref());
+        println!("{:?}", m.digest().to_string());
+        String::from("asdf")
     }
 }
 

@@ -7,5 +7,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+sha1 = "0.6.0"
 reqwest = { version = "0.10.8", features = ["blocking"] }
 # tokio = { version = "0.2", features = ["full"] }
