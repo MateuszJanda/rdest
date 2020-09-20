@@ -21,42 +21,36 @@ impl BValue {
     pub fn find_raw_value(key: &str, arg: &[u8]) -> Option<Vec<u8>> {
         println!("Tutaj");
         let mut it = arg.iter().enumerate();
-        match Self::extract_value(false, &mut it, Some(key.as_bytes()),  None) {
+        match Self::raw_values(&mut it, Some(key.as_bytes()),  None, false) {
             Ok(val) if val.len() > 0 => Some(val),
             _ => None
         }
     }
 
-    fn extract_value(
-        force_extract : bool,
+    fn raw_values(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         key: Option<&[u8]>,
         delimiter: Option<u8>,
+        extract : bool,
     ) -> Result<Vec<u8>, String> {
         let mut values = vec![];
         let (is_delim, delim) = delimiter.map_or((false, b' '), |v| (true, v));
 
         while let Some((pos, b)) = it.next() {
             if *b >= b'0' && *b <= b'9' {
-                let mut val = &mut Self::parse_byte_str(it, pos, b)?.1;
-
-                if force_extract {
-                    values.append(&mut val);
-                }
-
-
+                values.append(&mut Self::raw_byte_str(it, pos, b, extract)?);
             } else if *b == b'i' {
                 let mut val =  &mut Self::extract_int(it, pos)?;
 
-                if force_extract {
+                if extract {
                     values.append(&mut val);
                 }
 
 
             } else if *b == b'l' {
-                let mut val = &mut Self::extract_value(force_extract, it, None, Some(b'e'))?;
+                let mut val = &mut Self::raw_values(it, None, Some(b'e'), extract)?;
 
-                if force_extract {
+                if extract {
                     values.append(&mut val);
                 }
 
@@ -66,7 +60,7 @@ impl BValue {
                 println!("Slownik i some");
                 let val = Self::extract_dict(it, pos, key.unwrap())?;
 
-                    println!("extract_value dict {:?}", val);
+                    println!("raw_values dict {:?}", val);
                 if val.len() > 0 {
                     return Ok(val);
                 }
@@ -74,10 +68,10 @@ impl BValue {
 
             }
             else if key.is_none() && *b == b'd' {
-                let mut val = &mut Self::extract_value(force_extract, it, None, delimiter)?;
+                let mut val = &mut Self::raw_values(it, None, delimiter, extract)?;
 
-                if force_extract {
-                    println!("extract_value nont dict {:?}", val);
+                if extract {
+                    println!("raw_values nont dict {:?}", val);
                     values.append(&mut val);
                 }
             }
@@ -125,6 +119,20 @@ impl BValue {
     ) -> Result<BValue, String> {
         Ok(BValue::ByteStr(Self::parse_byte_str(it, pos, first_num)?.0))
     }
+
+    fn raw_byte_str(
+        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        pos: usize,
+        first_num: &u8,
+        extract: bool,
+    ) -> Result<Vec<u8>, String> {
+        let val = Self::parse_byte_str(it, pos, first_num)?.1;
+        match extract {
+            true => Ok(val),
+            false => Ok(vec![])
+        }
+    }
+
 
     fn parse_byte_str(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
@@ -268,7 +276,7 @@ impl BValue {
     }
 
     fn ppp(
-        force_extract : bool,
+        extract : bool,
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         b: &u8,
         pos: usize,
@@ -284,10 +292,10 @@ impl BValue {
             values.append(&mut Self::extract_int(it, pos)?);
             values.push(b'e')
         } else if *b == b'l' {
-            values.append(&mut Self::extract_value(force_extract, it, None, Some(b'e'))?);
+            values.append(&mut Self::raw_values(it, None, Some(b'e'), extract)?);
         }
         else if *b == b'd' {
-            values.append(&mut Self::extract_value(force_extract, it, None, Some(b'e'))?);
+            values.append(&mut Self::raw_values(it, None, Some(b'e'), extract)?);
             // values.append(Self::parse_dict(it, pos)?);
         }
         // else if is_delim && *b == delim {
