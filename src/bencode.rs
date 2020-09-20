@@ -18,6 +18,73 @@ impl BValue {
         Self::parse_values(&mut it, None)
     }
 
+    pub fn find_raw_value(key: &str, arg: &[u8]) -> Option<Vec<u8>> {
+        let mut it = arg.iter().enumerate();
+        match Self::extract_value(false, &mut it, Some(key),  None) {
+            Ok(val) if val.len() > 0 => Some(val),
+            _ => None
+        }
+    }
+
+    fn extract_value(
+        force_extract : bool,
+        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        key: Option<&str>,
+        delimiter: Option<u8>,
+    ) -> Result<Vec<u8>, String> {
+        let mut values = vec![];
+        let (is_delim, delim) = delimiter.map_or((false, b' '), |v| (true, v));
+
+        while let Some((pos, b)) = it.next() {
+            if *b >= b'0' && *b <= b'9' {
+                let mut val = &mut Self::extract_byte_str(it, pos, b)?;
+
+                if force_extract {
+                    values.append(&mut val);
+                }
+
+
+            } else if *b == b'i' {
+                let mut val =  &mut Self::extract_int(it, pos)?;
+
+                if force_extract {
+                    values.append(&mut val);
+                }
+
+
+            } else if *b == b'l' {
+                let mut val = &mut Self::extract_value(force_extract, it, None, Some(b'e'))?;
+
+                if force_extract {
+                    values.append(&mut val);
+                }
+
+            }
+            else if key.is_some() && *b == b'd' {
+                // values.append(Self::parse_dict(it, pos)?);
+                let mut val =  &mut Self::extract_dict(it, pos, key.unwrap())?;
+
+                if force_extract {
+                    values.append(&mut val);
+                }
+
+            }
+            else if key.is_none() && *b == b'd' {
+                values.append(&mut Self::extract_value(force_extract, it, None, delimiter)?);
+            }
+            else if is_delim && *b == delim {
+                return Ok(values);
+            } else {
+                return Err(format!("Loop [{}]: Incorrect character", pos));
+            }
+
+
+
+        }
+
+
+        Ok(vec![])
+    }
 
     fn parse_values(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
@@ -50,6 +117,15 @@ impl BValue {
         pos: usize,
         first_num: &u8,
     ) -> Result<BValue, String> {
+        let str_value = Self::extract_byte_str(it, pos, first_num)?;
+        return Ok(BValue::ByteStr(str_value));
+    }
+
+    fn extract_byte_str(
+        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        pos: usize,
+        first_num: &u8,
+    ) -> Result<Vec<u8>, String> {
         let mut len_bytes = vec![*first_num];
         let mut rest_len_bytes: Vec<_> = it
             .take_while(|(_, &b)| b != b':')
@@ -70,16 +146,12 @@ impl BValue {
             Err(_) => return Err(format!("ByteStr [{}]: Unable convert to int", pos)),
         };
 
-        if len == 0 {
-            return Ok(BValue::ByteStr(vec![]));
-        }
-
         let str_value: Vec<_> = it.take(len).map(|(_, &b)| b).collect();
         if str_value.len() != len {
             return Err(format!("ByteStr [{}]: Not enough characters", pos));
         }
 
-        return Ok(BValue::ByteStr(str_value));
+        return Ok(str_value);
     }
 
     fn parse_int(
@@ -87,21 +159,21 @@ impl BValue {
         pos: usize,
     ) -> Result<BValue, String> {
         let mut it_start = it.clone();
-        let num_bytes = Self::extract_int(it, pos)?;
+        let num_as_bytes = Self::extract_int(it, pos)?;
 
-        if let None = it_start.nth(num_bytes.len()) {
+        if let None = it_start.nth(num_as_bytes.len()) {
             return Err(format!("Int [{}]: Missing terminate character 'e'", pos));
         }
-        let num_str = match String::from_utf8(num_bytes) {
+        let num_as_str = match String::from_utf8(num_as_bytes) {
             Ok(v) => v,
             Err(_) => return Err(format!("Int [{}]: Unable convert to string", pos)),
         };
 
-        if num_str.len() >= 2 && num_str.starts_with("0") || num_str.starts_with("-0") {
+        if num_as_str.len() >= 2 && num_as_str.starts_with("0") || num_as_str.starts_with("-0") {
             return Err(format!("Int [{}]: Leading zero", pos));
         }
 
-        num_str
+        num_as_str
             .parse::<i64>()
             .map(|num| BValue::Int(num))
             .or(Err(format!("Int [{}]: Unable convert to int", pos)))
@@ -146,6 +218,83 @@ impl BValue {
             .collect();
 
         Ok(BValue::Dict(dict))
+    }
+
+    fn extract_dict(
+        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        pos: usize,
+        key: &str,
+    ) -> Result<Vec<u8>, String> {
+        let mut values = vec![];
+        // let (is_delim, delim) = delimiter.map_or((false, b' '), |v| (true, v));
+
+        let mut extract = false;
+        let mut key_turn = true;
+        while let Some((pos, b)) = it.next() {
+            if key_turn && *b >= b'0' && *b <= b'9' {
+                // let key = Self::ppp(it, b, pos);
+                if let BValue::ByteStr(k) = Self::parse_byte_str(it, pos, b)? {
+                    if key == String::from_utf8(k).unwrap() {
+                        extract = true;
+                    }
+                }
+            }
+            else if key_turn && *b == b'e' {
+                break;
+
+            } else {
+                let value = Self::ppp(extract, it, b, pos);
+                if extract {
+                    return value;
+                }
+            }
+            key_turn = !key_turn;
+        }
+
+        Ok(values)
+
+        // let list = Self::extract_values(it, Some(b'e'))?;
+        // if list.len() % 2 != 0 {
+        //     return Err(format!("Dict [{}]: Odd number of elements", pos));
+        // }
+        //
+        // let keys = Self::get_keys_from_list(&list, pos)?;
+        // let dict: HashMap<_, _> = keys
+        //     .iter()
+        //     .map(|k| k.clone())
+        //     .zip(list.iter().skip(1).step_by(2).map(|v| v.clone()))
+        //     .collect();
+        //
+        // Ok(BValue::Dict(dict))
+    }
+
+    fn ppp(
+        force_extract : bool,
+        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        b: &u8,
+        pos: usize,
+    ) -> Result<Vec<u8>, String> {
+        let mut values = vec![];
+
+        if *b >= b'0' && *b <= b'9' {
+            values.append(&mut Self::extract_byte_str(it, pos, b)?);
+        } else if *b == b'i' {
+            values.append(&mut Self::extract_int(it, pos)?);
+        } else if *b == b'l' {
+            values.append(&mut Self::extract_value(force_extract, it, None, Some(b'e'))?);
+        }
+        else if *b == b'd' {
+            values.append(&mut Self::extract_value(force_extract, it, None, Some(b'e'))?);
+            // values.append(Self::parse_dict(it, pos)?);
+        }
+        // else if is_delim && *b == delim {
+        //     return Ok(values);
+        // }
+        else {
+            return Err(format!("Loop [{}]: Incorrect character", pos));
+        }
+
+        Ok(vec![])
     }
 
     fn get_keys_from_list(list: &Vec<BValue>, pos: usize) -> Result<Vec<Key>, String> {
@@ -390,6 +539,14 @@ mod tests {
         assert_eq!(
             BValue::parse(b"i1ei2ei01e"),
             Err(String::from("Int [6]: Leading zero"))
+        );
+    }
+
+    #[test]
+    fn find_raw() {
+        assert_eq!(
+            BValue::find_raw_value("k", b"d1:ki5ee"),
+            Some(vec![b'i', b'5', b'e'])
         );
     }
 }
