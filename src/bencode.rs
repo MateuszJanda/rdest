@@ -49,11 +49,12 @@ impl BValue {
 
 
             } else if *b == b'l' {
-                let mut val = &mut Self::raw_values(it, None, Some(b'e'), extract)?;
-
-                if extract {
-                    values.append(&mut val);
-                }
+                values.append(&mut Self::raw_list(it, extract)?);
+                // let mut val = &mut Self::raw_values(it, None, Some(b'e'), extract)?;
+                //
+                // if extract {
+                //     values.append(&mut val);
+                // }
 
             }
             else if key.is_some() && *b == b'd' {
@@ -69,12 +70,13 @@ impl BValue {
 
             }
             else if key.is_none() && *b == b'd' {
-                let mut val = &mut Self::raw_values(it, None, delimiter, extract)?;
-
-                if extract {
-                    println!("raw_values nont dict {:?}", val);
-                    values.append(&mut val);
-                }
+                values.append(&mut Self::raw_dict(it, extract)?);
+                // let mut val = &mut Self::raw_values(it, None, delimiter, extract)?;
+                //
+                // if extract {
+                //     println!("raw_values nont dict {:?}", val);
+                //     values.append(&mut val);
+                // }
             }
             else if is_delim && *b == delim {
                 println!("delimiter");
@@ -90,6 +92,38 @@ impl BValue {
 
         println!("koniec ");
         Ok(values)
+    }
+
+    fn raw_list(
+        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        extract: bool,
+    ) -> Result<Vec<u8>, String> {
+        let mut val = &mut Self::raw_values(it, None, Some(b'e'), extract)?;
+        match extract {
+            true => {
+                let mut list = vec![b'l'];
+                list.append(&mut val);
+                list.push(b'e');
+                Ok(list)
+            },
+            false => Ok(vec![])
+        }
+    }
+
+    fn raw_dict(
+        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        extract: bool,
+    ) -> Result<Vec<u8>, String> {
+        let mut val = &mut Self::raw_values(it, None, Some(b'e'), extract)?;
+        match extract {
+            true => {
+                let mut list = vec![b'd'];
+                list.append(&mut val);
+                list.push(b'e');
+                Ok(list)
+            },
+            false => Ok(vec![])
+        }
     }
 
     fn parse_values(
