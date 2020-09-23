@@ -40,7 +40,7 @@ impl BValue {
                 b'i' => values.append(&mut Self::raw_int(it, pos, extract)?),
                 b'l' => values.append(&mut Self::raw_list(it, extract)?),
                 b'd' if key.is_some() => {
-                    let val = Self::traverse_dict(it, pos, key.unwrap())?;
+                    let val = Self::traverse_dict(it, key.unwrap())?;
                     if val.len() > 0 {
                         return Ok(val);
                     }
@@ -256,7 +256,7 @@ impl BValue {
             return Err(format!("Dict [{}]: Odd number of elements", pos));
         }
 
-        let keys = Self::get_keys_from_list(&list, pos)?;
+        let keys = Self::keys_from_list(&list, pos)?;
         let dict: HashMap<_, _> = keys
             .iter()
             .map(|k| k.clone())
@@ -268,19 +268,22 @@ impl BValue {
 
     fn traverse_dict(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
-        pos: usize,
         key: &[u8],
     ) -> Result<Vec<u8>, String> {
-        let mut extract = false;
+        const EXTRACT_KEY : bool = true;
+        let mut extract_value = false;
         let mut key_turn = true;
         while let Some((pos, b)) = it.next() {
             if key_turn {
                  match b {
-                    b'0'..=b'9' if &*Self::parse_byte_str(it, pos, b)?.1 == key => extract = true,
+                    b'0'..=b'9' if &*Self::raw_byte_str(it, pos, b, EXTRACT_KEY)? == key => extract_value = true,
+                    b'i' if &*Self::raw_int(it, pos, EXTRACT_KEY)? == key => extract_value = true,
+                    b'l' if &*Self::raw_list(it, EXTRACT_KEY)? == key => extract_value = true,
+                    b'd' if &*Self::raw_dict(it, EXTRACT_KEY)? == key => extract_value = true,
                     b'e' => break,
-                    _ => return Err(format!("ups"))
+                    _ => return Err(format!("TODO"))
                 };
-            } else if !key_turn && extract {
+            } else if !key_turn && extract_value {
                 return Self::extract_dict_raw_value(it, b, pos);
             }
 
@@ -308,7 +311,7 @@ impl BValue {
         Ok(values)
     }
 
-    fn get_keys_from_list(list: &Vec<BValue>, pos: usize) -> Result<Vec<Key>, String> {
+    fn keys_from_list(list: &Vec<BValue>, pos: usize) -> Result<Vec<Key>, String> {
         list.iter()
             .step_by(2)
             .map(|v| match v {
