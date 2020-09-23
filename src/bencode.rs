@@ -578,9 +578,10 @@ mod tests {
     fn find_raw_list_value() {
         assert_eq!(
             BValue::find_raw_value("1:k", b"d1:kli10ei20ee"),
-            Some(vec![
-                b'l', b'i', b'1', b'0', b'e', b'i', b'2', b'0', b'e', b'e'
-            ])
+            // Some(vec![
+            //     b'l', b'i', b'1', b'0', b'e', b'i', b'2', b'0', b'e', b'e'
+            // ])
+            Some(b"li10ei20ee".to_vec())
         );
     }
 }
