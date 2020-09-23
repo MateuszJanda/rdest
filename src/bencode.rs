@@ -19,7 +19,6 @@ impl BValue {
     }
 
     pub fn find_raw_value(key: &str, arg: &[u8]) -> Option<Vec<u8>> {
-        println!("Tutaj");
         let mut it = arg.iter().enumerate();
         match Self::raw_values_vector(&mut it, Some(key.as_bytes()),  None, false) {
             Ok(val) if val.len() > 0 => Some(val),
@@ -58,11 +57,10 @@ impl BValue {
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         extract: bool,
     ) -> Result<Vec<u8>, String> {
-        let mut val = &mut Self::raw_values_vector(it, None, Some(b'e'), extract)?;
         match extract {
             true => {
                 let mut list = vec![b'l'];
-                list.append(&mut val);
+                list.append(&mut Self::raw_values_vector(it, None, Some(b'e'), extract)?);
                 list.push(b'e');
                 Ok(list)
             },
@@ -74,11 +72,10 @@ impl BValue {
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         extract: bool,
     ) -> Result<Vec<u8>, String> {
-        let mut val = &mut Self::raw_values_vector(it, None, Some(b'e'), extract)?;
         match extract {
             true => {
                 let mut list = vec![b'd'];
-                list.append(&mut val);
+                list.append(&mut Self::raw_values_vector(it, None, Some(b'e'), extract)?);
                 list.push(b'e');
                 Ok(list)
             },
@@ -278,13 +275,13 @@ impl BValue {
         let mut key_turn = true;
         while let Some((pos, b)) = it.next() {
             if key_turn {
-                let key = match b {
+                 match b {
                     b'0'..=b'9' if &*Self::parse_byte_str(it, pos, b)?.1 == key => extract = true,
                     b'e' => break,
                     _ => return Err(format!("ups"))
                 };
             } else if !key_turn && extract {
-                return Self::dict_raw_value(extract, it, b, pos);
+                return Self::extract_dict_raw_value(it, b, pos);
             }
 
             key_turn = !key_turn;
@@ -293,14 +290,13 @@ impl BValue {
         Ok(vec![])
     }
 
-    fn dict_raw_value(
-        extract : bool,
+    fn extract_dict_raw_value(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         b: &u8,
         pos: usize,
     ) -> Result<Vec<u8>, String> {
         let mut values = vec![];
-
+        let extract = true;
         match b {
             b'0'..=b'9' => values.append(&mut Self::parse_byte_str(it, pos, b)?.1),
             b'i' => values.append(&mut Self::raw_int(it, pos, extract)?),
