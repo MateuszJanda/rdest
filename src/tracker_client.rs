@@ -1,21 +1,15 @@
 use crate::Torrent;
 
 #[derive(PartialEq, Clone, Debug)]
-pub struct TrackerClient {
-
-}
+pub struct TrackerClient {}
 
 impl TrackerClient {
-    pub fn connect(metafile : &Torrent) -> Result<(), reqwest::Error> {
+    pub fn connect(metafile: &Torrent) -> Result<(), reqwest::Error> {
         let url = metafile.get_url();
         println!("{:?}", metafile.get_url());
 
         let info_hash = metafile.get_info_hash();
-        let params = [
-            ("info_hash", "xxx"),
-            ("peer_id", "ABCDEFGHIJKLMNOPQRST")
-        ];
-
+        let params = [("info_hash", "xxx"), ("peer_id", "ABCDEFGHIJKLMNOPQRST")];
 
         Ok(())
     }

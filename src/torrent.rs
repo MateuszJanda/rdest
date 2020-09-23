@@ -69,7 +69,6 @@ impl Torrent {
             ));
         }
 
-
         Ok(torrent)
     }
 
@@ -177,7 +176,6 @@ impl Torrent {
     }
 
     pub fn get_info_hash(&self) -> String {
-
         let mut m = sha1::Sha1::new();
 
         let v: Vec<u8> = vec![1, 2, 3];

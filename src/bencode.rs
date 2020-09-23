@@ -20,9 +20,9 @@ impl BValue {
 
     pub fn find_raw_value(key: &str, arg: &[u8]) -> Option<Vec<u8>> {
         let mut it = arg.iter().enumerate();
-        match Self::raw_values_vector(&mut it, Some(key.as_bytes()),  None, false) {
+        match Self::raw_values_vector(&mut it, Some(key.as_bytes()), None, false) {
             Ok(val) if val.len() > 0 => Some(val),
-            _ => None
+            _ => None,
         }
     }
 
@@ -30,7 +30,7 @@ impl BValue {
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         key: Option<&[u8]>,
         delimiter: Option<u8>,
-        extract : bool,
+        extract: bool,
     ) -> Result<Vec<u8>, String> {
         let mut values = vec![];
 
@@ -47,7 +47,7 @@ impl BValue {
                 }
                 b'd' if key.is_none() => values.append(&mut Self::raw_dict(it, extract)?),
                 d if delimiter.is_some() && delimiter.unwrap() == *d => return Ok(values),
-                _ => return Err(format!("Loop [{}]: Incorrect character", pos))
+                _ => return Err(format!("Loop [{}]: Incorrect character", pos)),
             }
         }
         Ok(values)
@@ -63,8 +63,8 @@ impl BValue {
                 list.append(&mut Self::raw_values_vector(it, None, Some(b'e'), extract)?);
                 list.push(b'e');
                 Ok(list)
-            },
-            false => Ok(vec![])
+            }
+            false => Ok(vec![]),
         }
     }
 
@@ -78,11 +78,11 @@ impl BValue {
                 list.append(&mut Self::raw_values_vector(it, None, Some(b'e'), extract)?);
                 list.push(b'e');
                 Ok(list)
-            },
-            false => Ok(vec![])
+            }
+            false => Ok(vec![]),
         }
     }
-    
+
     fn values_vector(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         delimiter: Option<u8>,
@@ -96,7 +96,7 @@ impl BValue {
                 b'l' => values.push(Self::value_list(it)?),
                 b'd' => values.push(Self::value_dict(it, pos)?),
                 d if delimiter.is_some() && delimiter.unwrap() == *d => return Ok(values),
-                _ => return Err(format!("Loop [{}]: Incorrect character", pos))
+                _ => return Err(format!("Loop [{}]: Incorrect character", pos)),
             }
         }
 
@@ -120,7 +120,7 @@ impl BValue {
         let val = Self::parse_byte_str(it, pos, first_num)?.1;
         match extract {
             true => Ok(val),
-            false => Ok(vec![])
+            false => Ok(vec![]),
         }
     }
 
@@ -175,7 +175,7 @@ impl BValue {
         let val = Self::parse_int(it, pos)?.1;
         match extract {
             true => Ok(val),
-            false => Ok(vec![])
+            false => Ok(vec![]),
         }
     }
 
@@ -224,16 +224,16 @@ impl BValue {
             .collect()
     }
 
-    fn value_list(
-        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
-    ) -> Result<BValue, String> {
+    fn value_list(it: &mut std::iter::Enumerate<std::slice::Iter<u8>>) -> Result<BValue, String> {
         return match Self::parse_list(it) {
             Ok(v) => Ok(BValue::List(v)),
             Err(e) => Err(e),
         };
     }
-    
-    fn parse_list(it: &mut std::iter::Enumerate<std::slice::Iter<u8>>) -> Result<Vec<BValue>, String> {
+
+    fn parse_list(
+        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+    ) -> Result<Vec<BValue>, String> {
         return Self::values_vector(it, Some(b'e'));
     }
 
@@ -270,18 +270,20 @@ impl BValue {
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         key: &[u8],
     ) -> Result<Vec<u8>, String> {
-        const EXTRACT_KEY : bool = true;
+        const EXTRACT_KEY: bool = true;
         let mut extract_value = false;
         let mut key_turn = true;
         while let Some((pos, b)) = it.next() {
             if key_turn {
-                 match b {
-                    b'0'..=b'9' if &*Self::raw_byte_str(it, pos, b, EXTRACT_KEY)? == key => extract_value = true,
+                match b {
+                    b'0'..=b'9' if &*Self::raw_byte_str(it, pos, b, EXTRACT_KEY)? == key => {
+                        extract_value = true
+                    }
                     b'i' if &*Self::raw_int(it, pos, EXTRACT_KEY)? == key => extract_value = true,
                     b'l' if &*Self::raw_list(it, EXTRACT_KEY)? == key => extract_value = true,
                     b'd' if &*Self::raw_dict(it, EXTRACT_KEY)? == key => extract_value = true,
                     b'e' => break,
-                    _ => return Err(format!("TODO"))
+                    _ => return Err(format!("TODO")),
                 };
             } else if !key_turn && extract_value {
                 return Self::extract_dict_raw_value(it, b, pos);
@@ -305,7 +307,7 @@ impl BValue {
             b'i' => values.append(&mut Self::raw_int(it, pos, extract)?),
             b'l' => values.append(&mut Self::raw_list(it, extract)?),
             b'd' => values.append(&mut Self::raw_dict(it, extract)?),
-            _ => return Err(format!("Raw dict val [{}]: Incorrect character", pos))
+            _ => return Err(format!("Raw dict val [{}]: Incorrect character", pos)),
         }
 
         Ok(values)
@@ -576,7 +578,9 @@ mod tests {
     fn find_raw_list_value() {
         assert_eq!(
             BValue::find_raw_value("1:k", b"d1:kli10ei20ee"),
-            Some(vec![b'l', b'i', b'1', b'0', b'e', b'i', b'2', b'0', b'e', b'e'])
+            Some(vec![
+                b'l', b'i', b'1', b'0', b'e', b'i', b'2', b'0', b'e', b'e'
+            ])
         );
     }
 }
