@@ -34,63 +34,23 @@ impl BValue {
         extract : bool,
     ) -> Result<Vec<u8>, String> {
         let mut values = vec![];
-        let (is_delim, delim) = delimiter.map_or((false, b' '), |v| (true, v));
 
         while let Some((pos, b)) = it.next() {
-            if *b >= b'0' && *b <= b'9' {
-                values.append(&mut Self::raw_byte_str(it, pos, b, extract)?);
-            } else if *b == b'i' {
-                // let mut val =  &mut Self::extract_int(it, pos)?;
-                values.append(&mut Self::raw_int(it, pos, extract)?);
-
-                // if extract {
-                //     values.append(&mut val);
-                // }
-
-
-            } else if *b == b'l' {
-                values.append(&mut Self::raw_list(it, extract)?);
-                // let mut val = &mut Self::raw_values(it, None, Some(b'e'), extract)?;
-                //
-                // if extract {
-                //     values.append(&mut val);
-                // }
-
-            }
-            else if key.is_some() && *b == b'd' {
-                // values.append(Self::parse_dict(it, pos)?);
-                println!("Slownik i some");
-                let val = Self::extract_dict(it, pos, key.unwrap())?;
-
-                    println!("raw_values dict {:?}", val);
-                if val.len() > 0 {
-                    return Ok(val);
+            match b {
+                b'0'..=b'9' => values.append(&mut Self::raw_byte_str(it, pos, b, extract)?),
+                b'i' => values.append(&mut Self::raw_int(it, pos, extract)?),
+                b'l' => values.append(&mut Self::raw_list(it, extract)?),
+                b'd' if key.is_some() => {
+                    let val = Self::extract_dict(it, pos, key.unwrap())?;
+                    if val.len() > 0 {
+                        return Ok(val);
+                    }
                 }
-                    // values.append(&mut val);
-
+                b'd' if key.is_none() => values.append(&mut Self::raw_dict(it, extract)?),
+                d if delimiter.is_some() && delimiter.unwrap() == *d => return Ok(values),
+                _ => return Err(format!("Loop [{}]: Incorrect character", pos))
             }
-            else if key.is_none() && *b == b'd' {
-                values.append(&mut Self::raw_dict(it, extract)?);
-                // let mut val = &mut Self::raw_values(it, None, delimiter, extract)?;
-                //
-                // if extract {
-                //     println!("raw_values nont dict {:?}", val);
-                //     values.append(&mut val);
-                // }
-            }
-            else if is_delim && *b == delim {
-                println!("delimiter");
-                return Ok(values);
-            } else {
-                println!("err {:?}", b);
-                return Err(format!("Loop [{}]: Incorrect character", pos));
-            }
-
-
-
         }
-
-        println!("koniec ");
         Ok(values)
     }
 
@@ -131,7 +91,6 @@ impl BValue {
         delimiter: Option<u8>,
     ) -> Result<Vec<BValue>, String> {
         let mut values = vec![];
-        // let delim = delimiter.map_or(b' ', |v| v);
 
         while let Some((pos, b)) = it.next() {
             match b {
@@ -306,7 +265,7 @@ impl BValue {
         let mut key_turn = true;
         while let Some((pos, b)) = it.next() {
             if key_turn && *b >= b'0' && *b <= b'9' {
-                if let k = Self::parse_byte_str(it, pos, b)?.1 {
+                 if let k = Self::parse_byte_str(it, pos, b)?.1 {
                     println!("Sprawdzam klucz {:?}", k);
                     if key == &*k {
                         println!("klucz sie zgadza");
@@ -618,19 +577,19 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn find_raw_str_value() {
-    //     assert_eq!(
-    //         BValue::find_raw_value("k", b"d1:k4:spame"),
-    //         Some(vec![b'4', b':', b's', b'p', b'a', b'm'])
-    //     );
-    // }
+    #[test]
+    fn find_raw_str_value() {
+        assert_eq!(
+            BValue::find_raw_value("1:k", b"d1:k4:spame"),
+            Some(vec![b'4', b':', b's', b'p', b'a', b'm'])
+        );
+    }
 
-    // #[test]
-    // fn find_raw_str_value() {
-    //     assert_eq!(
-    //         BValue::find_raw_value("k", b"d1:k4:spame"),
-    //         Some(vec![b'4', b':', b's', b'p', b'a', b'm'])
-    //     );
-    // }
+    #[test]
+    fn find_raw_list_value() {
+        assert_eq!(
+            BValue::find_raw_value("1:k", b"d1:kli10ei20ee"),
+            Some(vec![b'l', b'i', b'1', b'0', b'e', b'i', b'2', b'0', b'e', b'e'])
+        );
+    }
 }
