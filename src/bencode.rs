@@ -15,19 +15,19 @@ pub enum BValue {
 impl BValue {
     pub fn parse(arg: &[u8]) -> Result<Vec<BValue>, String> {
         let mut it = arg.iter().enumerate();
-        Self::parse_values(&mut it, None)
+        Self::values_vector(&mut it, None)
     }
 
     pub fn find_raw_value(key: &str, arg: &[u8]) -> Option<Vec<u8>> {
         println!("Tutaj");
         let mut it = arg.iter().enumerate();
-        match Self::raw_values(&mut it, Some(key.as_bytes()),  None, false) {
+        match Self::raw_values_vector(&mut it, Some(key.as_bytes()),  None, false) {
             Ok(val) if val.len() > 0 => Some(val),
             _ => None
         }
     }
 
-    fn raw_values(
+    fn raw_values_vector(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         key: Option<&[u8]>,
         delimiter: Option<u8>,
@@ -41,7 +41,7 @@ impl BValue {
                 b'i' => values.append(&mut Self::raw_int(it, pos, extract)?),
                 b'l' => values.append(&mut Self::raw_list(it, extract)?),
                 b'd' if key.is_some() => {
-                    let val = Self::extract_dict(it, pos, key.unwrap())?;
+                    let val = Self::traverse_dict(it, pos, key.unwrap())?;
                     if val.len() > 0 {
                         return Ok(val);
                     }
@@ -58,7 +58,7 @@ impl BValue {
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         extract: bool,
     ) -> Result<Vec<u8>, String> {
-        let mut val = &mut Self::raw_values(it, None, Some(b'e'), extract)?;
+        let mut val = &mut Self::raw_values_vector(it, None, Some(b'e'), extract)?;
         match extract {
             true => {
                 let mut list = vec![b'l'];
@@ -74,7 +74,7 @@ impl BValue {
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         extract: bool,
     ) -> Result<Vec<u8>, String> {
-        let mut val = &mut Self::raw_values(it, None, Some(b'e'), extract)?;
+        let mut val = &mut Self::raw_values_vector(it, None, Some(b'e'), extract)?;
         match extract {
             true => {
                 let mut list = vec![b'd'];
@@ -85,8 +85,8 @@ impl BValue {
             false => Ok(vec![])
         }
     }
-
-    fn parse_values(
+    
+    fn values_vector(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         delimiter: Option<u8>,
     ) -> Result<Vec<BValue>, String> {
@@ -96,7 +96,7 @@ impl BValue {
             match b {
                 b'0'..=b'9' => values.push(Self::value_byte_str(it, pos, b)?),
                 b'i' => values.push(Self::value_int(it, pos)?),
-                b'l' => values.push(Self::parse_list(it)?),
+                b'l' => values.push(Self::value_list(it)?),
                 b'd' => values.push(Self::parse_dict(it, pos)?),
                 d if delimiter.is_some() && delimiter.unwrap() == *d => return Ok(values),
                 _ => return Err(format!("Loop [{}]: Incorrect character", pos))
@@ -227,18 +227,24 @@ impl BValue {
             .collect()
     }
 
-    fn parse_list(it: &mut std::iter::Enumerate<std::slice::Iter<u8>>) -> Result<BValue, String> {
-        return match Self::parse_values(it, Some(b'e')) {
+    fn value_list(
+        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+    ) -> Result<BValue, String> {
+        return match Self::parse_list(it) {
             Ok(v) => Ok(BValue::List(v)),
             Err(e) => Err(e),
         };
+    }
+    
+    fn parse_list(it: &mut std::iter::Enumerate<std::slice::Iter<u8>>) -> Result<Vec<BValue>, String> {
+        return Self::values_vector(it, Some(b'e'));
     }
 
     fn parse_dict(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         pos: usize,
     ) -> Result<BValue, String> {
-        let list = Self::parse_values(it, Some(b'e'))?;
+        let list = Self::values_vector(it, Some(b'e'))?;
         if list.len() % 2 != 0 {
             return Err(format!("Dict [{}]: Odd number of elements", pos));
         }
@@ -253,7 +259,7 @@ impl BValue {
         Ok(BValue::Dict(dict))
     }
 
-    fn extract_dict(
+    fn traverse_dict(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         pos: usize,
         key: &[u8],
@@ -265,12 +271,11 @@ impl BValue {
         let mut key_turn = true;
         while let Some((pos, b)) = it.next() {
             if key_turn && *b >= b'0' && *b <= b'9' {
-                 if let k = Self::parse_byte_str(it, pos, b)?.1 {
-                    println!("Sprawdzam klucz {:?}", k);
-                    if key == &*k {
-                        println!("klucz sie zgadza");
-                        extract = true;
-                    }
+                let k = Self::parse_byte_str(it, pos, b)?.1;
+                println!("Sprawdzam klucz {:?}", k);
+                if key == &*k {
+                    println!("klucz sie zgadza");
+                    extract = true;
                 }
             }
             else if key_turn && *b == b'e' {
@@ -278,7 +283,7 @@ impl BValue {
 
             } else {
                 println!("jest wartosc");
-                let value = Self::ppp(extract, it, b, pos);
+                let value = Self::dict_raw_value(extract, it, b, pos);
                 if extract {
                     println!("zwracam wartosc {:?}", value);
                     return value;
@@ -290,7 +295,7 @@ impl BValue {
         Ok(values)
     }
 
-    fn ppp(
+    fn dict_raw_value(
         extract : bool,
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         b: &u8,
@@ -298,19 +303,28 @@ impl BValue {
     ) -> Result<Vec<u8>, String> {
         let mut values = vec![];
 
+        // match b {
+        //     b'0'..=b'9' => values.push(Self::value_byte_str(it, pos, b)?),
+        //     b'i' => values.push(Self::value_int(it, pos)?),
+        //     b'l' => values.push(Self::value_list(it)?),
+        //     b'd' => values.push(Self::parse_dict(it, pos)?),
+        //     d if delimiter.is_some() && delimiter.unwrap() == *d => return Ok(values),
+        //     _ => return Err(format!("Loop [{}]: Incorrect character", pos))
+        // }
+
         if *b >= b'0' && *b <= b'9' {
-            println!("ppp str");
+            println!("dict_raw_value str");
             values.append(&mut Self::parse_byte_str(it, pos, b)?.1);
         } else if *b == b'i' {
-            println!("ppp int");
+            println!("dict_raw_value int");
             values.push(b'i');
             values.append(&mut Self::extract_int(it, pos)?);
             values.push(b'e')
         } else if *b == b'l' {
-            values.append(&mut Self::raw_values(it, None, Some(b'e'), extract)?);
+            values.append(&mut Self::raw_values_vector(it, None, Some(b'e'), extract)?);
         }
         else if *b == b'd' {
-            values.append(&mut Self::raw_values(it, None, Some(b'e'), extract)?);
+            values.append(&mut Self::raw_values_vector(it, None, Some(b'e'), extract)?);
             // values.append(Self::parse_dict(it, pos)?);
         }
         // else if is_delim && *b == delim {
