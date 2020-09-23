@@ -301,38 +301,14 @@ impl BValue {
     ) -> Result<Vec<u8>, String> {
         let mut values = vec![];
 
-        // match b {
-        //     b'0'..=b'9' => values.push(Self::value_byte_str(it, pos, b)?),
-        //     b'i' => values.push(Self::value_int(it, pos)?),
-        //     b'l' => values.push(Self::value_list(it)?),
-        //     b'd' => values.push(Self::parse_dict(it, pos)?),
-        //     d if delimiter.is_some() && delimiter.unwrap() == *d => return Ok(values),
-        //     _ => return Err(format!("Loop [{}]: Incorrect character", pos))
-        // }
-
-        if *b >= b'0' && *b <= b'9' {
-            println!("dict_raw_value str");
-            values.append(&mut Self::parse_byte_str(it, pos, b)?.1);
-        } else if *b == b'i' {
-            println!("dict_raw_value int");
-            values.push(b'i');
-            values.append(&mut Self::extract_int(it, pos)?);
-            values.push(b'e')
-        } else if *b == b'l' {
-            values.append(&mut Self::raw_list(it, extract)?);
-        }
-        else if *b == b'd' {
-            values.append(&mut Self::raw_values_vector(it, None, Some(b'e'), extract)?);
-            // values.append(Self::parse_dict(it, pos)?);
-        }
-        // else if is_delim && *b == delim {
-        //     return Ok(values);
-        // }
-        else {
-            return Err(format!("Loop [{}]: Incorrect character", pos));
+        match b {
+            b'0'..=b'9' => values.append(&mut Self::parse_byte_str(it, pos, b)?.1),
+            b'i' => values.append(&mut Self::raw_int(it, pos, extract)?),
+            b'l' => values.append(&mut Self::raw_list(it, extract)?),
+            b'd' => values.append(&mut Self::raw_dict(it, extract)?),
+            _ => return Err(format!("Raw dict val [{}]: Incorrect character", pos))
         }
 
-        // Ok(vec![])
         Ok(values)
     }
 
