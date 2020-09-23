@@ -274,35 +274,23 @@ impl BValue {
         pos: usize,
         key: &[u8],
     ) -> Result<Vec<u8>, String> {
-        let mut values = vec![];
-        // let (is_delim, delim) = delimiter.map_or((false, b' '), |v| (true, v));
-
         let mut extract = false;
         let mut key_turn = true;
         while let Some((pos, b)) = it.next() {
-            if key_turn && *b >= b'0' && *b <= b'9' {
-                let k = Self::parse_byte_str(it, pos, b)?.1;
-                println!("Sprawdzam klucz {:?}", k);
-                if key == &*k {
-                    println!("klucz sie zgadza");
-                    extract = true;
-                }
+            if key_turn {
+                let key = match b {
+                    b'0'..=b'9' if &*Self::parse_byte_str(it, pos, b)?.1 == key => extract = true,
+                    b'e' => break,
+                    _ => return Err(format!("ups"))
+                };
+            } else if !key_turn && extract {
+                return Self::dict_raw_value(extract, it, b, pos);
             }
-            else if key_turn && *b == b'e' {
-                break;
 
-            } else {
-                println!("jest wartosc");
-                let value = Self::dict_raw_value(extract, it, b, pos);
-                if extract {
-                    println!("zwracam wartosc {:?}", value);
-                    return value;
-                }
-            }
             key_turn = !key_turn;
         }
 
-        Ok(values)
+        Ok(vec![])
     }
 
     fn dict_raw_value(
@@ -331,7 +319,7 @@ impl BValue {
             values.append(&mut Self::extract_int(it, pos)?);
             values.push(b'e')
         } else if *b == b'l' {
-            values.append(&mut Self::raw_values_vector(it, None, Some(b'e'), extract)?);
+            values.append(&mut Self::raw_list(it, extract)?);
         }
         else if *b == b'd' {
             values.append(&mut Self::raw_values_vector(it, None, Some(b'e'), extract)?);
