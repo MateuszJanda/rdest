@@ -97,7 +97,7 @@ impl BValue {
                 b'0'..=b'9' => values.push(Self::value_byte_str(it, pos, b)?),
                 b'i' => values.push(Self::value_int(it, pos)?),
                 b'l' => values.push(Self::value_list(it)?),
-                b'd' => values.push(Self::parse_dict(it, pos)?),
+                b'd' => values.push(Self::value_dict(it, pos)?),
                 d if delimiter.is_some() && delimiter.unwrap() == *d => return Ok(values),
                 _ => return Err(format!("Loop [{}]: Incorrect character", pos))
             }
@@ -240,10 +240,20 @@ impl BValue {
         return Self::values_vector(it, Some(b'e'));
     }
 
-    fn parse_dict(
+    fn value_dict(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         pos: usize,
     ) -> Result<BValue, String> {
+        return match Self::parse_dict(it, pos) {
+            Ok(v) => Ok(BValue::Dict(v)),
+            Err(e) => Err(e),
+        };
+    }
+
+    fn parse_dict(
+        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        pos: usize,
+    ) -> Result<HashMap<Vec<u8>, BValue>, String> {
         let list = Self::values_vector(it, Some(b'e'))?;
         if list.len() % 2 != 0 {
             return Err(format!("Dict [{}]: Odd number of elements", pos));
@@ -256,7 +266,7 @@ impl BValue {
             .zip(list.iter().skip(1).step_by(2).map(|v| v.clone()))
             .collect();
 
-        Ok(BValue::Dict(dict))
+        Ok(dict)
     }
 
     fn traverse_dict(
