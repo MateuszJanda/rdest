@@ -345,9 +345,7 @@ mod tests {
     fn byte_str() {
         assert_eq!(
             BValue::parse(b"9:spamIsLoL"),
-            Ok(vec![BValue::ByteStr(vec![
-                b's', b'p', b'a', b'm', b'I', b's', b'L', b'o', b'L'
-            ])])
+            Ok(vec![BValue::ByteStr(b"spamIsLoL".to_vec())])
         );
     }
 
@@ -485,8 +483,8 @@ mod tests {
         assert_eq!(
             BValue::parse(b"l4:spam4:eggse"),
             Ok(vec![BValue::List(vec![
-                BValue::ByteStr(vec![b's', b'p', b'a', b'm']),
-                BValue::ByteStr(vec![b'e', b'g', b'g', b's'])
+                BValue::ByteStr(b"spam".to_vec()),
+                BValue::ByteStr(b"eggs".to_vec())
             ])])
         );
     }
@@ -505,7 +503,7 @@ mod tests {
             BValue::parse(b"lli1ei5ee3:abce"),
             Ok(vec![BValue::List(vec![
                 BValue::List(vec![BValue::Int(1), BValue::Int(5)]),
-                BValue::ByteStr(vec![b'a', b'b', b'c'])
+                BValue::ByteStr(b"abc".to_vec())
             ])])
         );
     }
@@ -562,7 +560,7 @@ mod tests {
     fn find_raw_int_value() {
         assert_eq!(
             BValue::find_raw_value("1:k", b"d1:ki-5ee"),
-            Some(vec![b'i', b'-', b'5', b'e'])
+            Some(b"i-5e".to_vec())
         );
     }
 
@@ -570,7 +568,7 @@ mod tests {
     fn find_raw_str_value() {
         assert_eq!(
             BValue::find_raw_value("1:k", b"d1:k4:spame"),
-            Some(vec![b'4', b':', b's', b'p', b'a', b'm'])
+            Some(b"4:spam".to_vec())
         );
     }
 
@@ -578,9 +576,6 @@ mod tests {
     fn find_raw_list_value() {
         assert_eq!(
             BValue::find_raw_value("1:k", b"d1:kli10ei20ee"),
-            // Some(vec![
-            //     b'l', b'i', b'1', b'0', b'e', b'i', b'2', b'0', b'e', b'e'
-            // ])
             Some(b"li10ei20ee".to_vec())
         );
     }
