@@ -173,6 +173,7 @@ impl BValue {
         extract: bool,
     ) -> Result<Vec<u8>, String> {
         let val = Self::parse_int(it, pos)?.1;
+        println!("vvv {:?}", val);
         match extract {
             true => Ok(val),
             false => Ok(vec![]),
@@ -316,17 +317,21 @@ impl BValue {
                         Err(format!("TODO"))
                     },
                 };
-            } else if !key_turn && extract_value {
-                println!("extract dict raw value");
-                return Self::extract_dict_raw_value(it, b, pos);
-            // } else if !key_turn && !extract_value && *b == b'd' {
-            } else if !key_turn && !extract_value {
-                println!("przeszukuje wartość");
-                println!("{:?}", b);
-                let val = Self::traverse_dict(it, key)?;
-                if val.len() > 0 {
-                    return Ok(val);
+            } else if !key_turn {
+                let mut bak = it.clone();
+                let val = Self::extract_dict_raw_value(it, b, pos);
+                if extract_value {
+                    return val
+                } else if *b == b'd' {
+                    println!("przeszukuje wartość");
+                    println!("www {:?}", *b as char);
+                    let val = Self::traverse_dict(&mut bak, key)?;
+                    if val.len() > 0 {
+                        return Ok(val);
+                    }
                 }
+
+
             }
 
             key_turn = !key_turn;
@@ -641,6 +646,14 @@ mod tests {
         assert_eq!(
             BValue::find_raw_value("1:k", b"di0ei1ee"),
             None
+        );
+    }
+
+    #[test]
+    fn find_raw_value_of_last_key() {
+        assert_eq!(
+            BValue::find_raw_value("i2e", b"di0ei1ei2ei3ee"),
+            Some(b"i3e".to_vec())
         );
     }
 
