@@ -173,7 +173,6 @@ impl BValue {
         extract: bool,
     ) -> Result<Vec<u8>, String> {
         let val = Self::parse_int(it, pos)?.1;
-        println!("vvv {:?}", val);
         match extract {
             true => Ok(val),
             false => Ok(vec![]),
@@ -271,67 +270,42 @@ impl BValue {
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         key: &[u8],
     ) -> Result<Vec<u8>, String> {
-        println!("trawerse");
         const EXTRACT_KEY: bool = true;
         let mut extract_value = false;
         let mut key_turn = true;
         while let Some((pos, b)) = it.next() {
             if key_turn {
-                println!("kkk {:?}", *b as char);
                 match b {
                     b'0'..=b'9' => {
-                        if &*Self::raw_byte_str(it, pos, b, EXTRACT_KEY)? == key {
-                            println!("klucz to string");
-                            extract_value = true;
-                        }
-                    },
-                    b'i' => {
-                        if &*Self::raw_int(it, pos, EXTRACT_KEY)? == key {
-                            extract_value = true;
-                        }
-                    },
-                    b'l' => {
-                        if &*Self::raw_list(it, EXTRACT_KEY)? == key {
-                            extract_value = true;
-                        }
-                    },
+                        extract_value = &*Self::raw_byte_str(it, pos, b, EXTRACT_KEY)? == key
+                    }
+                    b'i' => extract_value = &*Self::raw_int(it, pos, EXTRACT_KEY)? == key,
+                    b'l' => extract_value = &*Self::raw_list(it, EXTRACT_KEY)? == key,
                     b'd' => {
                         let mut bak = it.clone();
                         if &*Self::raw_dict(it, EXTRACT_KEY)? == key {
                             extract_value = true;
                         } else {
-                            println!("przeszukuje klucz");
                             let val = Self::traverse_dict(&mut bak, key)?;
                             if val.len() > 0 {
-                                println!("znalazlem");
                                 return Ok(val);
                             }
                         }
-                    },
-                    b'e' => {
-                        println!("break?");
-                        break
-                    },
-                    _ => return {
-                        println!("error?");
-                        Err(format!("TODO"))
-                    },
+                    }
+                    b'e' => break,
+                    _ => return Err(format!("Traverse [{}] : Incorrect character", pos)),
                 };
             } else if !key_turn {
                 let mut bak = it.clone();
                 let val = Self::extract_dict_raw_value(it, b, pos);
                 if extract_value {
-                    return val
+                    return val;
                 } else if *b == b'd' {
-                    println!("przeszukuje wartość");
-                    println!("www {:?}", *b as char);
                     let val = Self::traverse_dict(&mut bak, key)?;
                     if val.len() > 0 {
                         return Ok(val);
                     }
                 }
-
-
             }
 
             key_turn = !key_turn;
@@ -643,18 +617,12 @@ mod tests {
 
     #[test]
     fn find_raw_value_not_found() {
-        assert_eq!(
-            BValue::find_raw_value("1:k", b"di0ei1ee"),
-            None
-        );
+        assert_eq!(BValue::find_raw_value("1:k", b"di0ei1ee"), None);
     }
 
     #[test]
     fn find_raw_value_incorrect_bencode() {
-        assert_eq!(
-            BValue::find_raw_value("1:k", b"d1:kX4:spame"),
-            None
-        );
+        assert_eq!(BValue::find_raw_value("1:k", b"d1:kX4:spame"), None);
     }
 
     #[test]
