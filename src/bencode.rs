@@ -47,7 +47,7 @@ impl BValue {
                 }
                 b'd' if key.is_none() => values.append(&mut Self::raw_dict(it, extract)?),
                 d if delimiter.is_some() && delimiter.unwrap() == *d => return Ok(values),
-                _ => return Err(format!("Loop [{}]: Incorrect character", pos)),
+                _ => return Err(format!("Raw Loop [{}]: Incorrect character", pos)),
             }
         }
         Ok(values)
@@ -270,23 +270,63 @@ impl BValue {
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         key: &[u8],
     ) -> Result<Vec<u8>, String> {
+        println!("trawerse");
         const EXTRACT_KEY: bool = true;
         let mut extract_value = false;
         let mut key_turn = true;
         while let Some((pos, b)) = it.next() {
             if key_turn {
+                println!("kkk {:?}", *b as char);
                 match b {
-                    b'0'..=b'9' if &*Self::raw_byte_str(it, pos, b, EXTRACT_KEY)? == key => {
-                        extract_value = true
-                    }
-                    b'i' if &*Self::raw_int(it, pos, EXTRACT_KEY)? == key => extract_value = true,
-                    b'l' if &*Self::raw_list(it, EXTRACT_KEY)? == key => extract_value = true,
-                    b'd' if &*Self::raw_dict(it, EXTRACT_KEY)? == key => extract_value = true,
-                    b'e' => break,
-                    _ => return Err(format!("TODO")),
+                    b'0'..=b'9' => {
+                        if &*Self::raw_byte_str(it, pos, b, EXTRACT_KEY)? == key {
+                            println!("klucz to string");
+                            extract_value = true;
+                        }
+                    },
+                    b'i' => {
+                        if &*Self::raw_int(it, pos, EXTRACT_KEY)? == key {
+                            extract_value = true;
+                        }
+                    },
+                    b'l' => {
+                        if &*Self::raw_list(it, EXTRACT_KEY)? == key {
+                            extract_value = true;
+                        }
+                    },
+                    b'd' => {
+                        let mut bak = it.clone();
+                        if &*Self::raw_dict(it, EXTRACT_KEY)? == key {
+                            extract_value = true;
+                        } else {
+                            println!("przeszukuje klucz");
+                            let val = Self::traverse_dict(&mut bak, key)?;
+                            if val.len() > 0 {
+                                println!("znalazlem");
+                                return Ok(val);
+                            }
+                        }
+                    },
+                    b'e' => {
+                        println!("break?");
+                        break
+                    },
+                    _ => return {
+                        println!("error?");
+                        Err(format!("TODO"))
+                    },
                 };
             } else if !key_turn && extract_value {
+                println!("extract dict raw value");
                 return Self::extract_dict_raw_value(it, b, pos);
+            // } else if !key_turn && !extract_value && *b == b'd' {
+            } else if !key_turn && !extract_value {
+                println!("przeszukuje wartość");
+                println!("{:?}", b);
+                let val = Self::traverse_dict(it, key)?;
+                if val.len() > 0 {
+                    return Ok(val);
+                }
             }
 
             key_turn = !key_turn;
@@ -577,6 +617,54 @@ mod tests {
         assert_eq!(
             BValue::find_raw_value("1:k", b"d1:kli10ei20ee"),
             Some(b"li10ei20ee".to_vec())
+        );
+    }
+
+    #[test]
+    fn find_raw_dict_value() {
+        assert_eq!(
+            BValue::find_raw_value("1:k", b"i4ed1:kdi5ei0eee"),
+            Some(b"di5ei0ee".to_vec())
+        );
+    }
+
+    #[test]
+    fn find_raw_first_find() {
+        assert_eq!(
+            BValue::find_raw_value("1:k", b"d1:ki1eed1:ki2ee"),
+            Some(b"i1e".to_vec())
+        );
+    }
+
+    #[test]
+    fn find_raw_value_not_found() {
+        assert_eq!(
+            BValue::find_raw_value("1:k", b"di0ei1ee"),
+            None
+        );
+    }
+
+    #[test]
+    fn find_raw_value_in_sub_dict() {
+        assert_eq!(
+            BValue::find_raw_value("i1e", b"i4ed1:kdi1ei9eee"),
+            Some(b"i9e".to_vec())
+        );
+    }
+
+    #[test]
+    fn find_raw_value_in_dict_key() {
+        assert_eq!(
+            BValue::find_raw_value("i1e", b"ddi1ei9ee1:ke"),
+            Some(b"i9e".to_vec())
+        );
+    }
+
+    #[test]
+    fn find_raw_value_key_as_dict() {
+        assert_eq!(
+            BValue::find_raw_value("di1ei9ee", b"ddi1ei9ee1:ke"),
+            Some(b"1:k".to_vec())
         );
     }
 }
