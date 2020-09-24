@@ -650,6 +650,14 @@ mod tests {
     }
 
     #[test]
+    fn find_raw_value_incorrect_bencode() {
+        assert_eq!(
+            BValue::find_raw_value("1:k", b"d1:kX4:spame"),
+            None
+        );
+    }
+
+    #[test]
     fn find_raw_value_of_last_key() {
         assert_eq!(
             BValue::find_raw_value("i2e", b"di0ei1ei2ei3ee"),
