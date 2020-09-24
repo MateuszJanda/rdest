@@ -13,11 +13,6 @@ pub enum BValue {
 }
 
 impl BValue {
-    pub fn parse(arg: &[u8]) -> Result<Vec<BValue>, String> {
-        let mut it = arg.iter().enumerate();
-        Self::values_vector(&mut it, None)
-    }
-
     pub fn find_raw_value(key: &str, arg: &[u8]) -> Option<Vec<u8>> {
         let mut it = arg.iter().enumerate();
         match Self::raw_values_vector(&mut it, Some(key.as_bytes()), None, false) {
@@ -53,6 +48,31 @@ impl BValue {
         Ok(values)
     }
 
+    fn raw_byte_str(
+        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        pos: usize,
+        first_num: &u8,
+        extract: bool,
+    ) -> Result<Vec<u8>, String> {
+        let val = Self::parse_byte_str(it, pos, first_num)?.1;
+        match extract {
+            true => Ok(val),
+            false => Ok(vec![]),
+        }
+    }
+
+    fn raw_int(
+        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        pos: usize,
+        extract: bool,
+    ) -> Result<Vec<u8>, String> {
+        let val = Self::parse_int(it, pos)?.1;
+        match extract {
+            true => Ok(val),
+            false => Ok(vec![]),
+        }
+    }
+
     fn raw_list(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         extract: bool,
@@ -83,6 +103,77 @@ impl BValue {
         }
     }
 
+    fn traverse_dict(
+        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        key: &[u8],
+    ) -> Result<Vec<u8>, String> {
+        const EXTRACT_KEY: bool = true;
+        let mut extract_value = false;
+        let mut key_turn = true;
+        while let Some((pos, b)) = it.next() {
+            if key_turn {
+                match b {
+                    b'0'..=b'9' => {
+                        extract_value = &*Self::raw_byte_str(it, pos, b, EXTRACT_KEY)? == key
+                    }
+                    b'i' => extract_value = &*Self::raw_int(it, pos, EXTRACT_KEY)? == key,
+                    b'l' => extract_value = &*Self::raw_list(it, EXTRACT_KEY)? == key,
+                    b'd' => {
+                        let mut dict_it = it.clone();
+                        if &*Self::raw_dict(it, EXTRACT_KEY)? == key {
+                            extract_value = true;
+                        } else {
+                            let val = Self::traverse_dict(&mut dict_it, key)?;
+                            if val.len() > 0 {
+                                return Ok(val);
+                            }
+                        }
+                    }
+                    b'e' => break,
+                    _ => return Err(format!("Traverse [{}] : Incorrect character", pos)),
+                };
+            } else if !key_turn {
+                let mut dict_it = it.clone();
+                let val = Self::extract_dict_raw_value(it, b, pos);
+                if extract_value {
+                    return val;
+                } else if *b == b'd' {
+                    let val = Self::traverse_dict(&mut dict_it, key)?;
+                    if val.len() > 0 {
+                        return Ok(val);
+                    }
+                }
+            }
+
+            key_turn = !key_turn;
+        }
+
+        Ok(vec![])
+    }
+
+    fn extract_dict_raw_value(
+        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        b: &u8,
+        pos: usize,
+    ) -> Result<Vec<u8>, String> {
+        let mut values = vec![];
+        let extract = true;
+        match b {
+            b'0'..=b'9' => values.append(&mut Self::parse_byte_str(it, pos, b)?.1),
+            b'i' => values.append(&mut Self::raw_int(it, pos, extract)?),
+            b'l' => values.append(&mut Self::raw_list(it, extract)?),
+            b'd' => values.append(&mut Self::raw_dict(it, extract)?),
+            _ => return Err(format!("Extract dict val [{}]: Incorrect character", pos)),
+        }
+
+        Ok(values)
+    }
+
+    pub fn parse(arg: &[u8]) -> Result<Vec<BValue>, String> {
+        let mut it = arg.iter().enumerate();
+        Self::values_vector(&mut it, None)
+    }
+
     fn values_vector(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         delimiter: Option<u8>,
@@ -111,17 +202,28 @@ impl BValue {
         Ok(BValue::ByteStr(Self::parse_byte_str(it, pos, first_num)?.0))
     }
 
-    fn raw_byte_str(
+    fn value_int(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         pos: usize,
-        first_num: &u8,
-        extract: bool,
-    ) -> Result<Vec<u8>, String> {
-        let val = Self::parse_byte_str(it, pos, first_num)?.1;
-        match extract {
-            true => Ok(val),
-            false => Ok(vec![]),
-        }
+    ) -> Result<BValue, String> {
+        Ok(BValue::Int(Self::parse_int(it, pos)?.0))
+    }
+
+    fn value_list(it: &mut std::iter::Enumerate<std::slice::Iter<u8>>) -> Result<BValue, String> {
+        return match Self::parse_list(it) {
+            Ok(v) => Ok(BValue::List(v)),
+            Err(e) => Err(e),
+        };
+    }
+
+    fn value_dict(
+        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        pos: usize,
+    ) -> Result<BValue, String> {
+        return match Self::parse_dict(it, pos) {
+            Ok(v) => Ok(BValue::Dict(v)),
+            Err(e) => Err(e),
+        };
     }
 
     fn parse_byte_str(
@@ -160,25 +262,6 @@ impl BValue {
         return Ok((str_value, str_raw));
     }
 
-    fn value_int(
-        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
-        pos: usize,
-    ) -> Result<BValue, String> {
-        Ok(BValue::Int(Self::parse_int(it, pos)?.0))
-    }
-
-    fn raw_int(
-        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
-        pos: usize,
-        extract: bool,
-    ) -> Result<Vec<u8>, String> {
-        let val = Self::parse_int(it, pos)?.1;
-        match extract {
-            true => Ok(val),
-            false => Ok(vec![]),
-        }
-    }
-
     fn parse_int(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         pos: usize,
@@ -209,42 +292,10 @@ impl BValue {
         Ok((num, raw_num))
     }
 
-    fn extract_int(
-        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
-        pos: usize,
-    ) -> Result<Vec<u8>, String> {
-        it.take_while(|(_, &b)| b != b'e')
-            .map(|(_, b)| {
-                if (b'0'..=b'9').contains(b) || *b == b'-' {
-                    Ok(*b)
-                } else {
-                    Err(format!("Int [{}]: Incorrect character", pos))
-                }
-            })
-            .collect()
-    }
-
-    fn value_list(it: &mut std::iter::Enumerate<std::slice::Iter<u8>>) -> Result<BValue, String> {
-        return match Self::parse_list(it) {
-            Ok(v) => Ok(BValue::List(v)),
-            Err(e) => Err(e),
-        };
-    }
-
     fn parse_list(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
     ) -> Result<Vec<BValue>, String> {
         return Self::values_vector(it, Some(b'e'));
-    }
-
-    fn value_dict(
-        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
-        pos: usize,
-    ) -> Result<BValue, String> {
-        return match Self::parse_dict(it, pos) {
-            Ok(v) => Ok(BValue::Dict(v)),
-            Err(e) => Err(e),
-        };
     }
 
     fn parse_dict(
@@ -266,78 +317,27 @@ impl BValue {
         Ok(dict)
     }
 
-    fn traverse_dict(
-        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
-        key: &[u8],
-    ) -> Result<Vec<u8>, String> {
-        const EXTRACT_KEY: bool = true;
-        let mut extract_value = false;
-        let mut key_turn = true;
-        while let Some((pos, b)) = it.next() {
-            if key_turn {
-                match b {
-                    b'0'..=b'9' => {
-                        extract_value = &*Self::raw_byte_str(it, pos, b, EXTRACT_KEY)? == key
-                    }
-                    b'i' => extract_value = &*Self::raw_int(it, pos, EXTRACT_KEY)? == key,
-                    b'l' => extract_value = &*Self::raw_list(it, EXTRACT_KEY)? == key,
-                    b'd' => {
-                        let mut bak = it.clone();
-                        if &*Self::raw_dict(it, EXTRACT_KEY)? == key {
-                            extract_value = true;
-                        } else {
-                            let val = Self::traverse_dict(&mut bak, key)?;
-                            if val.len() > 0 {
-                                return Ok(val);
-                            }
-                        }
-                    }
-                    b'e' => break,
-                    _ => return Err(format!("Traverse [{}] : Incorrect character", pos)),
-                };
-            } else if !key_turn {
-                let mut bak = it.clone();
-                let val = Self::extract_dict_raw_value(it, b, pos);
-                if extract_value {
-                    return val;
-                } else if *b == b'd' {
-                    let val = Self::traverse_dict(&mut bak, key)?;
-                    if val.len() > 0 {
-                        return Ok(val);
-                    }
-                }
-            }
-
-            key_turn = !key_turn;
-        }
-
-        Ok(vec![])
-    }
-
-    fn extract_dict_raw_value(
-        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
-        b: &u8,
-        pos: usize,
-    ) -> Result<Vec<u8>, String> {
-        let mut values = vec![];
-        let extract = true;
-        match b {
-            b'0'..=b'9' => values.append(&mut Self::parse_byte_str(it, pos, b)?.1),
-            b'i' => values.append(&mut Self::raw_int(it, pos, extract)?),
-            b'l' => values.append(&mut Self::raw_list(it, extract)?),
-            b'd' => values.append(&mut Self::raw_dict(it, extract)?),
-            _ => return Err(format!("Raw dict val [{}]: Incorrect character", pos)),
-        }
-
-        Ok(values)
-    }
-
     fn keys_from_list(list: &Vec<BValue>, pos: usize) -> Result<Vec<Key>, String> {
         list.iter()
             .step_by(2)
             .map(|v| match v {
                 BValue::ByteStr(vec) => Ok(vec.clone()),
                 _ => Err(format!("Dict [{}]: Key not string", pos)),
+            })
+            .collect()
+    }
+
+    fn extract_int(
+        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        pos: usize,
+    ) -> Result<Vec<u8>, String> {
+        it.take_while(|(_, &b)| b != b'e')
+            .map(|(_, b)| {
+                if (b'0'..=b'9').contains(b) || *b == b'-' {
+                    Ok(*b)
+                } else {
+                    Err(format!("Int [{}]: Incorrect character", pos))
+                }
             })
             .collect()
     }
