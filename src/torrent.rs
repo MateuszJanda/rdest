@@ -15,6 +15,7 @@ pub struct Torrent {
     pieces: Vec<Vec<u8>>,
     length: Option<u64>,
     files: Option<Vec<File>>,
+    pub hash: [u8; 20]
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -31,8 +32,8 @@ impl Torrent {
         }
     }
 
-    pub fn from_bencode(arg: &[u8]) -> Result<Torrent, String> {
-        let bvalues = BValue::parse(arg)?;
+    pub fn from_bencode(data: &[u8]) -> Result<Torrent, String> {
+        let bvalues = BValue::parse(data)?;
         // let raw_info = BValue::cut_raw_info(arg)?;
 
         if bvalues.is_empty() {
@@ -42,7 +43,7 @@ impl Torrent {
         let mut err = Err(format!("Missing data"));
         for val in bvalues {
             match val {
-                BValue::Dict(dict) => match Self::create_torrent(&dict) {
+                BValue::Dict(dict) => match Self::create_torrent(data, &dict) {
                     Ok(torrent) => return Ok(torrent),
                     Err(e) => err = Err(e),
                 },
@@ -53,7 +54,7 @@ impl Torrent {
         err
     }
 
-    fn create_torrent(dict: &HashMap<Vec<u8>, BValue>) -> Result<Torrent, String> {
+    fn create_torrent(data: &[u8], dict: &HashMap<Vec<u8>, BValue>) -> Result<Torrent, String> {
         let torrent = Torrent {
             announce: Self::find_announce(dict)?,
             name: Self::find_name(dict)?,
@@ -61,6 +62,7 @@ impl Torrent {
             pieces: Self::find_pieces(dict)?,
             length: Self::find_length(dict),
             files: Self::find_files(dict),
+            hash: Self::info_hash(data),
         };
 
         if !torrent.is_valid() {
@@ -171,20 +173,29 @@ impl Torrent {
         return true;
     }
 
-    pub fn get_url(&self) -> String {
+    pub fn url(&self) -> String {
         self.announce.clone()
     }
 
-    pub fn get_info_hash(&self) -> String {
+
+    pub fn length(&self) -> u64 {
+        // TODO
+        return self.length.unwrap();
+    }
+
+    fn info_hash(data: &[u8]) -> [u8; 20] {
+        let info = BValue::find_deep("4:info", data).unwrap(); // TODO
         let mut m = sha1::Sha1::new();
 
-        let v: Vec<u8> = vec![1, 2, 3];
+        // let v: Vec<u8> = vec![1, 2, 3];
 
         // m.update(b"Hello World!");
-        m.update(v.as_ref());
+        m.update(info.as_ref());
         println!("{:?}", m.digest().to_string());
-        String::from("asdf")
+
+        m.digest().bytes()
     }
+
 }
 
 #[cfg(test)]
@@ -448,6 +459,7 @@ mod tests {
             pieces: vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
             length: Some(111),
             files: None,
+            hash: *b"AAAAABBBBBCCCCCDDDDD",
         };
         assert_eq!(torrent.is_valid(), true);
     }
@@ -461,6 +473,7 @@ mod tests {
             pieces: vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
             length: None,
             files: None,
+            hash: *b"AAAAABBBBBCCCCCDDDDD",
         };
         assert_eq!(torrent.is_valid(), false);
     }
@@ -474,6 +487,7 @@ mod tests {
             pieces: vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
             length: None,
             files: Some(vec![]),
+            hash: *b"AAAAABBBBBCCCCCDDDDD",
         };
         assert_eq!(torrent.is_valid(), true);
     }
@@ -487,6 +501,7 @@ mod tests {
             pieces: vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
             length: Some(111),
             files: Some(vec![]),
+            hash: *b"AAAAABBBBBCCCCCDDDDD",
         };
         assert_eq!(torrent.is_valid(), false);
     }
@@ -542,6 +557,7 @@ mod tests {
                 pieces : vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
                 length : Some(111),
                 files: None,
+                hash: *b"AAAAABBBBBCCCCCDDDDD",
             }));
     }
 }

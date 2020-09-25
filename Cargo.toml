@@ -8,5 +8,6 @@ edition = "2018"
 
 [dependencies]
 sha1 = "0.6.0"
+rand = "0.6.0"
 reqwest = { version = "0.10.8", features = ["blocking"] }
 # tokio = { version = "0.2", features = ["full"] }

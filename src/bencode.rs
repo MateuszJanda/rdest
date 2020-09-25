@@ -13,7 +13,7 @@ pub enum BValue {
 }
 
 impl BValue {
-    pub fn find_raw_value(key: &str, arg: &[u8]) -> Option<Vec<u8>> {
+    pub fn find_deep(key: &str, arg: &[u8]) -> Option<Vec<u8>> {
         let mut it = arg.iter().enumerate();
         match Self::raw_values_vector(&mut it, Some(key.as_bytes()), None, false) {
             Ok(val) if val.len() > 0 => Some(val),
@@ -578,7 +578,7 @@ mod tests {
     #[test]
     fn find_raw_int_value() {
         assert_eq!(
-            BValue::find_raw_value("1:k", b"d1:ki-5ee"),
+            BValue::find_deep("1:k", b"d1:ki-5ee"),
             Some(b"i-5e".to_vec())
         );
     }
@@ -586,7 +586,7 @@ mod tests {
     #[test]
     fn find_raw_str_value() {
         assert_eq!(
-            BValue::find_raw_value("1:k", b"d1:k4:spame"),
+            BValue::find_deep("1:k", b"d1:k4:spame"),
             Some(b"4:spam".to_vec())
         );
     }
@@ -594,7 +594,7 @@ mod tests {
     #[test]
     fn find_raw_list_value() {
         assert_eq!(
-            BValue::find_raw_value("1:k", b"d1:kli10ei20ee"),
+            BValue::find_deep("1:k", b"d1:kli10ei20ee"),
             Some(b"li10ei20ee".to_vec())
         );
     }
@@ -602,7 +602,7 @@ mod tests {
     #[test]
     fn find_raw_dict_value() {
         assert_eq!(
-            BValue::find_raw_value("1:k", b"i4ed1:kdi5ei0eee"),
+            BValue::find_deep("1:k", b"i4ed1:kdi5ei0eee"),
             Some(b"di5ei0ee".to_vec())
         );
     }
@@ -610,49 +610,49 @@ mod tests {
     #[test]
     fn find_raw_first_find() {
         assert_eq!(
-            BValue::find_raw_value("1:k", b"d1:ki1eed1:ki2ee"),
+            BValue::find_deep("1:k", b"d1:ki1eed1:ki2ee"),
             Some(b"i1e".to_vec())
         );
     }
 
     #[test]
-    fn find_raw_value_not_found() {
-        assert_eq!(BValue::find_raw_value("1:k", b"di0ei1ee"), None);
+    fn find_deep_not_found() {
+        assert_eq!(BValue::find_deep("1:k", b"di0ei1ee"), None);
     }
 
     #[test]
-    fn find_raw_value_incorrect_bencode() {
-        assert_eq!(BValue::find_raw_value("1:k", b"d1:kX4:spame"), None);
+    fn find_deep_incorrect_bencode() {
+        assert_eq!(BValue::find_deep("1:k", b"d1:kX4:spame"), None);
     }
 
     #[test]
-    fn find_raw_value_of_last_key() {
+    fn find_deep_of_last_key() {
         assert_eq!(
-            BValue::find_raw_value("i2e", b"di0ei1ei2ei3ee"),
+            BValue::find_deep("i2e", b"di0ei1ei2ei3ee"),
             Some(b"i3e".to_vec())
         );
     }
 
     #[test]
-    fn find_raw_value_in_sub_dict() {
+    fn find_deep_in_sub_dict() {
         assert_eq!(
-            BValue::find_raw_value("i1e", b"i4ed1:kdi1ei9eee"),
+            BValue::find_deep("i1e", b"i4ed1:kdi1ei9eee"),
             Some(b"i9e".to_vec())
         );
     }
 
     #[test]
-    fn find_raw_value_in_dict_key() {
+    fn find_deep_in_dict_key() {
         assert_eq!(
-            BValue::find_raw_value("i1e", b"ddi1ei9ee1:ke"),
+            BValue::find_deep("i1e", b"ddi1ei9ee1:ke"),
             Some(b"i9e".to_vec())
         );
     }
 
     #[test]
-    fn find_raw_value_key_as_dict() {
+    fn find_deep_key_as_dict() {
         assert_eq!(
-            BValue::find_raw_value("di1ei9ee", b"ddi1ei9ee1:ke"),
+            BValue::find_deep("di1ei9ee", b"ddi1ei9ee1:ke"),
             Some(b"1:k".to_vec())
         );
     }

@@ -1,6 +1,9 @@
 // use rdest::BValue;
 use rdest::Torrent;
 use rdest::TrackerClient;
+// use hex_literal::hex;
+use sha1::{Sha1, Digest};
+
 
 fn main() {
     println!("Hello, world!");
@@ -9,7 +12,7 @@ fn main() {
     // println!("{:?}", t);
 
     // get_http().await;
-    match TrackerClient::connect(&t.unwrap()) {
+    match TrackerClient::connect1(&t.unwrap()) {
         Ok(_) => println!("Http Ok"),
         _ => println!("Http Problem"),
     }
