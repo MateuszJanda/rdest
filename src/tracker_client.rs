@@ -1,5 +1,9 @@
 extern crate rand;
 
+extern crate url;
+use url::form_urlencoded;
+
+
 use crate::Torrent;
 use rand::Rng;
 use rand::distributions::Alphanumeric;
@@ -41,8 +45,8 @@ impl TrackerClient {
         let params = [
             // ("info_hash", metafile.hash.clone()),
             // ("info_hash", "ä"),
-            ("info_hash", a),
-            ("peer_id", "qqqwwweee".as_bytes()),
+            ("peer_id", "qqq"),
+            ("aaa", "123"),
         //     ("peer_id", peer_id),
         //     ("port", "6882".to_string()),
         //     ("uploaded", "0".to_string()),
@@ -53,22 +57,35 @@ impl TrackerClient {
         //     ("numwant", "x x x".to_string()),
         ];
 
+        let bytes: Vec<u8> = vec![1, 10, 100];
+        let ppp = [
+            ("www", "123"),
+        ];
+
+        let meal = &[
+            ("bread", [1, 2, 3]),
+        ];
+
+        // let encoded: String = form_urlencoded::Serializer::new(String::new())
+        //     .append_pair("foo", [1, 2, 3])
+        //     .finish();
+
+        let encoded: String = form_urlencoded::byte_serialize(&[1, 2, 3]).collect();
+        println!("{:?}", encoded);
+
         let client = reqwest::blocking::Client::new();
 
 
         println!("{:?}", client
-            .get("http://127.0.0.1:8080")
-            // .form(&params)
-            .body("a a a&xxx=1")
+            .get("http://127.0.0.1:8080?q=%20Q")
+            .form(&params)
             .build());
 
-        let bytes: Vec<u8> = vec![1, 10, 100];
 
         let body = client
-            .get("http://127.0.0.1:8080")
-            .form(&params)
-            .body("a a a&xxx=1")
-            .body(bytes)
+            .get("http://127.0.0.1:8080?q=%20Q")
+            // .form(&params)
+            .query(&ppp)
             .send()?
             .text();
         println!("body = {:?}", body);

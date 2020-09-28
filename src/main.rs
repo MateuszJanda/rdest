@@ -14,6 +14,6 @@ fn main() {
     // get_http().await;
     match TrackerClient::connect1(&t.unwrap()) {
         Ok(_) => println!("Http Ok"),
-        _ => println!("Http Problem"),
+        Err(e) => println!("Http Problem {:?}", e),
     }
 }
