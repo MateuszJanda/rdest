@@ -30,7 +30,8 @@ impl TrackerClient {
         //     .text()
         //     .await?;
 
-        let u = "http://127.0.0.1:8080/".to_string();
+        // let u = "http://127.0.0.1:8080/".to_string();
+        let u = metafile.url();
         let hash : String = form_urlencoded::byte_serialize(&metafile.hash).collect();
         let url = u + "?info_hash=" + hash.as_str();
 
