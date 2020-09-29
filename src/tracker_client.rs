@@ -7,6 +7,7 @@ use url::form_urlencoded;
 use crate::Torrent;
 use rand::Rng;
 use rand::distributions::Alphanumeric;
+use std::fs;
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct TrackerClient {}
@@ -62,6 +63,8 @@ impl TrackerClient {
             .send()?
             .text();
         println!("body = {:?}", body);
+
+        // fs::write("response.data", body.unwrap().as_str());
 
         Ok(())
     }
