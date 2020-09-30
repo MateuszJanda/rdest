@@ -3,6 +3,9 @@ mod torrent;
 mod tracker_client;
 
 pub mod utils;
+mod response_parser;
+
+pub use crate::response_parser::ResponseParser;
 
 pub use crate::bencode::BValue;
 pub use crate::torrent::Torrent;

@@ -133,14 +133,14 @@ impl Torrent {
     fn find_files(dict: &HashMap<Vec<u8>, BValue>) -> Option<Vec<File>> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"files".to_vec()) {
-                Some(BValue::List(list)) => Some(Self::find_files_list(list)),
+                Some(BValue::List(list)) => Some(Self::file_list(list)),
                 _ => None,
             },
             _ => None,
         }
     }
 
-    fn find_files_list(list: &Vec<BValue>) -> Vec<File> {
+    fn file_list(list: &Vec<BValue>) -> Vec<File> {
         list.iter()
             .filter_map(|elem| match elem {
                 BValue::Dict(dict) => Some(dict),
