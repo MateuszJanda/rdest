@@ -8,6 +8,8 @@ use crate::Torrent;
 use rand::Rng;
 use rand::distributions::Alphanumeric;
 use std::fs;
+use std::fs::File;
+use std::io::Write;
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct TrackerClient {}
@@ -60,11 +62,11 @@ impl TrackerClient {
         let body = client
             .get(&url)
             .query(&params)
-            .send()?
-            .text();
+            .send()?;
+            // .text();
         println!("body = {:?}", body);
 
-        // fs::write("response.data", body.unwrap().as_str());
+        fs::write("response.data", body.bytes().unwrap().as_ref());
 
         Ok(())
     }
