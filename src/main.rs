@@ -1,14 +1,13 @@
 // use rdest::BValue;
 use rdest::{Torrent, ResponseParser};
-use rdest::TrackerClient;
+// use rdest::TrackerClient;
 // use hex_literal::hex;
-use sha1::{Sha1, Digest};
 
 
 fn main() {
     println!("Hello, world!");
     // let b = BValue::parse(b"i4e").unwrap();
-    let t = Torrent::from_file(String::from("ubuntu-20.04.1-desktop-amd64.iso.torrent"));
+    let _t = Torrent::from_file(String::from("ubuntu-20.04.1-desktop-amd64.iso.torrent"));
     // println!("{:?}", t);
 
     // match TrackerClient::connect1(&t.unwrap()) {

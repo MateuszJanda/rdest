@@ -1,5 +1,5 @@
 #[cfg(test)]
-use super::hashmap;
+use crate::hashmap;
 use std::collections::HashMap;
 
 type Key = Vec<u8>;

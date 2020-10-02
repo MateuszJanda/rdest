@@ -1,26 +1,21 @@
-extern crate rand;
-
-extern crate url;
 use url::form_urlencoded;
-
-
 use crate::Torrent;
 use rand::Rng;
 use rand::distributions::Alphanumeric;
 use std::fs;
-use std::fs::File;
-use std::io::Write;
+// use std::fs::File;
+// use std::io::Write;
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct TrackerClient {}
 
 impl TrackerClient {
     pub fn connect(metafile: &Torrent) -> Result<(), reqwest::Error> {
-        let url = metafile.url();
+        let _url = metafile.url();
         println!("{:?}", metafile.url());
 
         // let info_hash = metafile.info_hash();
-        let params = [("info_hash", "xxx"), ("peer_id", "ABCDEFGHIJKLMNOPQRST")];
+        let _params = [("info_hash", "xxx"), ("peer_id", "ABCDEFGHIJKLMNOPQRST")];
 
         Ok(())
     }
@@ -66,7 +61,7 @@ impl TrackerClient {
             // .text();
         println!("body = {:?}", body);
 
-        fs::write("response.data", body.bytes().unwrap().as_ref());
+        fs::write("response.data", body.bytes().unwrap().as_ref()).unwrap();
 
         Ok(())
     }
