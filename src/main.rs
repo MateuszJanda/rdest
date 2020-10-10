@@ -5,6 +5,7 @@ use rdest::{Torrent, ResponseParser};
 use tokio;
 use tokio::net::{TcpListener, TcpStream};
 use std::io::Cursor;
+use std::fmt;
 
 // fn main() {
 //     println!("Hello, world!");
@@ -39,6 +40,8 @@ async fn main() {
 enum Frame {
     Handshake,
     KeepAlive,
+    Choke,
+
 }
 
 struct Connection {
@@ -57,7 +60,7 @@ impl Connection {
     }
 
     pub async fn read_frame(&mut self)
-                            -> Result<Option<Frame>, String>
+                            -> Result<Option<Frame>, Error>
     {
         loop {
             if let Some(frame) = self.parse_frame()? {
@@ -81,7 +84,7 @@ impl Connection {
                 if self.cursor == 0 {
                     return Ok(None);
                 } else {
-                    return Err("connection reset by peer".into());
+                    return Err(Error::S("connection reset by peer".into()));
                 }
             } else {
                 // Update our cursor
@@ -92,7 +95,7 @@ impl Connection {
 
 
     fn parse_frame(&mut self)
-                   -> Result<Option<Frame>, String>
+                   -> Result<Option<Frame>, Error>
     {
         // Create the `T: Buf` type.
         let mut buf = Cursor::new(&self.buffer[..]);
@@ -111,7 +114,8 @@ impl Connection {
                 let frame = Frame::parse(&mut buf)?;
 
                 // Discard the frame from the buffer
-                self.buffer.advance(len);
+                self.buffer.drain(..len);
+                self.buffer.resize(65536, 0);
 
                 // Return the frame to the caller.
                 Ok(Some(frame))
@@ -125,78 +129,58 @@ impl Connection {
 }
 
 impl Frame {
-    pub fn check(src: &mut Cursor<&[u8]>) -> Result<(), String> {
-        match get_prefix_length(src)? {
-            b'+' => {
-                get_line(src)?;
-                Ok(())
-            }
-            b'-' => {
-                get_line(src)?;
-                Ok(())
-            }
-            b':' => {
-                let _ = get_decimal(src)?;
-                Ok(())
-            }
-            b'$' => {
-                if b'-' == peek_u8(src)? {
-                    // Skip '-1\r\n'
-                    skip(src, 4)
-                } else {
-                    // Read the bulk string
-                    let len: usize = get_decimal(src)?.try_into()?;
-
-                    // skip that number of bytes + 2 (\r\n).
-                    skip(src, len + 2)
-                }
-            }
-            b'*' => {
-                let len = get_decimal(src)?;
-
-                for _ in 0..len {
-                    Frame::check(src)?;
-                }
-
-                Ok(())
-            }
-            actual => Err(format!("protocol error; invalid frame type byte `{}`", actual).into()),
+    pub fn check(src: &mut Cursor<&[u8]>) -> Result<(), Error> {
+        if Self::get_length(src)? == 0 {
+            return Ok(())
+        }
+        match Self::get_id(src)? {
+            0 => Ok(()),
+            _ => Err(Error::S("fuck".into()))
         }
     }
 
-    fn get_prefix_length<'a>(src: &mut Cursor<&'a [u8]>) -> Result<&'a [u8], Error> {
-        // Scan the bytes directly
+    fn get_length(src: &Cursor<&[u8]>) -> Result<u16, Error> {
         let start = src.position() as usize;
-        // Scan to the second to last byte
-        let end = src.get_ref().len() - 1;
+        let end = src.get_ref().len();
 
         if end - start >= 2 {
-            let a = src.get_ref()[start..start+2];
-            let v = u16::from_le_bytes(src.get_ref()[start..start+2]);
+            // let b : [u8; 2] = src.get_ref()[0..2];
+            let b = [src.get_ref()[0], src.get_ref()[1]];
+            return Ok(u16::from_be_bytes(b));
         }
 
         Err(Error::Incomplete)
     }
 
-    // /// Find a line
-    // fn get_line<'a>(src: &mut Cursor<&'a [u8]>) -> Result<&'a [u8], Error> {
-    //     // Scan the bytes directly
-    //     let start = src.position() as usize;
-    //     // Scan to the second to last byte
-    //     let end = src.get_ref().len() - 1;
-    //
-    //     for i in start..end {
-    //         if src.get_ref()[i] == b'\r' && src.get_ref()[i + 1] == b'\n' {
-    //             // We found a line, update the position to be *after* the \n
-    //             src.set_position((i + 2) as u64);
-    //
-    //             // Return the line
-    //             return Ok(&src.get_ref()[start..i]);
-    //         }
-    //     }
-    //
-    //     Err(Error::Incomplete)
-    // }
 
+    fn get_id(src: &Cursor<&[u8]>) -> Result<u8, Error> {
+        let start = src.position() as usize;
+        let end = src.get_ref().len();
+
+        if end - start >= 3 {
+            return Ok(src.get_ref()[3]);
+        }
+
+        Err(Error::Incomplete)
+    }
+
+    pub fn parse(src: &mut Cursor<&[u8]>) -> Result<Frame, Error>
+    {
+        Ok(Frame::Choke)
+    }
 }
 
+#[derive(Debug)]
+enum Error {
+    Incomplete,
+    S(String),
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Error::Incomplete => write!(f, "dddd"),
+            Error::S(s) => write!(f, "ssss")
+        }
+    }
+}
