@@ -6,6 +6,9 @@ use tokio;
 use tokio::net::{TcpListener, TcpStream};
 use std::io::Cursor;
 use std::fmt;
+use tokio::io::BufReader;
+// use tokio::io::util::async_read_ext::AsyncReadExt;
+use tokio::io::AsyncReadExt;
 
 // fn main() {
 //     println!("Hello, world!");
@@ -76,8 +79,23 @@ impl Connection {
             // Read into the buffer, tracking the number
             // of bytes read
 
-            // let n = self.stream.read(
-            //     &mut self.buffer[self.cursor..]).await?;
+            // let mut stream = BufReader::new(self.stream);
+
+            let n = self.stream.read(
+                &mut self.buffer[self.cursor..]).await?;
+
+
+            // let mut line = String::new();
+            // stream.read_line(&mut line).await.unwrap();
+
+            // let mut bb = [20; 0];
+            // self.stream.read(&mut bb).await?;
+
+            // let mut line = String::new();
+            // self.stream.read_line(&mut line).await.unwrap();
+
+            // self.stream.read_buf(&mut self.buffer[self.cursor..]).await?;
+            // self.stream.read_exact(&mut self.buffer[self.cursor..]).await?;
             let n = 0;
 
             if 0 == n {
@@ -174,13 +192,21 @@ impl Frame {
 enum Error {
     Incomplete,
     S(String),
+    I(std::io::Error)
 }
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::Incomplete => write!(f, "dddd"),
-            Error::S(s) => write!(f, "ssss")
+            Error::S(s) => write!(f, "ssss"),
+            Error::I(i) =>  write!(f, "iii"),
         }
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(error: std::io::Error) -> Self {
+        Error::I(error)
     }
 }
