@@ -1,17 +1,12 @@
 // use rdest::BValue;
-use rdest::{Torrent, ResponseParser, Error, Frame};
+use rdest::{Error, Frame};
 // use rdest::TrackerClient;
 // use hex_literal::hex;
 use tokio;
 use tokio::net::{TcpListener, TcpStream};
 use std::io::Cursor;
-use std::fmt;
-use tokio::io::BufReader;
-// use tokio::io::util::async_read_ext::AsyncReadExt;
-use tokio::io::AsyncReadExt;
 use std::net::Ipv4Addr;
-use std::convert::{TryFrom, TryInto};
-
+use tokio::io::AsyncReadExt;
 
 // fn main() {
 //     println!("Hello, world!");

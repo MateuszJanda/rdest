@@ -22,7 +22,8 @@ pub struct Handshake {}
 impl Handshake {
     const ID_BYTE: u8 = b'i';
     const PREFIX_LEN: usize = 1;
-    const LEN: usize = 19;
+    const PROTOCOL_ID: &'static [u8; 19] = b"BitTorrent protocol";
+    const LEN: usize = Handshake::PROTOCOL_ID.len();
     const FULL_LEN: usize = Handshake::PREFIX_LEN + Handshake::LEN;
 }
 
@@ -121,62 +122,8 @@ impl Port {
     const FULL_LEN: usize = Port::PREFIX_LEN + Port::LEN;
 }
 
-
-
-// enum MessageId {
-//     Choke = 0,
-//     Unchoke = 1,
-//     Interested = 2,
-//     NotInterested = 3,
-//     Have = 4,
-//     Bitfield = 5,
-//     Request = 6,
-//     Piece = 7,
-//     Cancel = 8,
-//     Port = 9,
-// }
-//
-//
-// impl TryFrom<u8> for MessageId {
-//     type Error = ();
-//
-//     fn try_from(v: u8) -> Result<Self, Self::Error> {
-//         match v {
-//             x if x == MessageId::Choke as u8 => Ok(MessageId::Choke),
-//             x if x == MessageId::Unchoke as u8 => Ok(MessageId::Unchoke),
-//             x if x == MessageId::Interested as u8 => Ok(MessageId::Interested),
-//             x if x == MessageId::NotInterested as u8 => Ok(MessageId::NotInterested),
-//             x if x == MessageId::Have as u8 => Ok(MessageId::Have),
-//             x if x == MessageId::Bitfield as u8 => Ok(MessageId::Bitfield),
-//             x if x == MessageId::Request as u8 => Ok(MessageId::Request),
-//             x if x == MessageId::Piece as u8 => Ok(MessageId::Piece),
-//             x if x == MessageId::Cancel as u8 => Ok(MessageId::Cancel),
-//             x if x == MessageId::Port as u8 => Ok(MessageId::Port),
-//             _ => Err(()),
-//         }
-//     }
-// }
-
 const PREFIX_LEN: usize = 2;
 const ID_LEN: usize = 1;
-
-// const ID_FIELD_LEN: usize = 1;
-//
-// const HANDSHAKE_PSTR_LEN: usize = 19;
-//
-// const KEEP_ALIVE_LEN: usize = 0;
-// const CHOKE_LEN: usize = 1;
-// const UNCHOKE_LEN: usize = 1;
-// const INTERESTED_LEN: usize = 1;
-// const NOT_INTERESTED_LEN: usize = 1;
-// const HAVE_LEN: usize = 5;
-// const REQUEST_LEN: usize = 13;
-// const CANCEL_LEN: usize = 13;
-// const PORT_LEN: usize = 3;
-
-// const MIN_PIECE_LEN: usize = 9;
-
-const HANDSHAKE: &[u8; 19] = b"BitTorrent protocol";
 
 impl Frame {
     pub fn check(src: &mut Cursor<&[u8]>) -> Result<(), Error> {
@@ -189,7 +136,7 @@ impl Frame {
 
         if msg_id == Handshake::ID_BYTE && Self::get_handshake_length(src)? == Handshake::LEN && Self::available_data(src) >= Handshake::FULL_LEN {
             for idx in 0..Handshake::LEN {
-                if src.get_ref()[idx + 1] != HANDSHAKE[idx] {
+                if src.get_ref()[idx + 1] != Handshake::PROTOCOL_ID[idx] {
                     return Err(Error::S("nope".into()))
                 }
             }
@@ -264,9 +211,9 @@ impl Frame {
 
         let msg_id = Self::get_message_id(src)?;
 
-        if msg_id == b'i' && Self::get_handshake_length(src)? == Handshake::LEN && Self::available_data(src) >= Handshake::FULL_LEN {
+        if msg_id == Handshake::ID_BYTE && Self::get_handshake_length(src)? == Handshake::LEN && Self::available_data(src) >= Handshake::FULL_LEN {
             for idx in 0..Handshake::LEN {
-                if src.get_ref()[idx + 1] != HANDSHAKE[idx] {
+                if src.get_ref()[idx + 1] != Handshake::PROTOCOL_ID[idx] {
                     return Err(Error::S("nope".into()))
                 }
             }
