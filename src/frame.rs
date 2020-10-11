@@ -3,100 +3,121 @@ use std::io::Cursor;
 
 
 pub enum Frame {
-    Handshake,
-    KeepAlive,
+    Handshake(Handshake),
+    KeepAlive(KeepAlive),
     Choke(Choke),
-    Unchoke,
-    Interested,
-    NotInterested,
-    Have,
-    Bitfield,
-    Request,
-    Piece,
-    Cancel,
-    Port,
+    Unchoke(Unchoke),
+    Interested(Interested),
+    NotInterested(NotInterested),
+    Have(Have),
+    Bitfield(Bitfield),
+    Request(Request),
+    Piece(Piece),
+    Cancel(Cancel),
+    Port(Port),
 }
 
 pub struct Handshake {}
 
 impl Handshake {
-    const THIRD_BIT: u8 = b'i';
+    const ID_BYTE: u8 = b'i';
     const PREFIX_LEN: usize = 1;
+    const LEN: usize = 19;
+    const FULL_LEN: usize = Handshake::PREFIX_LEN + Handshake::LEN;
 }
 
+pub struct KeepAlive {}
+
+impl KeepAlive {
+    const LEN: usize = 0;
+    const PREFIX_LEN: usize = 2;
+    const FULL_LEN: usize = KeepAlive::PREFIX_LEN;
+}
 
 pub struct Choke {}
 
 impl Choke {
     const ID: u8 = 0;
     const PREFIX_LEN: usize = 2;
+    const LEN: usize = 1;
+    const FULL_LEN: usize = Choke::PREFIX_LEN + Choke::LEN;
 }
 
-struct Unchoke {}
+pub struct Unchoke {}
 
 impl Unchoke {
     const ID: u8 = 1;
     const PREFIX_LEN: usize = 2;
+    const LEN: usize = 1;
+    const FULL_LEN: usize = Unchoke::PREFIX_LEN +  Unchoke::LEN;
 }
 
-struct Interested {}
+pub struct Interested {}
 
 impl Interested {
     const ID: u8 = 2;
     const PREFIX_LEN: usize = 2;
+    const LEN: usize = 1;
+    const FULL_LEN: usize = Interested::PREFIX_LEN + Interested::LEN;
 }
 
-struct NotInterested {}
+pub struct NotInterested {}
 
 impl NotInterested {
     const ID: u8 = 3;
     const PREFIX_LEN: usize = 2;
+    const LEN: usize = 1;
+    const FULL_LEN: usize = NotInterested::PREFIX_LEN + NotInterested::LEN;
 }
 
-struct Have {}
+pub struct Have {}
 
 impl Have {
     const ID: u8 = 4;
     const PREFIX_LEN: usize = 2;
     const LEN: usize = 5;
+    const FULL_LEN: usize = Have::PREFIX_LEN + Have::LEN;
 }
 
-struct Bitfield {}
+pub struct Bitfield {}
 
 impl Bitfield {
     const ID: u8 = 5;
     const PREFIX_LEN: usize = 2;
 }
 
-struct Request {}
+pub struct Request {}
 
 impl Request {
     const ID: u8 = 6;
     const PREFIX_LEN: usize = 2;
     const LEN: usize = 13;
+    const FULL_LEN: usize = Request::PREFIX_LEN + Request::LEN;
 }
 
-struct Piece {}
+pub struct Piece {}
 
 impl Piece {
     const ID: u8 = 7;
     const PREFIX_LEN: usize = 2;
 }
 
-struct Cancel {}
+pub struct Cancel {}
 
 impl Cancel {
     const ID: u8 = 8;
     const PREFIX_LEN: usize = 2;
     const LEN: usize = 13;
+    const FULL_LEN: usize = Cancel::PREFIX_LEN + Cancel::LEN;
 }
 
-struct Port {}
+pub struct Port {}
 
 impl Port {
     const ID: u8 = 9;
     const PREFIX_LEN: usize = 2;
     const LEN: usize = 3;
+    const FULL_LEN: usize = Port::PREFIX_LEN + Port::LEN;
 }
 
 
@@ -163,8 +184,8 @@ impl Frame {
 
         let msg_id = Self::get_message_id(src)?;
 
-        if msg_id == b'i' && Self::get_handshake_length(src)? == HANDSHAKE_PSTR_LEN && Self::available_data(src) - 1 >= HANDSHAKE_PSTR_LEN {
-            for idx in 0..HANDSHAKE.len() {
+        if msg_id == Handshake::ID_BYTE && Self::get_handshake_length(src)? == Handshake::LEN && Self::available_data(src) >= Handshake::FULL_LEN {
+            for idx in 0..Handshake::LEN {
                 if src.get_ref()[idx + 1] != HANDSHAKE[idx] {
                     return Err(Error::S("nope".into()))
                 }
@@ -177,12 +198,12 @@ impl Frame {
             Unchoke::ID => Ok(()),
             Interested::ID => Ok(()),
             NotInterested::ID => Ok(()),
-            Have::ID if Self::available_data(src) >= Have::PREFIX_LEN + Have::LEN => Ok(()),
+            Have::ID if Self::available_data(src) >= Have::FULL_LEN => Ok(()),
             Bitfield::ID if Self::available_data(src) >= Bitfield::PREFIX_LEN + length => Ok(()),
-            Request::ID if Self::available_data(src) >= Have::PREFIX_LEN + Request::LEN => Ok(()),
+            Request::ID if Self::available_data(src) >= Have::FULL_LEN => Ok(()),
             Piece::ID if Self::available_data(src) >= Piece::PREFIX_LEN + length => Ok(()),
-            Cancel::ID if Self::available_data(src) >= Cancel::PREFIX_LEN + Cancel::LEN => Ok(()),
-            Port::ID if Self::available_data(src) >= Port::PREFIX_LEN + Port::LEN => Ok(()),
+            Cancel::ID if Self::available_data(src) >= Cancel::FULL_LEN => Ok(()),
+            Port::ID if Self::available_data(src) >= Port::FULL_LEN => Ok(()),
             _ => Err(Error::S("fuck".into()))
         }
     }
@@ -233,64 +254,65 @@ impl Frame {
     pub fn parse(src: &mut Cursor<&[u8]>) -> Result<Frame, Error>
     {
         let length = Self::get_message_length(src)?;
-        if length == KEEP_ALIVE_LEN {
-            src.set_position(LENGTH_FIELD_LEN as u64);
-            return Ok(Frame::KeepAlive)
+        if length == KeepAlive::LEN {
+            src.set_position(KeepAlive::FULL_LEN as u64);
+            return Ok(Frame::KeepAlive(KeepAlive{}))
         }
 
         let msg_id = Self::get_message_id(src)?;
 
-        if msg_id == b'i' && Self::get_handshake_length(src)? == HANDSHAKE_PSTR_LEN && Self::available_data(src) - 1 >= HANDSHAKE_PSTR_LEN {
-            for idx in 0..HANDSHAKE.len() {
+        if msg_id == b'i' && Self::get_handshake_length(src)? == Handshake::LEN && Self::available_data(src) >= Handshake::FULL_LEN {
+            for idx in 0..Handshake::LEN {
                 if src.get_ref()[idx + 1] != HANDSHAKE[idx] {
                     return Err(Error::S("nope".into()))
                 }
             }
-            return Ok(Frame::Handshake)
+            src.set_position(Handshake::FULL_LEN as u64);
+            return Ok(Frame::Handshake(Handshake{}))
         }
 
-        let available_data = Self::available_data(src) - LENGTH_FIELD_LEN;
+        let available_data = Self::available_data(src);
         match msg_id {
-            Choke::ID if length == CHOKE_LEN => {
-                src.set_position((LENGTH_FIELD_LEN + length) as u64);
+            Choke::ID if length == Choke::LEN => {
+                src.set_position(Choke::FULL_LEN as u64);
                 Ok(Frame::Choke(Choke{}))
             },
-            // Ok(MessageId::Unchoke) if length == UNCHOKE_LEN => {
-            //     src.set_position((LENGTH_FIELD_LEN + length) as u64);
-            //     Ok(Frame::Unchoke)
-            // },
-            // Ok(MessageId::Interested) if length == INTERESTED_LEN => {
-            //     src.set_position((LENGTH_FIELD_LEN + length) as u64);
-            //     Ok(Frame::Interested)
-            // },
-            // Ok(MessageId::NotInterested) if length == NOT_INTERESTED_LEN => {
-            //     src.set_position((LENGTH_FIELD_LEN + length) as u64);
-            //     Ok(Frame::NotInterested)
-            // },
-            // Ok(MessageId::Have) if length == HAVE_LEN => {
-            //     src.set_position((LENGTH_FIELD_LEN + length) as u64);
-            //     Ok(Frame::Have)
-            // },
-            // Ok(MessageId::Bitfield) if available_data >= length => {
-            //     src.set_position((LENGTH_FIELD_LEN + length) as u64);
-            //     Ok(Frame::Bitfield)
-            // },
-            // Ok(MessageId::Request) if length == REQUEST_LEN => {
-            //     src.set_position((LENGTH_FIELD_LEN + length) as u64);
-            //     Ok(Frame::Request)
-            // },
-            // Ok(MessageId::Piece) if available_data >= length => {
-            //     src.set_position((LENGTH_FIELD_LEN + length) as u64);
-            //     Ok(Frame::Piece)
-            // },
-            // Ok(MessageId::Cancel) if length == CANCEL_LEN => {
-            //     src.set_position((LENGTH_FIELD_LEN + length) as u64);
-            //     Ok(Frame::Cancel)
-            // },
-            // Ok(MessageId::Port) if length == PORT_LEN => {
-            //     src.set_position((LENGTH_FIELD_LEN + length) as u64);
-            //     Ok(Frame::Port)
-            // },
+            Unchoke::ID if length == Unchoke::LEN => {
+                src.set_position(Unchoke::FULL_LEN as u64);
+                Ok(Frame::Unchoke(Unchoke{}))
+            },
+            Interested::ID if length == Interested::LEN => {
+                src.set_position(Interested::FULL_LEN as u64);
+                Ok(Frame::Interested(Interested{}))
+            },
+            NotInterested::ID if length == NotInterested::LEN => {
+                src.set_position(NotInterested::FULL_LEN as u64);
+                Ok(Frame::NotInterested(NotInterested{}))
+            },
+            Have::ID if length == Have::LEN => {
+                src.set_position(Have::FULL_LEN as u64);
+                Ok(Frame::Have(Have{}))
+            },
+            Bitfield::ID if available_data >= length => {
+                src.set_position((Bitfield::PREFIX_LEN + length) as u64);
+                Ok(Frame::Bitfield(Bitfield{}))
+            },
+            Request::ID if length == Request::LEN => {
+                src.set_position(Request::FULL_LEN as u64);
+                Ok(Frame::Request(Request{}))
+            },
+            Piece::ID if available_data >= length => {
+                src.set_position((Piece::PREFIX_LEN + length) as u64);
+                Ok(Frame::Piece(Piece{}))
+            },
+            Cancel::ID if length == Cancel::LEN => {
+                src.set_position(Cancel::FULL_LEN as u64);
+                Ok(Frame::Cancel(Cancel{}))
+            },
+            Port::ID if length == Port::LEN => {
+                src.set_position(Port::FULL_LEN as u64);
+                Ok(Frame::Port(Port{}))
+            },
             _ => Err(Error::S("fuck".into()))
         }
     }
