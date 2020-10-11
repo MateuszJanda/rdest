@@ -219,36 +219,45 @@ impl TryFrom<u8> for MessageId {
     }
 }
 
-const LENGTH_FIELD_LEN: u16 = 2;
-const ID_FIELD_LEN: u16 = 1;
+const LENGTH_FIELD_LEN: usize = 2;
+const ID_FIELD_LEN: usize = 1;
 
-const HANDSHAKE_PSTR_LEN: u8 = 19;
+const HANDSHAKE_PSTR_LEN: usize = 19;
 
-const KEEP_ALIVE_LEN: u16 = 0;
-const CHOKE_LEN: u16 = 1;
-const UNCHOKE_LEN: u16 = 1;
-const INTERESTED_LEN: u16 = 1;
-const NOT_INTERESTED_LEN: u16 = 1;
-const HAVE_LEN: u16 = 5;
-const REQUEST_LEN: u16 = 13;
-const CANCEL_LEN: u16 = 13;
-const PORT_LEN: u16 = 3;
+const KEEP_ALIVE_LEN: usize = 0;
+const CHOKE_LEN: usize = 1;
+const UNCHOKE_LEN: usize = 1;
+const INTERESTED_LEN: usize = 1;
+const NOT_INTERESTED_LEN: usize = 1;
+const HAVE_LEN: usize = 5;
+const REQUEST_LEN: usize = 13;
+const CANCEL_LEN: usize = 13;
+const PORT_LEN: usize = 3;
 
-const MIN_PIECE_LEN: u16 = 9;
+const MIN_PIECE_LEN: usize = 9;
+
+const HANDSHAKE: &[u8; 19] = b"BitTorrent protocol";
 
 impl Frame {
     pub fn check(src: &mut Cursor<&[u8]>) -> Result<(), Error> {
-        let length = Self::get_length(src)?;
+        let length = Self::get_message_length(src)?;
         if length == KEEP_ALIVE_LEN {
             return Ok(())
         }
 
         let msg_id = Self::get_message_id(src)?;
-        if msg_id == b'i' {
 
+        if msg_id == b'i' && Self::get_handshake_length(src)? == HANDSHAKE_PSTR_LEN && Self::available_data(src) - 1 >= HANDSHAKE_PSTR_LEN {
+            for idx in 0..HANDSHAKE.len() {
+                if src.get_ref()[idx + 1] != HANDSHAKE[idx] {
+                    return Err(Error::S("nope".into()))
+                }
+            }
+
+            return Ok(())
         }
 
-        let available_data = Self::available_data(src) - LENGTH_FIELD_LEN as u16;
+        let available_data = Self::available_data(src) - LENGTH_FIELD_LEN;
         match msg_id.try_into() {
             Ok(MessageId::Choke) => Ok(()),
             Ok(MessageId::Unchoke) => Ok(()),
@@ -264,14 +273,25 @@ impl Frame {
         }
     }
 
-    fn get_length(src: &Cursor<&[u8]>) -> Result<u16, Error> {
+    fn get_handshake_length(src: &Cursor<&[u8]>) -> Result<usize, Error> {
+        let start = src.position() as usize;
+        let end = src.get_ref().len();
+
+        if end - start >= 1 {
+            return Ok(src.get_ref()[0] as usize);
+        }
+
+        Err(Error::Incomplete)
+    }
+
+    fn get_message_length(src: &Cursor<&[u8]>) -> Result<usize, Error> {
         let start = src.position() as usize;
         let end = src.get_ref().len();
 
         if end - start >= LENGTH_FIELD_LEN as usize {
             // let b : [u8; 2] = src.get_ref()[0..2];
             let b = [src.get_ref()[0], src.get_ref()[1]];
-            return Ok(u16::from_be_bytes(b));
+            return Ok(u16::from_be_bytes(b) as usize);
         }
 
         Err(Error::Incomplete)
@@ -289,27 +309,33 @@ impl Frame {
         Err(Error::Incomplete)
     }
 
-    fn available_data(src: &Cursor<&[u8]>) -> u16 {
+    fn available_data(src: &Cursor<&[u8]>) -> usize {
         let start = src.position() as usize;
         let end = src.get_ref().len();
 
-        return (end - start) as u16
+        return end - start
     }
 
     pub fn parse(src: &mut Cursor<&[u8]>) -> Result<Frame, Error>
     {
-        let length = Self::get_length(src)?;
+        let length = Self::get_message_length(src)?;
         if length == KEEP_ALIVE_LEN {
             src.set_position(LENGTH_FIELD_LEN as u64);
             return Ok(Frame::KeepAlive)
         }
 
         let msg_id = Self::get_message_id(src)?;
-        if msg_id == b'i' {
 
+        if msg_id == b'i' && Self::get_handshake_length(src)? == HANDSHAKE_PSTR_LEN && Self::available_data(src) - 1 >= HANDSHAKE_PSTR_LEN {
+            for idx in 0..HANDSHAKE.len() {
+                if src.get_ref()[idx + 1] != HANDSHAKE[idx] {
+                    return Err(Error::S("nope".into()))
+                }
+            }
+            return Ok(Frame::Handshake)
         }
 
-        let available_data = Self::available_data(src) - LENGTH_FIELD_LEN as u16;
+        let available_data = Self::available_data(src) - LENGTH_FIELD_LEN;
         match msg_id.try_into() {
             Ok(MessageId::Choke) if length == CHOKE_LEN => {
                 src.set_position((LENGTH_FIELD_LEN + length) as u64);
