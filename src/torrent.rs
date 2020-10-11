@@ -15,7 +15,7 @@ pub struct Torrent {
     pieces: Vec<Vec<u8>>,
     length: Option<u64>,
     files: Option<Vec<File>>,
-    pub hash: [u8; 20]
+    pub hash: [u8; 20],
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -177,7 +177,6 @@ impl Torrent {
         self.announce.clone()
     }
 
-
     pub fn length(&self) -> u64 {
         // TODO
         return self.length.unwrap();
@@ -195,7 +194,6 @@ impl Torrent {
 
         m.digest().bytes()
     }
-
 }
 
 #[cfg(test)]

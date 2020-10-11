@@ -1,19 +1,19 @@
-use std::fs;
 use crate::BValue;
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::fs;
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct ResponseParser {
-    interval : u64,
-    peers: Vec<Peer>
+    interval: u64,
+    peers: Vec<Peer>,
 }
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct Peer {
-    ip : String,
-    peer_id : String,
-    port : u64
+    ip: String,
+    peer_id: String,
+    port: u64,
 }
 
 impl ResponseParser {
@@ -48,11 +48,11 @@ impl ResponseParser {
 
     fn create_response(dict: &HashMap<Vec<u8>, BValue>) -> Result<ResponseParser, String> {
         if let Some(reason) = Self::find_failure_reason(dict) {
-            return Err(reason)
+            return Err(reason);
         }
 
-        let response = ResponseParser{
-            interval : Self::find_interval(dict)?,
+        let response = ResponseParser {
+            interval: Self::find_interval(dict)?,
             peers: Self::find_peers(dict)?,
         };
 
@@ -62,21 +62,23 @@ impl ResponseParser {
     fn find_failure_reason(dict: &HashMap<Vec<u8>, BValue>) -> Option<String> {
         match dict.get(&b"failure reason".to_vec()) {
             Some(BValue::ByteStr(reason)) => String::from_utf8(reason.to_vec()).ok(),
-            _ => None
+            _ => None,
         }
     }
 
     fn find_interval(dict: &HashMap<Vec<u8>, BValue>) -> Result<u64, String> {
         match dict.get(&b"interval".to_vec()) {
-            Some(BValue::Int(interval)) => u64::try_from(*interval).or(Err(format!("Can't convert 'interval' to u64"))),
-            _ => Err(format!("Incorrect or missing 'interval' value"))
+            Some(BValue::Int(interval)) => {
+                u64::try_from(*interval).or(Err(format!("Can't convert 'interval' to u64")))
+            }
+            _ => Err(format!("Incorrect or missing 'interval' value")),
         }
     }
 
     fn find_peers(dict: &HashMap<Vec<u8>, BValue>) -> Result<Vec<Peer>, String> {
         match dict.get(&b"peers".to_vec()) {
             Some(BValue::List(peers)) => Ok(Self::peer_list(peers)),
-            _ => Err(format!("Incorrect or missing 'peers' value"))
+            _ => Err(format!("Incorrect or missing 'peers' value")),
         }
     }
 
@@ -86,16 +88,26 @@ impl ResponseParser {
                 BValue::Dict(dict) => Some(dict),
                 _ => None,
             })
-            .filter_map(
-                |dict| match (dict.get(&b"ip".to_vec()), dict.get(&b"peer id".to_vec()), dict.get(&b"port".to_vec())) {
-                    (Some(BValue::ByteStr(ip)), Some(BValue::ByteStr(peer_id)), Some(BValue::Int(port))) => {
-                        Some((ip, peer_id, port))
-                    }
+            .filter_map(|dict| {
+                match (
+                    dict.get(&b"ip".to_vec()),
+                    dict.get(&b"peer id".to_vec()),
+                    dict.get(&b"port".to_vec()),
+                ) {
+                    (
+                        Some(BValue::ByteStr(ip)),
+                        Some(BValue::ByteStr(peer_id)),
+                        Some(BValue::Int(port)),
+                    ) => Some((ip, peer_id, port)),
                     _ => None,
-                },
-            )
+                }
+            })
             .filter_map(|(ip, peer_id, port)| {
-                match (String::from_utf8(ip.to_vec()), String::from_utf8(peer_id.to_vec()), u64::try_from(*port)) {
+                match (
+                    String::from_utf8(ip.to_vec()),
+                    String::from_utf8(peer_id.to_vec()),
+                    u64::try_from(*port),
+                ) {
                     (Ok(ip), Ok(peer_id), Ok(port)) => Some(Peer { ip, peer_id, port }),
                     _ => None,
                 }

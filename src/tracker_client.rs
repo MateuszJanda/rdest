@@ -1,8 +1,8 @@
-use url::form_urlencoded;
 use crate::Torrent;
-use rand::Rng;
 use rand::distributions::Alphanumeric;
+use rand::Rng;
 use std::fs;
+use url::form_urlencoded;
 // use std::fs::File;
 // use std::io::Write;
 
@@ -30,7 +30,7 @@ impl TrackerClient {
 
         // let u = "http://127.0.0.1:8080/".to_string();
         let u = metafile.url();
-        let hash : String = form_urlencoded::byte_serialize(&metafile.hash).collect();
+        let hash: String = form_urlencoded::byte_serialize(&metafile.hash).collect();
         let url = u + "?info_hash=" + hash.as_str();
 
         println!("url = {:?}", url);
@@ -54,11 +54,8 @@ impl TrackerClient {
         ];
 
         let client = reqwest::blocking::Client::new();
-        let body = client
-            .get(&url)
-            .query(&params)
-            .send()?;
-            // .text();
+        let body = client.get(&url).query(&params).send()?;
+        // .text();
         println!("body = {:?}", body);
 
         fs::write("response.data", body.bytes().unwrap().as_ref()).unwrap();

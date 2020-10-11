@@ -10,6 +10,7 @@ use tokio::io::BufReader;
 // use tokio::io::util::async_read_ext::AsyncReadExt;
 use tokio::io::AsyncReadExt;
 
+
 // fn main() {
 //     println!("Hello, world!");
 //     // let b = BValue::parse(b"i4e").unwrap();
@@ -35,16 +36,43 @@ async fn main() {
         // The second item contains the IP and port of the new connection.
         let (socket, _) = listener.accept().await.unwrap();
         println!("accept");
-        // process(socket).await;
+
+        let connection = Connection::new(socket);
+
+        let mut handler = Handler {
+            connection: connection
+        };
+
+        tokio::spawn(async move {
+            // Process the connection. If an error is encountered, log it.
+            if let Err(err) =
+            handler.run().await {
+                // error!(cause = ?err, "connection error");
+                panic!("asdf");
+            }
+        });
     }
 
+}
+
+struct Handler {
+    connection: Connection,
+}
+
+impl Handler {
+    async fn run(&mut self) -> Result<(), Error> {
+        loop {
+            let res = self.connection.read_frame().await?;
+        }
+
+        Ok(())
+    }
 }
 
 enum Frame {
     Handshake,
     KeepAlive,
     Choke,
-
 }
 
 struct Connection {
