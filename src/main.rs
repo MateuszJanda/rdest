@@ -74,8 +74,17 @@ impl Handler {
 
 enum Frame {
     Handshake,
-    KeepAlive   ,
+    KeepAlive,
     Choke,
+    Unchoke,
+    Interested,
+    NotInterested,
+    Have,
+    Bitfield,
+    Request,
+    Piece,
+    Cancel,
+    Port,
 }
 
 struct Connection {
@@ -157,7 +166,7 @@ impl Connection {
 
                 // Reset the internal cursor for the
                 // call to `parse`.
-                buf.set_position(0);
+                // buf.set_position(0);
 
                 // Parse the frame
                 let frame = Frame::parse(&mut buf)?;
@@ -210,7 +219,8 @@ impl TryFrom<u8> for MessageId {
     }
 }
 
-const LENGTH_PREFIX_LEN: usize = 2;
+const LENGTH_FIELD_LEN: u16 = 2;
+const ID_FIELD_LEN: u16 = 1;
 
 const HANDSHAKE_PSTR_LEN: u8 = 19;
 
@@ -238,15 +248,16 @@ impl Frame {
 
         }
 
+        let available_data = Self::available_data(src) - LENGTH_FIELD_LEN as u16;
         match msg_id.try_into() {
             Ok(MessageId::Choke) => Ok(()),
             Ok(MessageId::Unchoke) => Ok(()),
             Ok(MessageId::Interested) => Ok(()),
             Ok(MessageId::NotInterested) => Ok(()),
             Ok(MessageId::Have) => Ok(()),
-            Ok(MessageId::Bitfield) if length == Self::avaliable_data(src) => Ok(()),
+            Ok(MessageId::Bitfield) if available_data  >= length => Ok(()),
             Ok(MessageId::Request) => Ok(()),
-            Ok(MessageId::Piece) if length == Self::avaliable_data(src) => Ok(()),
+            Ok(MessageId::Piece) if available_data >= length => Ok(()),
             Ok(MessageId::Cancel) if length == CANCEL_LEN => Ok(()),
             Ok(MessageId::Port) if length == PORT_LEN => Ok(()),
             _ => Err(Error::S("fuck".into()))
@@ -257,7 +268,7 @@ impl Frame {
         let start = src.position() as usize;
         let end = src.get_ref().len();
 
-        if end - start >= LENGTH_PREFIX_LEN {
+        if end - start >= LENGTH_FIELD_LEN as usize {
             // let b : [u8; 2] = src.get_ref()[0..2];
             let b = [src.get_ref()[0], src.get_ref()[1]];
             return Ok(u16::from_be_bytes(b));
@@ -271,14 +282,14 @@ impl Frame {
         let start = src.position() as usize;
         let end = src.get_ref().len();
 
-        if end - start >= LENGTH_PREFIX_LEN + 1 {
+        if end - start >= (LENGTH_FIELD_LEN + 1) as usize {
             return Ok(src.get_ref()[3]);
         }
 
         Err(Error::Incomplete)
     }
 
-    fn avaliable_data(src: &Cursor<&[u8]>) -> u16 {
+    fn available_data(src: &Cursor<&[u8]>) -> u16 {
         let start = src.position() as usize;
         let end = src.get_ref().len();
 
@@ -287,7 +298,61 @@ impl Frame {
 
     pub fn parse(src: &mut Cursor<&[u8]>) -> Result<Frame, Error>
     {
-        Ok(Frame::Choke)
+        let length = Self::get_length(src)?;
+        if length == KEEP_ALIVE_LEN {
+            src.set_position(LENGTH_FIELD_LEN as u64);
+            return Ok(Frame::KeepAlive)
+        }
+
+        let msg_id = Self::get_message_id(src)?;
+        if msg_id == b'i' {
+
+        }
+
+        let available_data = Self::available_data(src) - LENGTH_FIELD_LEN as u16;
+        match msg_id.try_into() {
+            Ok(MessageId::Choke) if length == CHOKE_LEN => {
+                src.set_position((LENGTH_FIELD_LEN + length) as u64);
+                Ok(Frame::Choke)
+            },
+            Ok(MessageId::Unchoke) if length == UNCHOKE_LEN => {
+                src.set_position((LENGTH_FIELD_LEN + length) as u64);
+                Ok(Frame::Unchoke)
+            },
+            Ok(MessageId::Interested) if length == INTERESTED_LEN => {
+                src.set_position((LENGTH_FIELD_LEN + length) as u64);
+                Ok(Frame::Interested)
+            },
+            Ok(MessageId::NotInterested) if length == NOT_INTERESTED_LEN => {
+                src.set_position((LENGTH_FIELD_LEN + length) as u64);
+                Ok(Frame::NotInterested)
+            },
+            Ok(MessageId::Have) if length == HAVE_LEN => {
+                src.set_position((LENGTH_FIELD_LEN + length) as u64);
+                Ok(Frame::Have)
+            },
+            Ok(MessageId::Bitfield) if available_data >= length => {
+                src.set_position((LENGTH_FIELD_LEN + length) as u64);
+                Ok(Frame::Bitfield)
+            },
+            Ok(MessageId::Request) if length == REQUEST_LEN => {
+                src.set_position((LENGTH_FIELD_LEN + length) as u64);
+                Ok(Frame::Request)
+            },
+            Ok(MessageId::Piece) if available_data >= length => {
+                src.set_position((LENGTH_FIELD_LEN + length) as u64);
+                Ok(Frame::Piece)
+            },
+            Ok(MessageId::Cancel) if length == CANCEL_LEN => {
+                src.set_position((LENGTH_FIELD_LEN + length) as u64);
+                Ok(Frame::Cancel)
+            },
+            Ok(MessageId::Port) if length == PORT_LEN => {
+                src.set_position((LENGTH_FIELD_LEN + length) as u64);
+                Ok(Frame::Port)
+            },
+            _ => Err(Error::S("fuck".into()))
+        }
     }
 }
 
