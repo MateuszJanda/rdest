@@ -2,11 +2,11 @@
 use rdest::{Error, Frame};
 // use rdest::TrackerClient;
 // use hex_literal::hex;
-use tokio;
-use tokio::net::{TcpListener, TcpStream};
 use std::io::Cursor;
 use std::net::Ipv4Addr;
+use tokio;
 use tokio::io::AsyncReadExt;
+use tokio::net::{TcpListener, TcpStream};
 
 // fn main() {
 //     println!("Hello, world!");
@@ -22,13 +22,14 @@ use tokio::io::AsyncReadExt;
 //     println!("{:?}", ResponseParser::from_file("response.data".to_string()));
 // }
 
-
 #[tokio::main]
 async fn main() {
     println!("Hello, world!");
 
     // let mut listener = TcpListener::bind("127.0.0.1:6881").await.unwrap();
-    let mut listener = TcpListener::bind((Ipv4Addr::new(0, 0, 0, 0), 6881)).await.unwrap();
+    let mut listener = TcpListener::bind((Ipv4Addr::new(0, 0, 0, 0), 6881))
+        .await
+        .unwrap();
 
     loop {
         // The second item contains the IP and port of the new connection.
@@ -38,19 +39,17 @@ async fn main() {
         let connection = Connection::new(socket);
 
         let mut handler = Handler {
-            connection: connection
+            connection: connection,
         };
 
         tokio::spawn(async move {
             // Process the connection. If an error is encountered, log it.
-            if let Err(err) =
-            handler.run().await {
+            if let Err(err) = handler.run().await {
                 // error!(cause = ?err, "connection error");
                 panic!("asdf");
             }
         });
     }
-
 }
 
 struct Handler {
@@ -82,9 +81,7 @@ impl Connection {
         }
     }
 
-    pub async fn read_frame(&mut self)
-                            -> Result<Option<Frame>, Error>
-    {
+    pub async fn read_frame(&mut self) -> Result<Option<Frame>, Error> {
         loop {
             if let Some(frame) = self.parse_frame()? {
                 return Ok(Some(frame));
@@ -101,9 +98,7 @@ impl Connection {
 
             // let mut stream = BufReader::new(self.stream);
 
-            let n = self.stream.read(
-                &mut self.buffer[self.cursor..]).await?;
-
+            let n = self.stream.read(&mut self.buffer[self.cursor..]).await?;
 
             // let mut line = String::new();
             // stream.read_line(&mut line).await.unwrap();
@@ -131,10 +126,7 @@ impl Connection {
         }
     }
 
-
-    fn parse_frame(&mut self)
-                   -> Result<Option<Frame>, Error>
-    {
+    fn parse_frame(&mut self) -> Result<Option<Frame>, Error> {
         // Create the `T: Buf` type.
         let mut buf = Cursor::new(&self.buffer[..]);
 
