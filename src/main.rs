@@ -210,14 +210,45 @@ impl TryFrom<u8> for MessageId {
     }
 }
 
+const LENGTH_PREFIX_LEN: usize = 2;
+
+const HANDSHAKE_PSTR_LEN: u8 = 19;
+
+const KEEP_ALIVE_LEN: u16 = 0;
+const CHOKE_LEN: u16 = 1;
+const UNCHOKE_LEN: u16 = 1;
+const INTERESTED_LEN: u16 = 1;
+const NOT_INTERESTED_LEN: u16 = 1;
+const HAVE_LEN: u16 = 5;
+const REQUEST_LEN: u16 = 13;
+const CANCEL_LEN: u16 = 13;
+const PORT_LEN: u16 = 3;
+
+const MIN_PIECE_LEN: u16 = 9;
+
 impl Frame {
     pub fn check(src: &mut Cursor<&[u8]>) -> Result<(), Error> {
-        // keep-alive
-        if Self::get_length(src)? == 0 {
+        let length = Self::get_length(src)?;
+        if length == KEEP_ALIVE_LEN {
             return Ok(())
         }
-        match Self::get_id(src)?.try_into() {
-            Ok(MessageId::Choke)=> Ok(()),
+
+        let msg_id = Self::get_message_id(src)?;
+        if msg_id == b'i' {
+
+        }
+
+        match msg_id.try_into() {
+            Ok(MessageId::Choke) => Ok(()),
+            Ok(MessageId::Unchoke) => Ok(()),
+            Ok(MessageId::Interested) => Ok(()),
+            Ok(MessageId::NotInterested) => Ok(()),
+            Ok(MessageId::Have) => Ok(()),
+            Ok(MessageId::Bitfield) if length == Self::avaliable_data(src) => Ok(()),
+            Ok(MessageId::Request) => Ok(()),
+            Ok(MessageId::Piece) if length == Self::avaliable_data(src) => Ok(()),
+            Ok(MessageId::Cancel) if length == CANCEL_LEN => Ok(()),
+            Ok(MessageId::Port) if length == PORT_LEN => Ok(()),
             _ => Err(Error::S("fuck".into()))
         }
     }
@@ -226,7 +257,7 @@ impl Frame {
         let start = src.position() as usize;
         let end = src.get_ref().len();
 
-        if end - start >= 2 {
+        if end - start >= LENGTH_PREFIX_LEN {
             // let b : [u8; 2] = src.get_ref()[0..2];
             let b = [src.get_ref()[0], src.get_ref()[1]];
             return Ok(u16::from_be_bytes(b));
@@ -236,15 +267,22 @@ impl Frame {
     }
 
 
-    fn get_id(src: &Cursor<&[u8]>) -> Result<u8, Error> {
+    fn get_message_id(src: &Cursor<&[u8]>) -> Result<u8, Error> {
         let start = src.position() as usize;
         let end = src.get_ref().len();
 
-        if end - start >= 3 {
+        if end - start >= LENGTH_PREFIX_LEN + 1 {
             return Ok(src.get_ref()[3]);
         }
 
         Err(Error::Incomplete)
+    }
+
+    fn avaliable_data(src: &Cursor<&[u8]>) -> u16 {
+        let start = src.position() as usize;
+        let end = src.get_ref().len();
+
+        return (end - start) as u16
     }
 
     pub fn parse(src: &mut Cursor<&[u8]>) -> Result<Frame, Error>
