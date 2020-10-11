@@ -100,6 +100,7 @@ pub struct Piece {}
 impl Piece {
     const ID: u8 = 7;
     const PREFIX_LEN: usize = 2;
+    const MIN_LEN: usize = 9;
 }
 
 pub struct Cancel {}
@@ -156,29 +157,31 @@ impl Port {
 //     }
 // }
 
-const LENGTH_FIELD_LEN: usize = 2;
-const ID_FIELD_LEN: usize = 1;
+const PREFIX_LEN: usize = 2;
+const ID_LEN: usize = 1;
 
-const HANDSHAKE_PSTR_LEN: usize = 19;
+// const ID_FIELD_LEN: usize = 1;
+//
+// const HANDSHAKE_PSTR_LEN: usize = 19;
+//
+// const KEEP_ALIVE_LEN: usize = 0;
+// const CHOKE_LEN: usize = 1;
+// const UNCHOKE_LEN: usize = 1;
+// const INTERESTED_LEN: usize = 1;
+// const NOT_INTERESTED_LEN: usize = 1;
+// const HAVE_LEN: usize = 5;
+// const REQUEST_LEN: usize = 13;
+// const CANCEL_LEN: usize = 13;
+// const PORT_LEN: usize = 3;
 
-const KEEP_ALIVE_LEN: usize = 0;
-const CHOKE_LEN: usize = 1;
-const UNCHOKE_LEN: usize = 1;
-const INTERESTED_LEN: usize = 1;
-const NOT_INTERESTED_LEN: usize = 1;
-const HAVE_LEN: usize = 5;
-const REQUEST_LEN: usize = 13;
-const CANCEL_LEN: usize = 13;
-const PORT_LEN: usize = 3;
-
-const MIN_PIECE_LEN: usize = 9;
+// const MIN_PIECE_LEN: usize = 9;
 
 const HANDSHAKE: &[u8; 19] = b"BitTorrent protocol";
 
 impl Frame {
     pub fn check(src: &mut Cursor<&[u8]>) -> Result<(), Error> {
         let length = Self::get_message_length(src)?;
-        if length == KEEP_ALIVE_LEN {
+        if length == KeepAlive::LEN {
             return Ok(())
         }
 
@@ -193,17 +196,18 @@ impl Frame {
             return Ok(())
         }
 
+        let available_data = Self::available_data(src);
         match msg_id {
             Choke::ID => Ok(()),
             Unchoke::ID => Ok(()),
             Interested::ID => Ok(()),
             NotInterested::ID => Ok(()),
-            Have::ID if Self::available_data(src) >= Have::FULL_LEN => Ok(()),
-            Bitfield::ID if Self::available_data(src) >= Bitfield::PREFIX_LEN + length => Ok(()),
-            Request::ID if Self::available_data(src) >= Have::FULL_LEN => Ok(()),
-            Piece::ID if Self::available_data(src) >= Piece::PREFIX_LEN + length => Ok(()),
-            Cancel::ID if Self::available_data(src) >= Cancel::FULL_LEN => Ok(()),
-            Port::ID if Self::available_data(src) >= Port::FULL_LEN => Ok(()),
+            Have::ID if available_data >= Have::FULL_LEN => Ok(()),
+            Bitfield::ID if available_data >= Bitfield::PREFIX_LEN + length => Ok(()),
+            Request::ID if available_data >= Have::FULL_LEN => Ok(()),
+            Piece::ID if available_data >= Piece::PREFIX_LEN + length => Ok(()),
+            Cancel::ID if available_data >= Cancel::FULL_LEN => Ok(()),
+            Port::ID if available_data >= Port::FULL_LEN => Ok(()),
             _ => Err(Error::S("fuck".into()))
         }
     }
@@ -223,8 +227,7 @@ impl Frame {
         let start = src.position() as usize;
         let end = src.get_ref().len();
 
-        if end - start >= LENGTH_FIELD_LEN as usize {
-            // let b : [u8; 2] = src.get_ref()[0..2];
+        if end - start >= PREFIX_LEN as usize {
             let b = [src.get_ref()[0], src.get_ref()[1]];
             return Ok(u16::from_be_bytes(b) as usize);
         }
@@ -237,7 +240,7 @@ impl Frame {
         let start = src.position() as usize;
         let end = src.get_ref().len();
 
-        if end - start >= (LENGTH_FIELD_LEN + 1) as usize {
+        if end - start >= (PREFIX_LEN + ID_LEN) as usize {
             return Ok(src.get_ref()[3]);
         }
 
@@ -289,27 +292,27 @@ impl Frame {
                 src.set_position(NotInterested::FULL_LEN as u64);
                 Ok(Frame::NotInterested(NotInterested{}))
             },
-            Have::ID if length == Have::LEN => {
+            Have::ID if length == Have::LEN && available_data >= Have::PREFIX_LEN + length => {
                 src.set_position(Have::FULL_LEN as u64);
                 Ok(Frame::Have(Have{}))
             },
-            Bitfield::ID if available_data >= length => {
+            Bitfield::ID if available_data >= Bitfield::PREFIX_LEN + length => {
                 src.set_position((Bitfield::PREFIX_LEN + length) as u64);
                 Ok(Frame::Bitfield(Bitfield{}))
             },
-            Request::ID if length == Request::LEN => {
+            Request::ID if length == Request::LEN && available_data >= Request::PREFIX_LEN + length => {
                 src.set_position(Request::FULL_LEN as u64);
                 Ok(Frame::Request(Request{}))
             },
-            Piece::ID if available_data >= length => {
+            Piece::ID if length >= Piece::MIN_LEN && available_data >= Piece::PREFIX_LEN + length => {
                 src.set_position((Piece::PREFIX_LEN + length) as u64);
                 Ok(Frame::Piece(Piece{}))
             },
-            Cancel::ID if length == Cancel::LEN => {
+            Cancel::ID if length == Cancel::LEN && available_data >= Cancel::PREFIX_LEN + length => {
                 src.set_position(Cancel::FULL_LEN as u64);
                 Ok(Frame::Cancel(Cancel{}))
             },
-            Port::ID if length == Port::LEN => {
+            Port::ID if length == Port::LEN && available_data >= Port::PREFIX_LEN + length => {
                 src.set_position(Port::FULL_LEN as u64);
                 Ok(Frame::Port(Port{}))
             },
