@@ -10,6 +10,7 @@ use tokio::io::BufReader;
 // use tokio::io::util::async_read_ext::AsyncReadExt;
 use tokio::io::AsyncReadExt;
 use std::net::Ipv4Addr;
+use std::convert::{TryFrom, TryInto};
 
 
 // fn main() {
@@ -176,13 +177,47 @@ impl Connection {
     }
 }
 
+enum MessageId {
+    Choke = 0,
+    Unchoke = 1,
+    Interested = 2,
+    NotInterested = 3,
+    Have = 4,
+    Bitfield = 5,
+    Request = 6,
+    Piece = 7,
+    Cancel = 8,
+    Port = 9,
+}
+
+impl TryFrom<u8> for MessageId {
+    type Error = ();
+
+    fn try_from(v: u8) -> Result<Self, Self::Error> {
+        match v {
+            x if x == MessageId::Choke as u8 => Ok(MessageId::Choke),
+            x if x == MessageId::Unchoke as u8 => Ok(MessageId::Unchoke),
+            x if x == MessageId::Interested as u8 => Ok(MessageId::Interested),
+            x if x == MessageId::NotInterested as u8 => Ok(MessageId::NotInterested),
+            x if x == MessageId::Have as u8 => Ok(MessageId::Have),
+            x if x == MessageId::Bitfield as u8 => Ok(MessageId::Bitfield),
+            x if x == MessageId::Request as u8 => Ok(MessageId::Request),
+            x if x == MessageId::Piece as u8 => Ok(MessageId::Piece),
+            x if x == MessageId::Cancel as u8 => Ok(MessageId::Cancel),
+            x if x == MessageId::Port as u8 => Ok(MessageId::Port),
+            _ => Err(()),
+        }
+    }
+}
+
 impl Frame {
     pub fn check(src: &mut Cursor<&[u8]>) -> Result<(), Error> {
+        // keep-alive
         if Self::get_length(src)? == 0 {
             return Ok(())
         }
-        match Self::get_id(src)? {
-            0 => Ok(()),
+        match Self::get_id(src)?.try_into() {
+            Ok(MessageId::Choke)=> Ok(()),
             _ => Err(Error::S("fuck".into()))
         }
     }
