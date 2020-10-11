@@ -125,27 +125,27 @@ const PREFIX_LEN: usize = 2;
 const ID_LEN: usize = 1;
 
 impl Frame {
-    pub fn check(src: &mut Cursor<&[u8]>) -> Result<(), Error> {
-        let length = Self::get_message_length(src)?;
+    pub fn check(crs: &mut Cursor<&[u8]>) -> Result<(), Error> {
+        let length = Self::get_message_length(crs)?;
         if length == KeepAlive::LEN {
             return Ok(());
         }
 
-        let msg_id = Self::get_message_id(src)?;
+        let msg_id = Self::get_message_id(crs)?;
 
         if msg_id == Handshake::ID_BYTE
-            && Self::get_handshake_length(src)? == Handshake::LEN
-            && Self::available_data(src) >= Handshake::FULL_LEN
+            && Self::get_handshake_length(crs)? == Handshake::LEN
+            && Self::available_data(crs) >= Handshake::FULL_LEN
         {
             for idx in 0..Handshake::LEN {
-                if src.get_ref()[idx + 1] != Handshake::PROTOCOL_ID[idx] {
+                if crs.get_ref()[idx + 1] != Handshake::PROTOCOL_ID[idx] {
                     return Err(Error::S("nope".into()));
                 }
             }
             return Ok(());
         }
 
-        let available_data = Self::available_data(src);
+        let available_data = Self::available_data(crs);
         match msg_id {
             Choke::ID => Ok(()),
             Unchoke::ID => Ok(()),
@@ -161,115 +161,115 @@ impl Frame {
         }
     }
 
-    fn get_handshake_length(src: &Cursor<&[u8]>) -> Result<usize, Error> {
-        let start = src.position() as usize;
-        let end = src.get_ref().len();
+    fn get_handshake_length(crs: &Cursor<&[u8]>) -> Result<usize, Error> {
+        let start = crs.position() as usize;
+        let end = crs.get_ref().len();
 
         if end - start >= 1 {
-            return Ok(src.get_ref()[0] as usize);
+            return Ok(crs.get_ref()[0] as usize);
         }
 
         Err(Error::Incomplete)
     }
 
-    fn get_message_length(src: &Cursor<&[u8]>) -> Result<usize, Error> {
-        let start = src.position() as usize;
-        let end = src.get_ref().len();
+    fn get_message_length(crs: &Cursor<&[u8]>) -> Result<usize, Error> {
+        let start = crs.position() as usize;
+        let end = crs.get_ref().len();
 
         if end - start >= PREFIX_LEN as usize {
-            let b = [src.get_ref()[0], src.get_ref()[1]];
+            let b = [crs.get_ref()[0], crs.get_ref()[1]];
             return Ok(u16::from_be_bytes(b) as usize);
         }
 
         Err(Error::Incomplete)
     }
 
-    fn get_message_id(src: &Cursor<&[u8]>) -> Result<u8, Error> {
-        let start = src.position() as usize;
-        let end = src.get_ref().len();
+    fn get_message_id(crs: &Cursor<&[u8]>) -> Result<u8, Error> {
+        let start = crs.position() as usize;
+        let end = crs.get_ref().len();
 
         if end - start >= (PREFIX_LEN + ID_LEN) as usize {
-            return Ok(src.get_ref()[3]);
+            return Ok(crs.get_ref()[3]);
         }
 
         Err(Error::Incomplete)
     }
 
-    fn available_data(src: &Cursor<&[u8]>) -> usize {
-        let start = src.position() as usize;
-        let end = src.get_ref().len();
+    fn available_data(crs: &Cursor<&[u8]>) -> usize {
+        let start = crs.position() as usize;
+        let end = crs.get_ref().len();
 
         return end - start;
     }
 
-    pub fn parse(src: &mut Cursor<&[u8]>) -> Result<Frame, Error> {
-        let length = Self::get_message_length(src)?;
+    pub fn parse(crs: &mut Cursor<&[u8]>) -> Result<Frame, Error> {
+        let length = Self::get_message_length(crs)?;
         if length == KeepAlive::LEN {
-            src.set_position(KeepAlive::FULL_LEN as u64);
+            crs.set_position(KeepAlive::FULL_LEN as u64);
             return Ok(Frame::KeepAlive(KeepAlive {}));
         }
 
-        let msg_id = Self::get_message_id(src)?;
+        let msg_id = Self::get_message_id(crs)?;
 
         if msg_id == Handshake::ID_BYTE
-            && Self::get_handshake_length(src)? == Handshake::LEN
-            && Self::available_data(src) >= Handshake::FULL_LEN
+            && Self::get_handshake_length(crs)? == Handshake::LEN
+            && Self::available_data(crs) >= Handshake::FULL_LEN
         {
             for idx in 0..Handshake::LEN {
-                if src.get_ref()[idx + 1] != Handshake::PROTOCOL_ID[idx] {
+                if crs.get_ref()[idx + 1] != Handshake::PROTOCOL_ID[idx] {
                     return Err(Error::S("nope".into()));
                 }
             }
-            src.set_position(Handshake::FULL_LEN as u64);
+            crs.set_position(Handshake::FULL_LEN as u64);
             return Ok(Frame::Handshake(Handshake {}));
         }
 
-        let available_data = Self::available_data(src);
+        let available_data = Self::available_data(crs);
         match msg_id {
             Choke::ID if length == Choke::LEN => {
-                src.set_position(Choke::FULL_LEN as u64);
+                crs.set_position(Choke::FULL_LEN as u64);
                 Ok(Frame::Choke(Choke {}))
             }
             Unchoke::ID if length == Unchoke::LEN => {
-                src.set_position(Unchoke::FULL_LEN as u64);
+                crs.set_position(Unchoke::FULL_LEN as u64);
                 Ok(Frame::Unchoke(Unchoke {}))
             }
             Interested::ID if length == Interested::LEN => {
-                src.set_position(Interested::FULL_LEN as u64);
+                crs.set_position(Interested::FULL_LEN as u64);
                 Ok(Frame::Interested(Interested {}))
             }
             NotInterested::ID if length == NotInterested::LEN => {
-                src.set_position(NotInterested::FULL_LEN as u64);
+                crs.set_position(NotInterested::FULL_LEN as u64);
                 Ok(Frame::NotInterested(NotInterested {}))
             }
             Have::ID if length == Have::LEN && available_data >= Have::PREFIX_LEN + length => {
-                src.set_position(Have::FULL_LEN as u64);
+                crs.set_position(Have::FULL_LEN as u64);
                 Ok(Frame::Have(Have {}))
             }
             Bitfield::ID if available_data >= Bitfield::PREFIX_LEN + length => {
-                src.set_position((Bitfield::PREFIX_LEN + length) as u64);
+                crs.set_position((Bitfield::PREFIX_LEN + length) as u64);
                 Ok(Frame::Bitfield(Bitfield {}))
             }
             Request::ID
                 if length == Request::LEN && available_data >= Request::PREFIX_LEN + length =>
             {
-                src.set_position(Request::FULL_LEN as u64);
+                crs.set_position(Request::FULL_LEN as u64);
                 Ok(Frame::Request(Request {}))
             }
             Piece::ID
                 if length >= Piece::MIN_LEN && available_data >= Piece::PREFIX_LEN + length =>
             {
-                src.set_position((Piece::PREFIX_LEN + length) as u64);
+                crs.set_position((Piece::PREFIX_LEN + length) as u64);
                 Ok(Frame::Piece(Piece {}))
             }
             Cancel::ID
                 if length == Cancel::LEN && available_data >= Cancel::PREFIX_LEN + length =>
             {
-                src.set_position(Cancel::FULL_LEN as u64);
+                crs.set_position(Cancel::FULL_LEN as u64);
                 Ok(Frame::Cancel(Cancel {}))
             }
             Port::ID if length == Port::LEN && available_data >= Port::PREFIX_LEN + length => {
-                src.set_position(Port::FULL_LEN as u64);
+                crs.set_position(Port::FULL_LEN as u64);
                 Ok(Frame::Port(Port {}))
             }
             _ => Err(Error::S("fuck".into())),

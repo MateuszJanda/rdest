@@ -72,11 +72,13 @@ struct Connection {
     cursor: usize,
 }
 
+const BUFFER_SIZE: usize = 65536 + 2;
+
 impl Connection {
     pub fn new(stream: TcpStream) -> Connection {
         Connection {
             stream,
-            buffer: vec![0; 65536],
+            buffer: vec![0; BUFFER_SIZE],
             cursor: 0,
         }
     }
@@ -128,24 +130,24 @@ impl Connection {
 
     fn parse_frame(&mut self) -> Result<Option<Frame>, Error> {
         // Create the `T: Buf` type.
-        let mut buf = Cursor::new(&self.buffer[..]);
+        let mut crs = Cursor::new(&self.buffer[..]);
 
         // Check whether a full frame is available
-        match Frame::check(&mut buf) {
+        match Frame::check(&mut crs) {
             Ok(_) => {
                 // Get the byte length of the frame
-                let len = buf.position() as usize;
+                let len = crs.position() as usize;
 
                 // Reset the internal cursor for the
                 // call to `parse`.
-                // buf.set_position(0);
+                // crs.set_position(0);
 
                 // Parse the frame
-                let frame = Frame::parse(&mut buf)?;
+                let frame = Frame::parse(&mut crs)?;
 
                 // Discard the frame from the buffer
                 self.buffer.drain(..len);
-                self.buffer.resize(65536, 0);
+                self.buffer.resize(BUFFER_SIZE, 0);
 
                 // Return the frame to the caller.
                 Ok(Some(frame))
