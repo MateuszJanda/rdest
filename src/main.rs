@@ -9,6 +9,7 @@ use std::fmt;
 use tokio::io::BufReader;
 // use tokio::io::util::async_read_ext::AsyncReadExt;
 use tokio::io::AsyncReadExt;
+use std::net::Ipv4Addr;
 
 
 // fn main() {
@@ -30,7 +31,8 @@ use tokio::io::AsyncReadExt;
 async fn main() {
     println!("Hello, world!");
 
-    let mut listener = TcpListener::bind("127.0.0.1:6379").await.unwrap();
+    // let mut listener = TcpListener::bind("127.0.0.1:6881").await.unwrap();
+    let mut listener = TcpListener::bind((Ipv4Addr::new(0, 0, 0, 0), 6881)).await.unwrap();
 
     loop {
         // The second item contains the IP and port of the new connection.
@@ -71,7 +73,7 @@ impl Handler {
 
 enum Frame {
     Handshake,
-    KeepAlive,
+    KeepAlive   ,
     Choke,
 }
 
