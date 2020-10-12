@@ -32,15 +32,17 @@ async fn main() {
     let t = Torrent::from_file(String::from("ubuntu-20.04.1-desktop-amd64.iso.torrent"));
     // println!("{:?}", t);
 
-    match TrackerClient::connect1(&t.unwrap()).await {
-        Ok(_) => println!("Http Ok"),
-        Err(e) => println!("Http Problem {:?}", e),
+    let r = TrackerClient::connect1(&t.unwrap()).await.unwrap(); // TODO
+
+    for v in r.peers {
+        println!("{:?}", v);
     }
 
     // println!("{:?}", ResponseParser::from_file("response.data".to_string()));
 
 
     loop {
+        println!("Listening");
         // The second item contains the IP and port of the new connection.
         let (socket, _) = listener.accept().await.unwrap();
         println!("accept");

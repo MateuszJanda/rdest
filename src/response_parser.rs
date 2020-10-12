@@ -1,12 +1,12 @@
-use crate::BValue;
+use crate::{BValue, Error};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fs;
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct ResponseParser {
-    interval: u64,
-    peers: Vec<Peer>,
+    pub interval: u64,
+    pub peers: Vec<Peer>,
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -17,22 +17,22 @@ pub struct Peer {
 }
 
 impl ResponseParser {
-    pub fn from_file(path: String) -> Result<ResponseParser, String> {
+    pub fn from_file(path: String) -> Result<ResponseParser, Error> {
         match &fs::read(path) {
             Ok(val) => Self::from_bencode(val),
-            Err(_) => Err(format!("File not found")),
+            Err(_) => Err(Error::S(format!("File not found"))),
         }
     }
 
-    pub fn from_bencode(data: &[u8]) -> Result<ResponseParser, String> {
-        let bvalues = BValue::parse(data)?;
+    pub fn from_bencode(data: &[u8]) -> Result<ResponseParser, Error> {
+        let bvalues = BValue::parse(data).map_err(|e| Error::S(e))?;
         // let raw_info = BValue::cut_raw_info(arg)?;
 
         if bvalues.is_empty() {
-            return Err(format!("Empty torrent"));
+            return Err(Error::S(format!("Empty torrent")));
         }
 
-        let mut err = Err(format!("Missing data"));
+        let mut err = Err(Error::S(format!("Missing data")));
         for val in bvalues {
             match val {
                 BValue::Dict(dict) => match Self::create_response(&dict) {
@@ -46,9 +46,9 @@ impl ResponseParser {
         err
     }
 
-    fn create_response(dict: &HashMap<Vec<u8>, BValue>) -> Result<ResponseParser, String> {
+    fn create_response(dict: &HashMap<Vec<u8>, BValue>) -> Result<ResponseParser, Error> {
         if let Some(reason) = Self::find_failure_reason(dict) {
-            return Err(reason);
+            return Err(Error::S(reason));
         }
 
         let response = ResponseParser {
@@ -66,19 +66,19 @@ impl ResponseParser {
         }
     }
 
-    fn find_interval(dict: &HashMap<Vec<u8>, BValue>) -> Result<u64, String> {
+    fn find_interval(dict: &HashMap<Vec<u8>, BValue>) -> Result<u64, Error> {
         match dict.get(&b"interval".to_vec()) {
             Some(BValue::Int(interval)) => {
-                u64::try_from(*interval).or(Err(format!("Can't convert 'interval' to u64")))
+                u64::try_from(*interval).or(Err(Error::S(format!("Can't convert 'interval' to u64"))))
             }
-            _ => Err(format!("Incorrect or missing 'interval' value")),
+            _ => Err(Error::S(format!("Incorrect or missing 'interval' value"))),
         }
     }
 
-    fn find_peers(dict: &HashMap<Vec<u8>, BValue>) -> Result<Vec<Peer>, String> {
+    fn find_peers(dict: &HashMap<Vec<u8>, BValue>) -> Result<Vec<Peer>, Error> {
         match dict.get(&b"peers".to_vec()) {
             Some(BValue::List(peers)) => Ok(Self::peer_list(peers)),
-            _ => Err(format!("Incorrect or missing 'peers' value")),
+            _ => Err(Error::S(format!("Incorrect or missing 'peers' value"))),
         }
     }
 
