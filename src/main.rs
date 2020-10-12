@@ -1,5 +1,5 @@
 // use rdest::BValue;
-use rdest::{Error, Frame};
+use rdest::{Error, Frame, Torrent, TrackerClient, ResponseParser};
 // use rdest::TrackerClient;
 // use hex_literal::hex;
 use std::io::Cursor;
@@ -9,17 +9,14 @@ use tokio::io::AsyncReadExt;
 use tokio::net::{TcpListener, TcpStream};
 
 // fn main() {
-//     println!("Hello, world!");
-//     // let b = BValue::parse(b"i4e").unwrap();
-//     let _t = Torrent::from_file(String::from("ubuntu-20.04.1-desktop-amd64.iso.torrent"));
-//     // println!("{:?}", t);
+//     let t = Torrent::from_file(String::from("ubuntu-20.04.1-desktop-amd64.iso.torrent"));
+//     println!("{:?}", t);
+//     match TrackerClient::connect1(&t.unwrap()) {
+//         Ok(_) => println!("Http Ok"),
+//         Err(e) => println!("Http Problem {:?}", e),
+//     }
 //
-//     // match TrackerClient::connect1(&t.unwrap()) {
-//     //     Ok(_) => println!("Http Ok"),
-//     //     Err(e) => println!("Http Problem {:?}", e),
-//     // }
-//
-//     println!("{:?}", ResponseParser::from_file("response.data".to_string()));
+//     // println!("{:?}", ResponseParser::from_file("response.data".to_string()));
 // }
 
 #[tokio::main]
@@ -30,6 +27,18 @@ async fn main() {
     let mut listener = TcpListener::bind((Ipv4Addr::new(0, 0, 0, 0), 6881))
         .await
         .unwrap();
+
+
+    let t = Torrent::from_file(String::from("ubuntu-20.04.1-desktop-amd64.iso.torrent"));
+    // println!("{:?}", t);
+
+    match TrackerClient::connect1(&t.unwrap()).await {
+        Ok(_) => println!("Http Ok"),
+        Err(e) => println!("Http Problem {:?}", e),
+    }
+
+    // println!("{:?}", ResponseParser::from_file("response.data".to_string()));
+
 
     loop {
         // The second item contains the IP and port of the new connection.

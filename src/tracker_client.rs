@@ -20,15 +20,7 @@ impl TrackerClient {
         Ok(())
     }
 
-    // async fn get_http() -> Result<(), reqwest::Error> {
-    pub fn connect1(metafile: &Torrent) -> Result<(), reqwest::Error> {
-        // netcat -l 127.0.0.1 8080
-        // let body = reqwest::get("http://127.0.0.1:8080")
-        //     .await?
-        //     .text()
-        //     .await?;
-
-        // let u = "http://127.0.0.1:8080/".to_string();
+    pub async fn connect1(metafile: &Torrent) -> Result<(), reqwest::Error> {
         let u = metafile.url();
         let hash: String = form_urlencoded::byte_serialize(&metafile.hash).collect();
         let url = u + "?info_hash=" + hash.as_str();
@@ -53,12 +45,13 @@ impl TrackerClient {
             ("numwant", "50".to_string()),
         ];
 
-        let client = reqwest::blocking::Client::new();
-        let body = client.get(&url).query(&params).send()?;
-        // .text();
+        let client = reqwest::Client::new();
+        let resp = client.get(&url).query(&params).send().await?;
+        println!("resp = {:?}", resp);
+        let body = resp.bytes().await?;
         println!("body = {:?}", body);
 
-        fs::write("response.data", body.bytes().unwrap().as_ref()).unwrap();
+        fs::write("response.data", body).unwrap();
 
         Ok(())
     }
