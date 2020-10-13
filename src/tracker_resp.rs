@@ -1,4 +1,4 @@
-use crate::{BValue, Error};
+use crate::{BValue, Error, BDecoder};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fs;
@@ -25,7 +25,7 @@ impl TrackerResp {
     }
 
     pub fn from_bencode(data: &[u8]) -> Result<TrackerResp, Error> {
-        let bvalues = BValue::parse(data)?;
+        let bvalues = BDecoder::from_array(data)?;
         // let raw_info = BValue::cut_raw_info(arg)?;
 
         if bvalues.is_empty() {

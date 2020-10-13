@@ -13,11 +13,6 @@ pub enum BValue {
 }
 
 impl BValue {
-    pub fn parse(arg: &[u8]) -> Result<Vec<BValue>, String> {
-        let mut it = arg.iter().enumerate();
-        Self::values_vector(&mut it, None)
-    }
-
     fn values_vector(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         delimiter: Option<u8>,
@@ -187,19 +182,29 @@ impl BValue {
     }
 }
 
+pub struct BDecoder {
+}
+
+impl BDecoder {
+    pub fn from_array(arg: &[u8]) -> Result<Vec<BValue>, String> {
+        let mut it = arg.iter().enumerate();
+        BValue::values_vector(&mut it, None)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn empty_input() {
-        assert_eq!(BValue::parse(b""), Ok(vec![]));
+        assert_eq!(BDecoder::from_array(b""), Ok(vec![]));
     }
 
     #[test]
     fn incorrect_character() {
         assert_eq!(
-            BValue::parse(b"x"),
+            BDecoder::from_array(b"x"),
             Err(String::from("Loop [0]: Incorrect character"))
         );
     }
@@ -207,7 +212,7 @@ mod tests {
     #[test]
     fn byte_str() {
         assert_eq!(
-            BValue::parse(b"9:spamIsLoL"),
+            BDecoder::from_array(b"9:spamIsLoL"),
             Ok(vec![BValue::ByteStr(b"spamIsLoL".to_vec())])
         );
     }
@@ -215,7 +220,7 @@ mod tests {
     #[test]
     fn byte_str_unexpected_end() {
         assert_eq!(
-            BValue::parse(b"4"),
+            BDecoder::from_array(b"4"),
             Err(String::from("ByteStr [0]: Not enough characters"))
         );
     }
@@ -223,7 +228,7 @@ mod tests {
     #[test]
     fn byte_str_missing_value() {
         assert_eq!(
-            BValue::parse(b"4:"),
+            BDecoder::from_array(b"4:"),
             Err(String::from("ByteStr [0]: Not enough characters"))
         );
     }
@@ -231,7 +236,7 @@ mod tests {
     #[test]
     fn byte_str_not_enough_characters() {
         assert_eq!(
-            BValue::parse(b"4:spa"),
+            BDecoder::from_array(b"4:spa"),
             Err(String::from("ByteStr [0]: Not enough characters"))
         );
     }
@@ -239,20 +244,20 @@ mod tests {
     #[test]
     fn byte_str_invalid_len_character() {
         assert_eq!(
-            BValue::parse(b"4+3:spa"),
+            BDecoder::from_array(b"4+3:spa"),
             Err(String::from("ByteStr [0]: Incorrect character"))
         );
     }
 
     #[test]
     fn byte_str_zero_length() {
-        assert_eq!(BValue::parse(b"0:"), Ok(vec![BValue::ByteStr(vec![])]));
+        assert_eq!(BDecoder::from_array(b"0:"), Ok(vec![BValue::ByteStr(vec![])]));
     }
 
     #[test]
     fn int_missing_e() {
         assert_eq!(
-            BValue::parse(b"i"),
+            BDecoder::from_array(b"i"),
             Err(String::from("Int [0]: Missing terminate character 'e'"))
         );
     }
@@ -260,7 +265,7 @@ mod tests {
     #[test]
     fn int_missing_value() {
         assert_eq!(
-            BValue::parse(b"ie"),
+            BDecoder::from_array(b"ie"),
             Err(String::from("Int [0]: Unable convert to int"))
         );
     }
@@ -268,7 +273,7 @@ mod tests {
     #[test]
     fn int_incorrect_format1() {
         assert_eq!(
-            BValue::parse(b"i-e"),
+            BDecoder::from_array(b"i-e"),
             Err(String::from("Int [0]: Unable convert to int"))
         );
     }
@@ -276,7 +281,7 @@ mod tests {
     #[test]
     fn int_incorrect_format2() {
         assert_eq!(
-            BValue::parse(b"i--4e"),
+            BDecoder::from_array(b"i--4e"),
             Err(String::from("Int [0]: Unable convert to int"))
         );
     }
@@ -284,7 +289,7 @@ mod tests {
     #[test]
     fn int_incorrect_format3() {
         assert_eq!(
-            BValue::parse(b"i-4-e"),
+            BDecoder::from_array(b"i-4-e"),
             Err(String::from("Int [0]: Unable convert to int"))
         );
     }
@@ -292,7 +297,7 @@ mod tests {
     #[test]
     fn int_incorrect_character() {
         assert_eq!(
-            BValue::parse(b"i+4e"),
+            BDecoder::from_array(b"i+4e"),
             Err(String::from("Int [0]: Incorrect character"))
         );
     }
@@ -300,7 +305,7 @@ mod tests {
     #[test]
     fn int_leading_zero() {
         assert_eq!(
-            BValue::parse(b"i01e"),
+            BDecoder::from_array(b"i01e"),
             Err(String::from("Int [0]: Leading zero"))
         );
     }
@@ -308,43 +313,43 @@ mod tests {
     #[test]
     fn int_leading_zero_for_negative() {
         assert_eq!(
-            BValue::parse(b"i-01e"),
+            BDecoder::from_array(b"i-01e"),
             Err(String::from("Int [0]: Leading zero"))
         );
     }
 
     #[test]
     fn int_zero() {
-        assert_eq!(BValue::parse(b"i0e"), Ok(vec![BValue::Int(0)]));
+        assert_eq!(BDecoder::from_array(b"i0e"), Ok(vec![BValue::Int(0)]));
     }
 
     #[test]
     fn int_positive() {
-        assert_eq!(BValue::parse(b"i4e"), Ok(vec![BValue::Int(4)]));
+        assert_eq!(BDecoder::from_array(b"i4e"), Ok(vec![BValue::Int(4)]));
     }
 
     #[test]
     fn int_negative() {
-        assert_eq!(BValue::parse(b"i-4e"), Ok(vec![BValue::Int(-4)]));
+        assert_eq!(BDecoder::from_array(b"i-4e"), Ok(vec![BValue::Int(-4)]));
     }
 
     #[test]
     fn int_above_u32() {
         assert_eq!(
-            BValue::parse(b"i4294967297e"),
+            BDecoder::from_array(b"i4294967297e"),
             Ok(vec![BValue::Int(4294967297)])
         );
     }
 
     // TODO: bit int support needed
     //    fn int_above_i64() {
-    //        assert_eq!(BValue::parse(b"i9223372036854775808e"), Ok(vec![BValue::Int(9223372036854775808)]));
+    //        assert_eq!(BDecoder::from_array(b"i9223372036854775808e"), Ok(vec![BValue::Int(9223372036854775808)]));
     //    }
 
     #[test]
     fn list_of_strings() {
         assert_eq!(
-            BValue::parse(b"l4:spam4:eggse"),
+            BDecoder::from_array(b"l4:spam4:eggse"),
             Ok(vec![BValue::List(vec![
                 BValue::ByteStr(b"spam".to_vec()),
                 BValue::ByteStr(b"eggs".to_vec())
@@ -355,7 +360,7 @@ mod tests {
     #[test]
     fn list_of_ints() {
         assert_eq!(
-            BValue::parse(b"li1ei9ee"),
+            BDecoder::from_array(b"li1ei9ee"),
             Ok(vec![BValue::List(vec![BValue::Int(1), BValue::Int(9)])])
         );
     }
@@ -363,7 +368,7 @@ mod tests {
     #[test]
     fn list_of_nested_values() {
         assert_eq!(
-            BValue::parse(b"lli1ei5ee3:abce"),
+            BDecoder::from_array(b"lli1ei5ee3:abce"),
             Ok(vec![BValue::List(vec![
                 BValue::List(vec![BValue::Int(1), BValue::Int(5)]),
                 BValue::ByteStr(b"abc".to_vec())
@@ -374,7 +379,7 @@ mod tests {
     #[test]
     fn dict_odd_number_of_elements() {
         assert_eq!(
-            BValue::parse(b"di1ee"),
+            BDecoder::from_array(b"di1ee"),
             Err(String::from("Dict [0]: Odd number of elements"))
         );
     }
@@ -382,7 +387,7 @@ mod tests {
     #[test]
     fn dict_key_not_string() {
         assert_eq!(
-            BValue::parse(b"di1ei1ee"),
+            BDecoder::from_array(b"di1ei1ee"),
             Err(String::from("Dict [0]: Key not string"))
         );
     }
@@ -390,7 +395,7 @@ mod tests {
     #[test]
     fn dict() {
         assert_eq!(
-            BValue::parse(b"d1:ki5ee"),
+            BDecoder::from_array(b"d1:ki5ee"),
             Ok(vec![BValue::Dict(hashmap![vec![b'k'] => BValue::Int(5)]),])
         );
     }
@@ -398,7 +403,7 @@ mod tests {
     #[test]
     fn two_ints() {
         assert_eq!(
-            BValue::parse(b"i2ei-3e"),
+            BDecoder::from_array(b"i2ei-3e"),
             Ok(vec![BValue::Int(2), BValue::Int(-3)])
         );
     }
@@ -406,7 +411,7 @@ mod tests {
     #[test]
     fn empty_string_and_int() {
         assert_eq!(
-            BValue::parse(b"0:i4e"),
+            BDecoder::from_array(b"0:i4e"),
             Ok(vec![BValue::ByteStr(vec![]), BValue::Int(4)])
         );
     }
@@ -414,7 +419,7 @@ mod tests {
     #[test]
     fn incorrect_value_char_pointer_change() {
         assert_eq!(
-            BValue::parse(b"i1ei2ei01e"),
+            BDecoder::from_array(b"i1ei2ei01e"),
             Err(String::from("Int [6]: Leading zero"))
         );
     }

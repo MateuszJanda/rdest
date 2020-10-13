@@ -1,6 +1,6 @@
 #[cfg(test)]
 use crate::hashmap;
-use crate::{BValue, DeepFinder};
+use crate::{BValue, DeepFinder, BDecoder};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use crate::raw_finder::RawFinder;
@@ -34,7 +34,7 @@ impl Metainfo {
     }
 
     pub fn from_bencode(data: &[u8]) -> Result<Metainfo, String> {
-        let bvalues = BValue::parse(data)?;
+        let bvalues = BDecoder::from_array(data)?;
         // let raw_info = BValue::cut_raw_info(arg)?;
 
         if bvalues.is_empty() {
