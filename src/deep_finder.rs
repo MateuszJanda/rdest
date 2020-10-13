@@ -1,12 +1,14 @@
 use crate::raw_finder::RawFinder;
 use crate::bdecoder::BValue;
+use std::iter::Enumerate;
+use std::slice::Iter;
 
 pub struct DeepFinder {
 }
 
 impl DeepFinder {
     fn raw_values_vector(
-        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        it: &mut Enumerate<Iter<u8>>,
         key: Option<&[u8]>,
         with_end: bool,
         extract: bool,
@@ -33,7 +35,7 @@ impl DeepFinder {
     }
 
     fn raw_int(
-        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        it: &mut Enumerate<Iter<u8>>,
         pos: usize,
         extract: bool,
     ) -> Result<Vec<u8>, String> {
@@ -45,7 +47,7 @@ impl DeepFinder {
     }
 
     fn raw_list(
-        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        it: &mut Enumerate<Iter<u8>>,
         extract: bool,
     ) -> Result<Vec<u8>, String> {
         match extract {
@@ -60,7 +62,7 @@ impl DeepFinder {
     }
 
     fn raw_dict(
-        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        it: &mut Enumerate<Iter<u8>>,
         extract: bool,
     ) -> Result<Vec<u8>, String> {
         match extract {
@@ -75,7 +77,7 @@ impl DeepFinder {
     }
 
     fn traverse_dict(
-        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        it: &mut Enumerate<Iter<u8>>,
         key: &[u8],
     ) -> Result<Vec<u8>, String> {
         const EXTRACT_KEY: bool = true;
@@ -123,7 +125,7 @@ impl DeepFinder {
     }
 
     fn extract_dict_raw_value(
-        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        it: &mut Enumerate<Iter<u8>>,
         b: &u8,
         pos: usize,
     ) -> Result<Vec<u8>, String> {
@@ -141,7 +143,7 @@ impl DeepFinder {
     }
 
     fn raw_byte_str(
-        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        it: &mut Enumerate<Iter<u8>>,
         pos: usize,
         first_num: &u8,
         extract: bool,
