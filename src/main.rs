@@ -131,7 +131,7 @@ impl Connection {
                 if self.cursor == 0 {
                     return Ok(None);
                 } else {
-                    return Err(Error::S("connection reset by peer".into()));
+                    return Err(Error::Str("connection reset by peer".into()));
                 }
             } else {
                 // Update our cursor

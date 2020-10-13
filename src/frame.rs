@@ -139,7 +139,7 @@ impl Frame {
         {
             for idx in 0..Handshake::LEN {
                 if crs.get_ref()[idx + 1] != Handshake::PROTOCOL_ID[idx] {
-                    return Err(Error::S("nope".into()));
+                    return Err(Error::Str("nope".into()));
                 }
             }
             return Ok(());
@@ -157,7 +157,7 @@ impl Frame {
             Piece::ID if available_data >= Piece::PREFIX_LEN + length => Ok(()),
             Cancel::ID if available_data >= Cancel::FULL_LEN => Ok(()),
             Port::ID if available_data >= Port::FULL_LEN => Ok(()),
-            _ => Err(Error::S("fuck".into())),
+            _ => Err(Error::Str("fuck".into())),
         }
     }
 
@@ -217,7 +217,7 @@ impl Frame {
         {
             for idx in 0..Handshake::LEN {
                 if crs.get_ref()[idx + 1] != Handshake::PROTOCOL_ID[idx] {
-                    return Err(Error::S("nope".into()));
+                    return Err(Error::Str("nope".into()));
                 }
             }
             crs.set_position(Handshake::FULL_LEN as u64);
@@ -272,7 +272,7 @@ impl Frame {
                 crs.set_position(Port::FULL_LEN as u64);
                 Ok(Frame::Port(Port {}))
             }
-            _ => Err(Error::S("fuck".into())),
+            _ => Err(Error::Str("fuck".into())),
         }
     }
 }
