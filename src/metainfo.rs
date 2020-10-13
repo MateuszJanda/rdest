@@ -1,9 +1,9 @@
 #[cfg(test)]
 use crate::hashmap;
-use crate::{BValue, DeepFinder, BDecoder};
+use crate::raw_finder::RawFinder;
+use crate::{BDecoder, BValue, DeepFinder};
 use std::collections::HashMap;
 use std::convert::TryFrom;
-use crate::raw_finder::RawFinder;
 use std::fs;
 
 extern crate sha1;

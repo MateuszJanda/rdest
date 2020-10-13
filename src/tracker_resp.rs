@@ -1,4 +1,4 @@
-use crate::{BValue, Error, BDecoder};
+use crate::{BDecoder, BValue, Error};
 use std::collections::HashMap;
 use std::convert::TryFrom;
 use std::fs;
@@ -68,9 +68,8 @@ impl TrackerResp {
 
     fn find_interval(dict: &HashMap<Vec<u8>, BValue>) -> Result<u64, Error> {
         match dict.get(&b"interval".to_vec()) {
-            Some(BValue::Int(interval)) => {
-                u64::try_from(*interval).or(Err(Error::Str(format!("Can't convert 'interval' to u64"))))
-            }
+            Some(BValue::Int(interval)) => u64::try_from(*interval)
+                .or(Err(Error::Str(format!("Can't convert 'interval' to u64")))),
             _ => Err(Error::Str(format!("Incorrect or missing 'interval' value"))),
         }
     }

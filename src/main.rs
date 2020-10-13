@@ -28,7 +28,6 @@ async fn main() {
         .await
         .unwrap();
 
-
     let t = Metainfo::from_file(String::from("ubuntu-20.04.1-desktop-amd64.iso.torrent"));
     // println!("{:?}", t);
 
@@ -40,7 +39,6 @@ async fn main() {
     }
 
     // println!("{:?}", ResponseParser::from_file("response.data".to_string()));
-
 
     loop {
         println!("Listening");

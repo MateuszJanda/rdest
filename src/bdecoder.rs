@@ -1,8 +1,8 @@
 #[cfg(test)]
 use crate::hashmap;
 use std::collections::HashMap;
-use std::slice::Iter;
 use std::iter::Enumerate;
+use std::slice::Iter;
 
 type Key = Vec<u8>;
 
@@ -15,10 +15,7 @@ pub enum BValue {
 }
 
 impl BValue {
-    fn values_vector(
-        it: &mut Enumerate<Iter<u8>>,
-        with_end: bool,
-    ) -> Result<Vec<BValue>, String> {
+    fn values_vector(it: &mut Enumerate<Iter<u8>>, with_end: bool) -> Result<Vec<BValue>, String> {
         let mut values = vec![];
 
         while let Some((pos, b)) = it.next() {
@@ -43,10 +40,7 @@ impl BValue {
         Ok(BValue::ByteStr(Self::parse_byte_str(it, pos, first_num)?.0))
     }
 
-    fn value_int(
-        it: &mut Enumerate<Iter<u8>>,
-        pos: usize,
-    ) -> Result<BValue, String> {
+    fn value_int(it: &mut Enumerate<Iter<u8>>, pos: usize) -> Result<BValue, String> {
         Ok(BValue::Int(Self::parse_int(it, pos)?.0))
     }
 
@@ -57,10 +51,7 @@ impl BValue {
         };
     }
 
-    fn value_dict(
-        it: &mut Enumerate<Iter<u8>>,
-        pos: usize,
-    ) -> Result<BValue, String> {
+    fn value_dict(it: &mut Enumerate<Iter<u8>>, pos: usize) -> Result<BValue, String> {
         return match Self::parse_dict(it, pos) {
             Ok(v) => Ok(BValue::Dict(v)),
             Err(e) => Err(e),
@@ -103,10 +94,7 @@ impl BValue {
         return Ok((str_value, str_raw));
     }
 
-    pub fn parse_int(
-        it: &mut Enumerate<Iter<u8>>,
-        pos: usize,
-    ) -> Result<(i64, Vec<u8>), String> {
+    pub fn parse_int(it: &mut Enumerate<Iter<u8>>, pos: usize) -> Result<(i64, Vec<u8>), String> {
         let mut it_start = it.clone();
         let num_as_bytes = Self::extract_int(it, pos)?;
 
@@ -133,9 +121,7 @@ impl BValue {
         Ok((num, raw_num))
     }
 
-    fn parse_list(
-        it: &mut Enumerate<Iter<u8>>,
-    ) -> Result<Vec<BValue>, String> {
+    fn parse_list(it: &mut Enumerate<Iter<u8>>) -> Result<Vec<BValue>, String> {
         return Self::values_vector(it, true);
     }
 
@@ -168,10 +154,7 @@ impl BValue {
             .collect()
     }
 
-    fn extract_int(
-        it: &mut Enumerate<Iter<u8>>,
-        pos: usize,
-    ) -> Result<Vec<u8>, String> {
+    fn extract_int(it: &mut Enumerate<Iter<u8>>, pos: usize) -> Result<Vec<u8>, String> {
         it.take_while(|(_, &b)| b != b'e')
             .map(|(_, b)| {
                 if (b'0'..=b'9').contains(b) || *b == b'-' {
@@ -184,8 +167,7 @@ impl BValue {
     }
 }
 
-pub struct BDecoder {
-}
+pub struct BDecoder {}
 
 impl BDecoder {
     pub fn from_array(arg: &[u8]) -> Result<Vec<BValue>, String> {
@@ -253,7 +235,10 @@ mod tests {
 
     #[test]
     fn byte_str_zero_length() {
-        assert_eq!(BDecoder::from_array(b"0:"), Ok(vec![BValue::ByteStr(vec![])]));
+        assert_eq!(
+            BDecoder::from_array(b"0:"),
+            Ok(vec![BValue::ByteStr(vec![])])
+        );
     }
 
     #[test]
