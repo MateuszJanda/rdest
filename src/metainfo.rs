@@ -1,5 +1,3 @@
-#[cfg(test)]
-use crate::hashmap;
 use crate::raw_finder::RawFinder;
 use crate::{BDecoder, BValue, DeepFinder};
 use std::collections::HashMap;
