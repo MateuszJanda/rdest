@@ -1,4 +1,4 @@
-use crate::{Torrent, ResponseParser, Error};
+use crate::{Metainfo, ResponseParser, Error};
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use std::fs;
@@ -10,7 +10,7 @@ use url::form_urlencoded;
 pub struct TrackerClient {}
 
 impl TrackerClient {
-    pub fn connect(metafile: &Torrent) -> Result<(), reqwest::Error> {
+    pub fn connect(metafile: &Metainfo) -> Result<(), reqwest::Error> {
         let _url = metafile.url();
         println!("{:?}", metafile.url());
 
@@ -20,7 +20,7 @@ impl TrackerClient {
         Ok(())
     }
 
-    pub async fn connect1(metafile: &Torrent) -> Result<ResponseParser, Error> {
+    pub async fn connect1(metafile: &Metainfo) -> Result<ResponseParser, Error> {
         let u = metafile.url();
         let hash: String = form_urlencoded::byte_serialize(&metafile.hash).collect();
         let url = u + "?info_hash=" + hash.as_str();
