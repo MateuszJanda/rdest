@@ -11,6 +11,7 @@ mod utils;
 pub use crate::bdecoder::BDecoder;
 pub use crate::bdecoder::BValue;
 pub use crate::deep_finder::DeepFinder;
+pub use crate::raw_finder::RawFinder;
 pub use crate::error::Error;
 pub use crate::frame::Frame;
 pub use crate::metainfo::Metainfo;
