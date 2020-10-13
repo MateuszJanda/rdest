@@ -8,7 +8,7 @@ impl DeepFinder {
     fn raw_values_vector(
         it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
         key: Option<&[u8]>,
-        delimiter: Option<u8>,
+        with_end: bool,
         extract: bool,
     ) -> Result<Vec<u8>, String> {
         let mut values = vec![];
@@ -25,7 +25,7 @@ impl DeepFinder {
                     }
                 }
                 b'd' if key.is_none() => values.append(&mut Self::raw_dict(it, extract)?),
-                d if delimiter.is_some() && delimiter.unwrap() == *d => return Ok(values),
+                b'e' if with_end => return Ok(values),
                 _ => return Err(format!("Raw Loop [{}]: Incorrect character", pos)),
             }
         }
@@ -51,7 +51,7 @@ impl DeepFinder {
         match extract {
             true => {
                 let mut list = vec![b'l'];
-                list.append(&mut Self::raw_values_vector(it, None, Some(b'e'), extract)?);
+                list.append(&mut Self::raw_values_vector(it, None, true, extract)?);
                 list.push(b'e');
                 Ok(list)
             }
@@ -66,7 +66,7 @@ impl DeepFinder {
         match extract {
             true => {
                 let mut list = vec![b'd'];
-                list.append(&mut Self::raw_values_vector(it, None, Some(b'e'), extract)?);
+                list.append(&mut Self::raw_values_vector(it, None, true, extract)?);
                 list.push(b'e');
                 Ok(list)
             }
@@ -157,7 +157,7 @@ impl DeepFinder {
 impl RawFinder for DeepFinder {
     fn find_first(key: &str, arg: &[u8]) -> Option<Vec<u8>> {
         let mut it = arg.iter().enumerate();
-        match Self::raw_values_vector(&mut it, Some(key.as_bytes()), None, false) {
+        match Self::raw_values_vector(&mut it, Some(key.as_bytes()), false, false) {
             Ok(val) if val.len() > 0 => Some(val),
             _ => None,
         }

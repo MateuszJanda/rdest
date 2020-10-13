@@ -1,6 +1,8 @@
 #[cfg(test)]
 use crate::hashmap;
 use std::collections::HashMap;
+use std::slice::Iter;
+use std::iter::Enumerate;
 
 type Key = Vec<u8>;
 
@@ -14,8 +16,8 @@ pub enum BValue {
 
 impl BValue {
     fn values_vector(
-        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
-        delimiter: Option<u8>,
+        it: &mut Enumerate<Iter<u8>>,
+        with_end: bool,
     ) -> Result<Vec<BValue>, String> {
         let mut values = vec![];
 
@@ -25,7 +27,7 @@ impl BValue {
                 b'i' => values.push(Self::value_int(it, pos)?),
                 b'l' => values.push(Self::value_list(it)?),
                 b'd' => values.push(Self::value_dict(it, pos)?),
-                d if delimiter.is_some() && delimiter.unwrap() == *d => return Ok(values),
+                b'e' if with_end => return Ok(values),
                 _ => return Err(format!("Loop [{}]: Incorrect character", pos)),
             }
         }
@@ -34,7 +36,7 @@ impl BValue {
     }
 
     fn value_byte_str(
-        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        it: &mut Enumerate<Iter<u8>>,
         pos: usize,
         first_num: &u8,
     ) -> Result<BValue, String> {
@@ -42,13 +44,13 @@ impl BValue {
     }
 
     fn value_int(
-        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        it: &mut Enumerate<Iter<u8>>,
         pos: usize,
     ) -> Result<BValue, String> {
         Ok(BValue::Int(Self::parse_int(it, pos)?.0))
     }
 
-    fn value_list(it: &mut std::iter::Enumerate<std::slice::Iter<u8>>) -> Result<BValue, String> {
+    fn value_list(it: &mut Enumerate<Iter<u8>>) -> Result<BValue, String> {
         return match Self::parse_list(it) {
             Ok(v) => Ok(BValue::List(v)),
             Err(e) => Err(e),
@@ -56,7 +58,7 @@ impl BValue {
     }
 
     fn value_dict(
-        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        it: &mut Enumerate<Iter<u8>>,
         pos: usize,
     ) -> Result<BValue, String> {
         return match Self::parse_dict(it, pos) {
@@ -66,7 +68,7 @@ impl BValue {
     }
 
     pub fn parse_byte_str(
-        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        it: &mut Enumerate<Iter<u8>>,
         pos: usize,
         first_num: &u8,
     ) -> Result<(Vec<u8>, Vec<u8>), String> {
@@ -102,7 +104,7 @@ impl BValue {
     }
 
     pub fn parse_int(
-        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        it: &mut Enumerate<Iter<u8>>,
         pos: usize,
     ) -> Result<(i64, Vec<u8>), String> {
         let mut it_start = it.clone();
@@ -132,16 +134,16 @@ impl BValue {
     }
 
     fn parse_list(
-        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        it: &mut Enumerate<Iter<u8>>,
     ) -> Result<Vec<BValue>, String> {
-        return Self::values_vector(it, Some(b'e'));
+        return Self::values_vector(it, true);
     }
 
     fn parse_dict(
-        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        it: &mut Enumerate<Iter<u8>>,
         pos: usize,
     ) -> Result<HashMap<Vec<u8>, BValue>, String> {
-        let list = Self::values_vector(it, Some(b'e'))?;
+        let list = Self::values_vector(it, true)?;
         if list.len() % 2 != 0 {
             return Err(format!("Dict [{}]: Odd number of elements", pos));
         }
@@ -167,7 +169,7 @@ impl BValue {
     }
 
     fn extract_int(
-        it: &mut std::iter::Enumerate<std::slice::Iter<u8>>,
+        it: &mut Enumerate<Iter<u8>>,
         pos: usize,
     ) -> Result<Vec<u8>, String> {
         it.take_while(|(_, &b)| b != b'e')
@@ -188,7 +190,7 @@ pub struct BDecoder {
 impl BDecoder {
     pub fn from_array(arg: &[u8]) -> Result<Vec<BValue>, String> {
         let mut it = arg.iter().enumerate();
-        BValue::values_vector(&mut it, None)
+        BValue::values_vector(&mut it, false)
     }
 }
 
