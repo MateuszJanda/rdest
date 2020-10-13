@@ -32,7 +32,8 @@ async fn main() {
     let t = Torrent::from_file(String::from("ubuntu-20.04.1-desktop-amd64.iso.torrent"));
     // println!("{:?}", t);
 
-    let r = TrackerClient::connect1(&t.unwrap()).await.unwrap(); // TODO
+    let r = ResponseParser::from_file("response.data".to_string()).unwrap();
+    // let r = TrackerClient::connect1(&t.unwrap()).await.unwrap(); // TODO
 
     for v in r.peers {
         println!("{:?}", v);

@@ -25,7 +25,7 @@ impl ResponseParser {
     }
 
     pub fn from_bencode(data: &[u8]) -> Result<ResponseParser, Error> {
-        let bvalues = BValue::parse(data).map_err(|e| Error::S(e))?;
+        let bvalues = BValue::parse(data)?;
         // let raw_info = BValue::cut_raw_info(arg)?;
 
         if bvalues.is_empty() {
@@ -48,7 +48,7 @@ impl ResponseParser {
 
     fn create_response(dict: &HashMap<Vec<u8>, BValue>) -> Result<ResponseParser, Error> {
         if let Some(reason) = Self::find_failure_reason(dict) {
-            return Err(Error::S(reason));
+            return Err(Error::from(reason));
         }
 
         let response = ResponseParser {
