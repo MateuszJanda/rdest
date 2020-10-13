@@ -5,8 +5,11 @@ mod tracker_resp;
 mod tracker_client;
 mod utils;
 mod metainfo;
+mod raw_finder;
+mod deep_finder;
 
 pub use crate::bdecoder::BValue;
+pub use crate::deep_finder::DeepFinder;
 pub use crate::error::Error;
 pub use crate::frame::Frame;
 pub use crate::tracker_resp::TrackerResp;

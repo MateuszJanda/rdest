@@ -1,8 +1,9 @@
 #[cfg(test)]
 use crate::hashmap;
-use crate::BValue;
+use crate::{BValue, DeepFinder};
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use crate::raw_finder::RawFinder;
 use std::fs;
 
 extern crate sha1;
@@ -183,7 +184,7 @@ impl Metainfo {
     }
 
     fn info_hash(data: &[u8]) -> [u8; 20] {
-        let info = BValue::find_deep("4:info", data).unwrap(); // TODO
+        let info = DeepFinder::find_first("4:info", data).unwrap(); // TODO
         let mut m = sha1::Sha1::new();
 
         // let v: Vec<u8> = vec![1, 2, 3];
