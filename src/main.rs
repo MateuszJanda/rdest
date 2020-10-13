@@ -1,5 +1,5 @@
 // use rdest::BValue;
-use rdest::{Error, Frame, Metainfo, TrackerClient, ResponseParser};
+use rdest::{Error, Frame, Metainfo, TrackerClient, TrackerResp};
 // use rdest::TrackerClient;
 // use hex_literal::hex;
 use std::io::Cursor;
@@ -32,7 +32,7 @@ async fn main() {
     let t = Metainfo::from_file(String::from("ubuntu-20.04.1-desktop-amd64.iso.torrent"));
     // println!("{:?}", t);
 
-    let r = ResponseParser::from_file("response.data".to_string()).unwrap();
+    let r = TrackerResp::from_file("response.data".to_string()).unwrap();
     // let r = TrackerClient::connect1(&t.unwrap()).await.unwrap(); // TODO
 
     for v in r.peers {

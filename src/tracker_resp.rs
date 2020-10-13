@@ -4,7 +4,7 @@ use std::convert::TryFrom;
 use std::fs;
 
 #[derive(PartialEq, Clone, Debug)]
-pub struct ResponseParser {
+pub struct TrackerResp {
     pub interval: u64,
     pub peers: Vec<Peer>,
 }
@@ -16,15 +16,15 @@ pub struct Peer {
     port: u64,
 }
 
-impl ResponseParser {
-    pub fn from_file(path: String) -> Result<ResponseParser, Error> {
+impl TrackerResp {
+    pub fn from_file(path: String) -> Result<TrackerResp, Error> {
         match &fs::read(path) {
             Ok(val) => Self::from_bencode(val),
             Err(_) => Err(Error::Str(format!("File not found"))),
         }
     }
 
-    pub fn from_bencode(data: &[u8]) -> Result<ResponseParser, Error> {
+    pub fn from_bencode(data: &[u8]) -> Result<TrackerResp, Error> {
         let bvalues = BValue::parse(data)?;
         // let raw_info = BValue::cut_raw_info(arg)?;
 
@@ -46,12 +46,12 @@ impl ResponseParser {
         err
     }
 
-    fn create_response(dict: &HashMap<Vec<u8>, BValue>) -> Result<ResponseParser, Error> {
+    fn create_response(dict: &HashMap<Vec<u8>, BValue>) -> Result<TrackerResp, Error> {
         if let Some(reason) = Self::find_failure_reason(dict) {
             return Err(Error::from(reason));
         }
 
-        let response = ResponseParser {
+        let response = TrackerResp {
             interval: Self::find_interval(dict)?,
             peers: Self::find_peers(dict)?,
         };

@@ -1,4 +1,4 @@
-use crate::{Metainfo, ResponseParser, Error};
+use crate::{Metainfo, TrackerResp, Error};
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use std::fs;
@@ -20,7 +20,7 @@ impl TrackerClient {
         Ok(())
     }
 
-    pub async fn connect1(metafile: &Metainfo) -> Result<ResponseParser, Error> {
+    pub async fn connect1(metafile: &Metainfo) -> Result<TrackerResp, Error> {
         let u = metafile.url();
         let hash: String = form_urlencoded::byte_serialize(&metafile.hash).collect();
         let url = u + "?info_hash=" + hash.as_str();
@@ -53,7 +53,7 @@ impl TrackerClient {
 
         fs::write("response.data", &body).unwrap();
 
-        let rrr = ResponseParser::from_bencode(body.as_ref())?;
+        let rrr = TrackerResp::from_bencode(body.as_ref())?;
 
         Ok(rrr)
     }
