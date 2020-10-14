@@ -15,5 +15,6 @@ pub use crate::raw_finder::RawFinder;
 pub use crate::error::Error;
 pub use crate::frame::Frame;
 pub use crate::metainfo::Metainfo;
+pub use crate::metainfo::File;
 pub use crate::tracker_client::TrackerClient;
 pub use crate::tracker_resp::TrackerResp;
