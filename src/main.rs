@@ -1,13 +1,9 @@
-// use rdest::BValue;
-use rdest::{Error, Frame, Metainfo, TrackerClient, TrackerResp};
-// use rdest::TrackerClient;
-// use hex_literal::hex;
+use rdest::{Error, Frame, Metainfo, TrackerResp};
 use std::io::Cursor;
 use std::net::Ipv4Addr;
 use tokio;
 use tokio::io::AsyncReadExt;
 use tokio::net::{TcpListener, TcpStream};
-use std::error;
 
 // fn main() {
 //     let t = Torrent::from_file(String::from("ubuntu-20.04.1-desktop-amd64.iso.torrent"));

@@ -1,4 +1,4 @@
-use crate::{Error, Metainfo, TrackerResp};
+use crate::{Metainfo, TrackerResp};
 use rand::distributions::Alphanumeric;
 use rand::Rng;
 use std::fs;
