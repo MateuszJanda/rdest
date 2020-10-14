@@ -3,8 +3,6 @@ use rand::distributions::Alphanumeric;
 use rand::Rng;
 use std::fs;
 use url::form_urlencoded;
-// use std::fs::File;
-// use std::io::Write;
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct TrackerClient {}
@@ -20,7 +18,7 @@ impl TrackerClient {
         Ok(())
     }
 
-    pub async fn connect1(metafile: &Metainfo) -> Result<TrackerResp, Error> {
+    pub async fn connect1(metafile: &Metainfo) -> Result<TrackerResp, Box<dyn std::error::Error>> {
         let u = metafile.url();
         let hash: String = form_urlencoded::byte_serialize(&metafile.hash).collect();
         let url = u + "?info_hash=" + hash.as_str();

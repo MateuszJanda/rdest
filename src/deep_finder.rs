@@ -1,3 +1,4 @@
+use crate::Error;
 use crate::bdecoder::BValue;
 use crate::raw_finder::RawFinder;
 use std::iter::Enumerate;
@@ -11,7 +12,7 @@ impl DeepFinder {
         key: Option<&[u8]>,
         with_end: bool,
         extract: bool,
-    ) -> Result<Vec<u8>, String> {
+    ) -> Result<Vec<u8>, Error> {
         let mut values = vec![];
 
         while let Some((pos, b)) = it.next() {
@@ -27,13 +28,13 @@ impl DeepFinder {
                 }
                 b'd' if key.is_none() => values.append(&mut Self::raw_dict(it, extract)?),
                 b'e' if with_end => return Ok(values),
-                _ => return Err(format!("Raw Loop [{}]: Incorrect character", pos)),
+                _ => return Err(Error::Decode(format!("Raw Loop [{}]: Incorrect character", pos))),
             }
         }
         Ok(values)
     }
 
-    fn raw_int(it: &mut Enumerate<Iter<u8>>, pos: usize, extract: bool) -> Result<Vec<u8>, String> {
+    fn raw_int(it: &mut Enumerate<Iter<u8>>, pos: usize, extract: bool) -> Result<Vec<u8>, Error> {
         let val = BValue::parse_int(it, pos)?.1;
         match extract {
             true => Ok(val),
@@ -41,7 +42,7 @@ impl DeepFinder {
         }
     }
 
-    fn raw_list(it: &mut Enumerate<Iter<u8>>, extract: bool) -> Result<Vec<u8>, String> {
+    fn raw_list(it: &mut Enumerate<Iter<u8>>, extract: bool) -> Result<Vec<u8>, Error> {
         match extract {
             true => {
                 let mut list = vec![b'l'];
@@ -53,7 +54,7 @@ impl DeepFinder {
         }
     }
 
-    fn raw_dict(it: &mut Enumerate<Iter<u8>>, extract: bool) -> Result<Vec<u8>, String> {
+    fn raw_dict(it: &mut Enumerate<Iter<u8>>, extract: bool) -> Result<Vec<u8>, Error> {
         match extract {
             true => {
                 let mut list = vec![b'd'];
@@ -65,7 +66,7 @@ impl DeepFinder {
         }
     }
 
-    fn traverse_dict(it: &mut Enumerate<Iter<u8>>, key: &[u8]) -> Result<Vec<u8>, String> {
+    fn traverse_dict(it: &mut Enumerate<Iter<u8>>, key: &[u8]) -> Result<Vec<u8>, Error> {
         const EXTRACT_KEY: bool = true;
         let mut extract_value = false;
         let mut key_turn = true;
@@ -89,7 +90,7 @@ impl DeepFinder {
                         }
                     }
                     b'e' => break,
-                    _ => return Err(format!("Traverse [{}] : Incorrect character", pos)),
+                    _ => return Err(Error::Decode(format!("Traverse [{}] : Incorrect character", pos))),
                 };
             } else if !key_turn {
                 let mut dict_it = it.clone();
@@ -114,7 +115,7 @@ impl DeepFinder {
         it: &mut Enumerate<Iter<u8>>,
         b: &u8,
         pos: usize,
-    ) -> Result<Vec<u8>, String> {
+    ) -> Result<Vec<u8>, Error> {
         let mut values = vec![];
         let extract = true;
         match b {
@@ -122,7 +123,7 @@ impl DeepFinder {
             b'i' => values.append(&mut Self::raw_int(it, pos, extract)?),
             b'l' => values.append(&mut Self::raw_list(it, extract)?),
             b'd' => values.append(&mut Self::raw_dict(it, extract)?),
-            _ => return Err(format!("Extract dict val [{}]: Incorrect character", pos)),
+            _ => return Err(Error::Decode(format!("Extract dict val [{}]: Incorrect character", pos))),
         }
 
         Ok(values)
@@ -133,7 +134,7 @@ impl DeepFinder {
         pos: usize,
         first_num: &u8,
         extract: bool,
-    ) -> Result<Vec<u8>, String> {
+    ) -> Result<Vec<u8>, Error> {
         let val = BValue::parse_byte_str(it, pos, first_num)?.1;
         match extract {
             true => Ok(val),

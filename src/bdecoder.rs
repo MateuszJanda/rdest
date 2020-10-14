@@ -1,3 +1,4 @@
+use crate::Error;
 use std::collections::HashMap;
 use std::iter::Enumerate;
 use std::slice::Iter;
@@ -13,7 +14,7 @@ pub enum BValue {
 }
 
 impl BValue {
-    fn values_vector(it: &mut Enumerate<Iter<u8>>, with_end: bool) -> Result<Vec<BValue>, String> {
+    fn values_vector(it: &mut Enumerate<Iter<u8>>, with_end: bool) -> Result<Vec<BValue>, Error> {
         let mut values = vec![];
 
         while let Some((pos, b)) = it.next() {
@@ -23,7 +24,7 @@ impl BValue {
                 b'l' => values.push(Self::value_list(it)?),
                 b'd' => values.push(Self::value_dict(it, pos)?),
                 b'e' if with_end => return Ok(values),
-                _ => return Err(format!("Loop [{}]: Incorrect character", pos)),
+                _ => return Err(Error::Decode(format!("Loop [{}]: Incorrect character", pos))),
             }
         }
 
@@ -34,22 +35,22 @@ impl BValue {
         it: &mut Enumerate<Iter<u8>>,
         pos: usize,
         first_num: &u8,
-    ) -> Result<BValue, String> {
+    ) -> Result<BValue, Error> {
         Ok(BValue::ByteStr(Self::parse_byte_str(it, pos, first_num)?.0))
     }
 
-    fn value_int(it: &mut Enumerate<Iter<u8>>, pos: usize) -> Result<BValue, String> {
+    fn value_int(it: &mut Enumerate<Iter<u8>>, pos: usize) -> Result<BValue, Error> {
         Ok(BValue::Int(Self::parse_int(it, pos)?.0))
     }
 
-    fn value_list(it: &mut Enumerate<Iter<u8>>) -> Result<BValue, String> {
+    fn value_list(it: &mut Enumerate<Iter<u8>>) -> Result<BValue, Error> {
         return match Self::parse_list(it) {
             Ok(v) => Ok(BValue::List(v)),
             Err(e) => Err(e),
         };
     }
 
-    fn value_dict(it: &mut Enumerate<Iter<u8>>, pos: usize) -> Result<BValue, String> {
+    fn value_dict(it: &mut Enumerate<Iter<u8>>, pos: usize) -> Result<BValue, Error> {
         return match Self::parse_dict(it, pos) {
             Ok(v) => Ok(BValue::Dict(v)),
             Err(e) => Err(e),
@@ -60,7 +61,7 @@ impl BValue {
         it: &mut Enumerate<Iter<u8>>,
         pos: usize,
         first_num: &u8,
-    ) -> Result<(Vec<u8>, Vec<u8>), String> {
+    ) -> Result<(Vec<u8>, Vec<u8>), Error> {
         let mut len_bytes = vec![*first_num];
         let mut rest_len_bytes: Vec<_> = it
             .take_while(|(_, &b)| b != b':')
@@ -71,28 +72,28 @@ impl BValue {
         str_raw.push(b':');
 
         if !len_bytes.iter().all(|b| (b'0'..=b'9').contains(b)) {
-            return Err(format!("ByteStr [{}]: Incorrect character", pos));
+            return Err(Error::Decode(format!("ByteStr [{}]: Incorrect character", pos)));
         }
 
         let len_str = match String::from_utf8(len_bytes) {
             Ok(v) => v,
-            Err(_) => return Err(format!("ByteStr [{}]: Unable convert to string", pos)),
+            Err(_) => return Err(Error::Decode(format!("ByteStr [{}]: Unable convert to string", pos))),
         };
         let len: usize = match len_str.parse() {
             Ok(v) => v,
-            Err(_) => return Err(format!("ByteStr [{}]: Unable convert to int", pos)),
+            Err(_) => return Err(Error::Decode(format!("ByteStr [{}]: Unable convert to int", pos))),
         };
 
         let str_value: Vec<_> = it.take(len).map(|(_, &b)| b).collect();
         if str_value.len() != len {
-            return Err(format!("ByteStr [{}]: Not enough characters", pos));
+            return Err(Error::Decode(format!("ByteStr [{}]: Not enough characters", pos)));
         }
 
         str_raw.append(&mut str_value.clone());
         return Ok((str_value, str_raw));
     }
 
-    pub fn parse_int(it: &mut Enumerate<Iter<u8>>, pos: usize) -> Result<(i64, Vec<u8>), String> {
+    pub fn parse_int(it: &mut Enumerate<Iter<u8>>, pos: usize) -> Result<(i64, Vec<u8>), Error> {
         let mut it_start = it.clone();
         let num_as_bytes = Self::extract_int(it, pos)?;
 
@@ -101,35 +102,35 @@ impl BValue {
         raw_num.push(b'e');
 
         if let None = it_start.nth(num_as_bytes.len()) {
-            return Err(format!("Int [{}]: Missing terminate character 'e'", pos));
+            return Err(Error::Decode(format!("Int [{}]: Missing terminate character 'e'", pos)));
         }
         let num_as_str = match String::from_utf8(num_as_bytes) {
             Ok(v) => v,
-            Err(_) => return Err(format!("Int [{}]: Unable convert to string", pos)),
+            Err(_) => return Err(Error::Decode(format!("Int [{}]: Unable convert to string", pos))),
         };
 
         if num_as_str.len() >= 2 && num_as_str.starts_with("0") || num_as_str.starts_with("-0") {
-            return Err(format!("Int [{}]: Leading zero", pos));
+            return Err(Error::Decode(format!("Int [{}]: Leading zero", pos)));
         }
 
         let num = num_as_str
             .parse::<i64>()
-            .or(Err(format!("Int [{}]: Unable convert to int", pos)))?;
+            .or(Err(Error::Decode(format!("Int [{}]: Unable convert to int", pos))))?;
 
         Ok((num, raw_num))
     }
 
-    fn parse_list(it: &mut Enumerate<Iter<u8>>) -> Result<Vec<BValue>, String> {
+    fn parse_list(it: &mut Enumerate<Iter<u8>>) -> Result<Vec<BValue>, Error> {
         return Self::values_vector(it, true);
     }
 
     fn parse_dict(
         it: &mut Enumerate<Iter<u8>>,
         pos: usize,
-    ) -> Result<HashMap<Vec<u8>, BValue>, String> {
+    ) -> Result<HashMap<Vec<u8>, BValue>, Error> {
         let list = Self::values_vector(it, true)?;
         if list.len() % 2 != 0 {
-            return Err(format!("Dict [{}]: Odd number of elements", pos));
+            return Err(Error::Decode(format!("Dict [{}]: Odd number of elements", pos)));
         }
 
         let keys = Self::keys_from_list(&list, pos)?;
@@ -142,33 +143,34 @@ impl BValue {
         Ok(dict)
     }
 
-    fn keys_from_list(list: &Vec<BValue>, pos: usize) -> Result<Vec<Key>, String> {
+    fn keys_from_list(list: &Vec<BValue>, pos: usize) -> Result<Vec<Key>, Error> {
         list.iter()
             .step_by(2)
             .map(|v| match v {
                 BValue::ByteStr(vec) => Ok(vec.clone()),
-                _ => Err(format!("Dict [{}]: Key not string", pos)),
+                _ => Err(Error::Decode(format!("Dict [{}]: Key not string", pos))),
             })
             .collect()
     }
 
-    fn extract_int(it: &mut Enumerate<Iter<u8>>, pos: usize) -> Result<Vec<u8>, String> {
+    fn extract_int(it: &mut Enumerate<Iter<u8>>, pos: usize) -> Result<Vec<u8>, Error> {
         it.take_while(|(_, &b)| b != b'e')
             .map(|(_, b)| {
                 if (b'0'..=b'9').contains(b) || *b == b'-' {
                     Ok(*b)
                 } else {
-                    Err(format!("Int [{}]: Incorrect character", pos))
+                    Err(Error::Decode(format!("Int [{}]: Incorrect character", pos)))
                 }
             })
             .collect()
     }
 }
 
+#[derive(PartialEq, Clone, Debug)]
 pub struct BDecoder {}
 
 impl BDecoder {
-    pub fn from_array(arg: &[u8]) -> Result<Vec<BValue>, String> {
+    pub fn from_array(arg: &[u8]) -> Result<Vec<BValue>, Error> {
         let mut it = arg.iter().enumerate();
         BValue::values_vector(&mut it, false)
     }

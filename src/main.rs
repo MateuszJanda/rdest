@@ -7,6 +7,7 @@ use std::net::Ipv4Addr;
 use tokio;
 use tokio::io::AsyncReadExt;
 use tokio::net::{TcpListener, TcpStream};
+use std::error;
 
 // fn main() {
 //     let t = Torrent::from_file(String::from("ubuntu-20.04.1-desktop-amd64.iso.torrent"));
@@ -67,7 +68,7 @@ struct Handler {
 }
 
 impl Handler {
-    async fn run(&mut self) -> Result<(), Error> {
+    async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         loop {
             let res = self.connection.read_frame().await?;
         }
@@ -93,7 +94,7 @@ impl Connection {
         }
     }
 
-    pub async fn read_frame(&mut self) -> Result<Option<Frame>, Error> {
+    pub async fn read_frame(&mut self) -> Result<Option<Frame>, Box<dyn std::error::Error>> {
         loop {
             if let Some(frame) = self.parse_frame()? {
                 return Ok(Some(frame));
@@ -129,7 +130,7 @@ impl Connection {
                 if self.cursor == 0 {
                     return Ok(None);
                 } else {
-                    return Err(Error::Str("connection reset by peer".into()));
+                    return Err(Error::Peer("connection reset by peer".into()).into());
                 }
             } else {
                 // Update our cursor

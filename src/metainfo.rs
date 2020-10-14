@@ -1,3 +1,6 @@
+#[cfg(test)]
+use crate::hashmap;
+use crate::Error;
 use crate::raw_finder::RawFinder;
 use crate::{BDecoder, BValue, DeepFinder};
 use std::collections::HashMap;
@@ -24,22 +27,22 @@ pub struct File {
 }
 
 impl Metainfo {
-    pub fn from_file(path: String) -> Result<Metainfo, String> {
+    pub fn from_file(path: String) -> Result<Metainfo, Error> {
         match &fs::read(path) {
             Ok(val) => Self::from_bencode(val),
-            Err(_) => Err(format!("File not found")),
+            Err(_) => Err(Error::Meta("File not found".into())),
         }
     }
 
-    pub fn from_bencode(data: &[u8]) -> Result<Metainfo, String> {
+    pub fn from_bencode(data: &[u8]) -> Result<Metainfo, Error> {
         let bvalues = BDecoder::from_array(data)?;
         // let raw_info = BValue::cut_raw_info(arg)?;
 
         if bvalues.is_empty() {
-            return Err(format!("Empty torrent"));
+            return Err(Error::Meta(format!("Empty torrent")));
         }
 
-        let mut err = Err(format!("Missing data"));
+        let mut err = Err(Error::Meta(format!("Missing data")));
         for val in bvalues {
             match val {
                 BValue::Dict(dict) => match Self::create(data, &dict) {
@@ -53,7 +56,7 @@ impl Metainfo {
         err
     }
 
-    fn create(data: &[u8], dict: &HashMap<Vec<u8>, BValue>) -> Result<Metainfo, String> {
+    fn create(data: &[u8], dict: &HashMap<Vec<u8>, BValue>) -> Result<Metainfo, Error> {
         let torrent = Metainfo {
             announce: Self::find_announce(dict)?,
             name: Self::find_name(dict)?,
@@ -65,57 +68,57 @@ impl Metainfo {
         };
 
         if !torrent.is_valid() {
-            return Err(format!(
+            return Err(Error::Meta(format!(
                 "Conflicting values 'length' and 'files'. Only one is allowed"
-            ));
+            )));
         }
 
         Ok(torrent)
     }
 
-    fn find_announce(dict: &HashMap<Vec<u8>, BValue>) -> Result<String, String> {
+    fn find_announce(dict: &HashMap<Vec<u8>, BValue>) -> Result<String, Error> {
         match dict.get(&b"announce".to_vec()) {
             Some(BValue::ByteStr(val)) => String::from_utf8(val.to_vec())
-                .or(Err(format!("Can't convert 'announce' to UTF-8"))),
-            _ => Err(format!("Incorrect or missing 'announce' value")),
+                .or(Err(Error::Meta("Can't convert 'announce' to UTF-8".into()))),
+            _ => Err(Error::Meta("Incorrect or missing 'announce' value".into())),
         }
     }
 
-    fn find_name(dict: &HashMap<Vec<u8>, BValue>) -> Result<String, String> {
+    fn find_name(dict: &HashMap<Vec<u8>, BValue>) -> Result<String, Error> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"name".to_vec()) {
                 Some(BValue::ByteStr(val)) => String::from_utf8(val.to_vec())
-                    .or(Err(format!("Can't convert 'name' to UTF-8"))),
-                _ => Err(format!("Incorrect or missing 'name' value")),
+                    .or(Err(Error::Meta("Can't convert 'name' to UTF-8".into()))),
+                _ => Err(Error::Meta("Incorrect or missing 'name' value".into())),
             },
-            _ => Err(format!("Incorrect or missing 'info' value")),
+            _ => Err(Error::Meta("Incorrect or missing 'info' value".into())),
         }
     }
 
-    fn find_piece_length(dict: &HashMap<Vec<u8>, BValue>) -> Result<u64, String> {
+    fn find_piece_length(dict: &HashMap<Vec<u8>, BValue>) -> Result<u64, Error> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"piece length".to_vec()) {
                 Some(BValue::Int(length)) => {
-                    u64::try_from(*length).or(Err(format!("Can't convert 'piece length' to u64")))
+                    u64::try_from(*length).or(Err(Error::Meta("Can't convert 'piece length' to u64".into())))
                 }
-                _ => Err(format!("Incorrect or missing 'piece length' value")),
+                _ => Err(Error::Meta("Incorrect or missing 'piece length' value".into())),
             },
-            _ => Err(format!("Incorrect or missing 'info' value")),
+            _ => Err(Error::Meta("Incorrect or missing 'info' value".into())),
         }
     }
 
-    fn find_pieces(dict: &HashMap<Vec<u8>, BValue>) -> Result<Vec<Vec<u8>>, String> {
+    fn find_pieces(dict: &HashMap<Vec<u8>, BValue>) -> Result<Vec<Vec<u8>>, Error> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"pieces".to_vec()) {
                 Some(BValue::ByteStr(pieces)) => {
                     if pieces.len() % 20 != 0 {
-                        return Err(format!("'pieces' not divisible by 20"));
+                        return Err(Error::Meta("'pieces' not divisible by 20".into()));
                     }
                     Ok(pieces.chunks(20).map(|chunk| chunk.to_vec()).collect())
                 }
-                _ => Err(format!("Incorrect or missing 'pieces' value")),
+                _ => Err(Error::Meta("Incorrect or missing 'pieces' value".into())),
             },
-            _ => Err(format!("Incorrect or missing 'info' value")),
+            _ => Err(Error::Meta("Incorrect or missing 'info' value".into())),
         }
     }
 
@@ -201,9 +204,9 @@ mod tests {
 
     #[test]
     fn find_announce_incorrect() {
-        assert_eq!(
-            Metainfo::find_announce(&hashmap![b"announce".to_vec() => BValue::Int(5)]),
-            Err(String::from("Incorrect or missing 'announce' value"))
+        assert!(
+            Metainfo::find_announce(&hashmap![b"announce".to_vec() => BValue::Int(5)]).is_err(),
+            "Incorrect or missing 'announce' value df"
         );
     }
 
@@ -223,7 +226,7 @@ mod tests {
             Metainfo::find_name(
                 &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"name".to_vec() => BValue::Int(12)])]
             ),
-            Err(String::from("Incorrect or missing 'name' value"))
+            Err(Error::Meta("Incorrect or missing 'name' value".into()))
         );
     }
 
@@ -231,7 +234,7 @@ mod tests {
     fn find_name_incorrect_info() {
         assert_eq!(
             Metainfo::find_name(&hashmap![b"info".to_vec() => BValue::Int(12)]),
-            Err(String::from("Incorrect or missing 'info' value"))
+            Err(Error::Meta("Incorrect or missing 'info' value".into()))
         );
     }
 
@@ -251,7 +254,7 @@ mod tests {
             Metainfo::find_piece_length(
                 &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"piece length".to_vec() => BValue::ByteStr(b"BAD".to_vec())])]
             ),
-            Err(String::from("Incorrect or missing 'piece length' value"))
+            Err(Error::Meta("Incorrect or missing 'piece length' value".into()))
         );
     }
 
@@ -261,7 +264,7 @@ mod tests {
             Metainfo::find_piece_length(
                 &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"piece length".to_vec() => BValue::Int(-12)])]
             ),
-            Err(String::from("Can't convert 'piece length' to u64"))
+            Err(Error::Meta("Can't convert 'piece length' to u64".into()))
         );
     }
 
@@ -269,7 +272,7 @@ mod tests {
     fn find_piece_length_incorrect_info() {
         assert_eq!(
             Metainfo::find_piece_length(&hashmap![b"info".to_vec() => BValue::Int(12)]),
-            Err(String::from("Incorrect or missing 'info' value"))
+            Err(Error::Meta("Incorrect or missing 'info' value".into()))
         );
     }
 
@@ -289,7 +292,7 @@ mod tests {
             Metainfo::find_pieces(
                 &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"pieces".to_vec() => BValue::Int(12)])]
             ),
-            Err(String::from("Incorrect or missing 'pieces' value"))
+            Err(Error::Meta("Incorrect or missing 'pieces' value".into()))
         );
     }
 
@@ -299,7 +302,7 @@ mod tests {
             Metainfo::find_pieces(
                 &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"pieces".to_vec() => BValue::ByteStr(b"aaa".to_vec())])]
             ),
-            Err(String::from("'pieces' not divisible by 20"))
+            Err(Error::Meta("'pieces' not divisible by 20".into()))
         );
     }
 
@@ -307,7 +310,7 @@ mod tests {
     fn find_pieces_incorrect_info() {
         assert_eq!(
             Metainfo::find_pieces(&hashmap![b"info".to_vec() => BValue::Int(12)]),
-            Err(String::from("Incorrect or missing 'info' value"))
+            Err(Error::Meta("Incorrect or missing 'info' value".into()))
         );
     }
 
@@ -507,7 +510,7 @@ mod tests {
     fn empty_input_incorrect() {
         assert_eq!(
             Metainfo::from_bencode(b""),
-            Err(String::from("Empty torrent"))
+            Err(Error::Meta("Empty torrent".into()))
         );
     }
 
@@ -515,7 +518,7 @@ mod tests {
     fn incorrect_bencode() {
         assert_eq!(
             Metainfo::from_bencode(b"12"),
-            Err(String::from("ByteStr [0]: Not enough characters"))
+            Err(Error::Decode("ByteStr [0]: Not enough characters".into()))
         );
     }
 
@@ -523,7 +526,7 @@ mod tests {
     fn missing_announce() {
         assert_eq!(
             Metainfo::from_bencode(b"d8:announcei1ee"),
-            Err(String::from("Incorrect or missing 'announce' value"))
+            Err(Error::Meta("Incorrect or missing 'announce' value".into()))
         );
     }
 
@@ -531,7 +534,7 @@ mod tests {
     fn torrent_incorrect() {
         assert_eq!(
             Metainfo::from_bencode(b"i12e"),
-            Err(String::from("Missing data"))
+            Err(Error::Meta("Missing data".into()))
         );
     }
 
@@ -539,7 +542,7 @@ mod tests {
     fn torrent_missing_length_and_files() {
         assert_eq!(
             Metainfo::from_bencode(b"d8:announce3:URL4:infod4:name4:NAME12:piece lengthi999e6:pieces20:AAAAABBBBBCCCCCDDDDDee"),
-            Err(String::from("Conflicting values 'length' and 'files'. Only one is allowed"))
+            Err(Error::Meta("Conflicting values 'length' and 'files'. Only one is allowed".into()))
         );
     }
 

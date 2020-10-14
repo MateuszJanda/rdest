@@ -20,7 +20,7 @@ impl TrackerResp {
     pub fn from_file(path: String) -> Result<TrackerResp, Error> {
         match &fs::read(path) {
             Ok(val) => Self::from_bencode(val),
-            Err(_) => Err(Error::Str(format!("File not found"))),
+            Err(_) => Err(Error::Tracker("File not found".into())),
         }
     }
 
@@ -29,10 +29,10 @@ impl TrackerResp {
         // let raw_info = BValue::cut_raw_info(arg)?;
 
         if bvalues.is_empty() {
-            return Err(Error::Str(format!("Empty torrent")));
+            return Err(Error::Tracker("Empty torrent".into()));
         }
 
-        let mut err = Err(Error::Str(format!("Missing data")));
+        let mut err = Err(Error::Tracker("Missing data".into()));
         for val in bvalues {
             match val {
                 BValue::Dict(dict) => match Self::create_response(&dict) {
@@ -48,7 +48,7 @@ impl TrackerResp {
 
     fn create_response(dict: &HashMap<Vec<u8>, BValue>) -> Result<TrackerResp, Error> {
         if let Some(reason) = Self::find_failure_reason(dict) {
-            return Err(Error::from(reason));
+            return Err(Error::Tracker(reason));
         }
 
         let response = TrackerResp {
@@ -69,15 +69,15 @@ impl TrackerResp {
     fn find_interval(dict: &HashMap<Vec<u8>, BValue>) -> Result<u64, Error> {
         match dict.get(&b"interval".to_vec()) {
             Some(BValue::Int(interval)) => u64::try_from(*interval)
-                .or(Err(Error::Str(format!("Can't convert 'interval' to u64")))),
-            _ => Err(Error::Str(format!("Incorrect or missing 'interval' value"))),
+                .or(Err(Error::Tracker("Can't convert 'interval' to u64".into()))),
+            _ => Err(Error::Tracker("Incorrect or missing 'interval' value".into())),
         }
     }
 
     fn find_peers(dict: &HashMap<Vec<u8>, BValue>) -> Result<Vec<Peer>, Error> {
         match dict.get(&b"peers".to_vec()) {
             Some(BValue::List(peers)) => Ok(Self::peer_list(peers)),
-            _ => Err(Error::Str(format!("Incorrect or missing 'peers' value"))),
+            _ => Err(Error::Tracker("Incorrect or missing 'peers' value".into())),
         }
     }
 
