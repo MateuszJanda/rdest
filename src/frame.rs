@@ -169,12 +169,18 @@ impl Frame {
             Some(MsgId::InterestedId) => Ok(()),
             Some(MsgId::NotInterestedId) => Ok(()),
             Some(MsgId::HaveId) if available_data >= Have::FULL_LEN => Ok(()),
+            Some(MsgId::HaveId) => Err(Error::Incomplete),
             Some(MsgId::BitfieldId) if available_data >= Bitfield::PREFIX_LEN + length => Ok(()),
+            Some(MsgId::BitfieldId) => Err(Error::Incomplete),
             Some(MsgId::RequestId) if available_data >= Have::FULL_LEN => Ok(()),
+            Some(MsgId::RequestId) => Err(Error::Incomplete),
             Some(MsgId::PieceId) if available_data >= Piece::PREFIX_LEN + length => Ok(()),
+            Some(MsgId::PieceId) => Err(Error::Incomplete),
             Some(MsgId::CancelId) if available_data >= Cancel::FULL_LEN => Ok(()),
+            Some(MsgId::CancelId) => Err(Error::Incomplete),
             Some(MsgId::PortId) if available_data >= Port::FULL_LEN => Ok(()),
-            _ => Err(Error::UnknownId),
+            Some(MsgId::PortId) => Err(Error::Incomplete),
+            None => Err(Error::UnknownId),
         }
     }
 
