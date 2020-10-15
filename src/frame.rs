@@ -21,10 +21,10 @@ pub enum Frame {
 pub struct Handshake {}
 
 impl Handshake {
-    const ID_BYTE: u8 = b'i';
-    const PREFIX_LEN: usize = 1;
     const PROTOCOL_ID: &'static [u8; 19] = b"BitTorrent protocol";
-    const LEN: usize = Handshake::PROTOCOL_ID.len();
+    const ID_FROM_PROTOCOL: u8 = Handshake::PROTOCOL_ID[2];
+    const PREFIX_LEN: usize = 1;
+    const LEN: usize = 48 + Handshake::PROTOCOL_ID.len();
     const FULL_LEN: usize = Handshake::PREFIX_LEN + Handshake::LEN;
 }
 
@@ -150,7 +150,7 @@ impl Frame {
 
         let msg_id = Self::get_message_id(crs)?;
 
-        if msg_id == Handshake::ID_BYTE
+        if msg_id == Handshake::ID_FROM_PROTOCOL
             && Self::get_handshake_length(crs)? == Handshake::LEN
             && Self::available_data(crs) >= Handshake::FULL_LEN
         {
@@ -234,7 +234,7 @@ impl Frame {
 
         let msg_id = Self::get_message_id(crs)?;
 
-        if msg_id == Handshake::ID_BYTE
+        if msg_id == Handshake::ID_FROM_PROTOCOL
             && Self::get_handshake_length(crs)? == Handshake::LEN
             && Self::available_data(crs) >= Handshake::FULL_LEN
         {
