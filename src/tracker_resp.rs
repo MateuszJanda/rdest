@@ -68,9 +68,12 @@ impl TrackerResp {
 
     fn find_interval(dict: &HashMap<Vec<u8>, BValue>) -> Result<u64, Error> {
         match dict.get(&b"interval".to_vec()) {
-            Some(BValue::Int(interval)) => u64::try_from(*interval)
-                .or(Err(Error::Tracker("Can't convert 'interval' to u64".into()))),
-            _ => Err(Error::Tracker("Incorrect or missing 'interval' value".into())),
+            Some(BValue::Int(interval)) => u64::try_from(*interval).or(Err(Error::Tracker(
+                "Can't convert 'interval' to u64".into(),
+            ))),
+            _ => Err(Error::Tracker(
+                "Incorrect or missing 'interval' value".into(),
+            )),
         }
     }
 

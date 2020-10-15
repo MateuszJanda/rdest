@@ -1,5 +1,5 @@
-use rdest::{BDecoder, BValue, Error};
 use rdest::hashmap;
+use rdest::{BDecoder, BValue, Error};
 
 #[test]
 fn empty_input() {
@@ -9,7 +9,8 @@ fn empty_input() {
 #[test]
 fn incorrect_character() {
     assert_eq!(
-        BDecoder::from_array(b"x"), Err(Error::Decode("Loop [0]: Incorrect character".into()))
+        BDecoder::from_array(b"x"),
+        Err(Error::Decode("Loop [0]: Incorrect character".into()))
     );
 }
 
@@ -65,7 +66,9 @@ fn byte_str_zero_length() {
 fn int_missing_e() {
     assert_eq!(
         BDecoder::from_array(b"i"),
-        Err(Error::Decode("Int [0]: Missing terminate character 'e'".into()))
+        Err(Error::Decode(
+            "Int [0]: Missing terminate character 'e'".into()
+        ))
     );
 }
 

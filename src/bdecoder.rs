@@ -24,7 +24,12 @@ impl BValue {
                 b'l' => values.push(Self::value_list(it)?),
                 b'd' => values.push(Self::value_dict(it, pos)?),
                 b'e' if with_end => return Ok(values),
-                _ => return Err(Error::Decode(format!("Loop [{}]: Incorrect character", pos))),
+                _ => {
+                    return Err(Error::Decode(format!(
+                        "Loop [{}]: Incorrect character",
+                        pos
+                    )))
+                }
             }
         }
 
@@ -72,21 +77,37 @@ impl BValue {
         str_raw.push(b':');
 
         if !len_bytes.iter().all(|b| (b'0'..=b'9').contains(b)) {
-            return Err(Error::Decode(format!("ByteStr [{}]: Incorrect character", pos)));
+            return Err(Error::Decode(format!(
+                "ByteStr [{}]: Incorrect character",
+                pos
+            )));
         }
 
         let len_str = match String::from_utf8(len_bytes) {
             Ok(v) => v,
-            Err(_) => return Err(Error::Decode(format!("ByteStr [{}]: Unable convert to string", pos))),
+            Err(_) => {
+                return Err(Error::Decode(format!(
+                    "ByteStr [{}]: Unable convert to string",
+                    pos
+                )))
+            }
         };
         let len: usize = match len_str.parse() {
             Ok(v) => v,
-            Err(_) => return Err(Error::Decode(format!("ByteStr [{}]: Unable convert to int", pos))),
+            Err(_) => {
+                return Err(Error::Decode(format!(
+                    "ByteStr [{}]: Unable convert to int",
+                    pos
+                )))
+            }
         };
 
         let str_value: Vec<_> = it.take(len).map(|(_, &b)| b).collect();
         if str_value.len() != len {
-            return Err(Error::Decode(format!("ByteStr [{}]: Not enough characters", pos)));
+            return Err(Error::Decode(format!(
+                "ByteStr [{}]: Not enough characters",
+                pos
+            )));
         }
 
         str_raw.append(&mut str_value.clone());
@@ -102,20 +123,29 @@ impl BValue {
         raw_num.push(b'e');
 
         if let None = it_start.nth(num_as_bytes.len()) {
-            return Err(Error::Decode(format!("Int [{}]: Missing terminate character 'e'", pos)));
+            return Err(Error::Decode(format!(
+                "Int [{}]: Missing terminate character 'e'",
+                pos
+            )));
         }
         let num_as_str = match String::from_utf8(num_as_bytes) {
             Ok(v) => v,
-            Err(_) => return Err(Error::Decode(format!("Int [{}]: Unable convert to string", pos))),
+            Err(_) => {
+                return Err(Error::Decode(format!(
+                    "Int [{}]: Unable convert to string",
+                    pos
+                )))
+            }
         };
 
         if num_as_str.len() >= 2 && num_as_str.starts_with("0") || num_as_str.starts_with("-0") {
             return Err(Error::Decode(format!("Int [{}]: Leading zero", pos)));
         }
 
-        let num = num_as_str
-            .parse::<i64>()
-            .or(Err(Error::Decode(format!("Int [{}]: Unable convert to int", pos))))?;
+        let num = num_as_str.parse::<i64>().or(Err(Error::Decode(format!(
+            "Int [{}]: Unable convert to int",
+            pos
+        ))))?;
 
         Ok((num, raw_num))
     }
@@ -130,7 +160,10 @@ impl BValue {
     ) -> Result<HashMap<Vec<u8>, BValue>, Error> {
         let list = Self::values_vector(it, true)?;
         if list.len() % 2 != 0 {
-            return Err(Error::Decode(format!("Dict [{}]: Odd number of elements", pos)));
+            return Err(Error::Decode(format!(
+                "Dict [{}]: Odd number of elements",
+                pos
+            )));
         }
 
         let keys = Self::keys_from_list(&list, pos)?;

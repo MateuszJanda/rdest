@@ -1,7 +1,7 @@
 use crate::Error;
-use std::io::Cursor;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
+use std::io::Cursor;
 
 pub enum Frame {
     Handshake(Handshake),
@@ -163,7 +163,7 @@ impl Frame {
         }
 
         let available_data = Self::available_data(crs);
-        match FromPrimitive::from_u8(msg_id)  {
+        match FromPrimitive::from_u8(msg_id) {
             Some(MsgId::ChokeId) => Ok(()),
             Some(MsgId::UnchokeId) => Ok(()),
             Some(MsgId::InterestedId) => Ok(()),
@@ -265,7 +265,9 @@ impl Frame {
                 crs.set_position(NotInterested::FULL_LEN as u64);
                 Ok(Frame::NotInterested(NotInterested {}))
             }
-            Some(MsgId::HaveId) if length == Have::LEN && available_data >= Have::PREFIX_LEN + length => {
+            Some(MsgId::HaveId)
+                if length == Have::LEN && available_data >= Have::PREFIX_LEN + length =>
+            {
                 crs.set_position(Have::FULL_LEN as u64);
                 Ok(Frame::Have(Have {}))
             }
@@ -273,33 +275,35 @@ impl Frame {
                 crs.set_position((Bitfield::PREFIX_LEN + length) as u64);
                 Ok(Frame::Bitfield(Bitfield {}))
             }
-            Some(MsgId::RequestId
-               ) if length == Request::LEN && available_data >= Request::PREFIX_LEN + length =>
+            Some(MsgId::RequestId)
+                if length == Request::LEN && available_data >= Request::PREFIX_LEN + length =>
             {
                 crs.set_position(Request::FULL_LEN as u64);
                 Ok(Frame::Request(Request {}))
             }
-            Some(MsgId::PieceId
-               ) if length >= Piece::MIN_LEN && available_data >= Piece::PREFIX_LEN + length =>
+            Some(MsgId::PieceId)
+                if length >= Piece::MIN_LEN && available_data >= Piece::PREFIX_LEN + length =>
             {
                 crs.set_position((Piece::PREFIX_LEN + length) as u64);
                 Ok(Frame::Piece(Piece {}))
             }
-            Some(MsgId::CancelId
-               ) if length == Cancel::LEN && available_data >= Cancel::PREFIX_LEN + length =>
+            Some(MsgId::CancelId)
+                if length == Cancel::LEN && available_data >= Cancel::PREFIX_LEN + length =>
             {
                 crs.set_position(Cancel::FULL_LEN as u64);
                 Ok(Frame::Cancel(Cancel {}))
             }
-            Some(MsgId::PortId) if length == Port::LEN && available_data >= Port::PREFIX_LEN + length => {
+            Some(MsgId::PortId)
+                if length == Port::LEN && available_data >= Port::PREFIX_LEN + length =>
+            {
                 crs.set_position(Port::FULL_LEN as u64);
                 Ok(Frame::Port(Port {}))
             }
             _ => {
                 // Skip unknown message
-                crs.set_position((PREFIX_LEN +  length) as u64);
+                crs.set_position((PREFIX_LEN + length) as u64);
                 Err(Error::UnknownId)
-            },
+            }
         }
     }
 }

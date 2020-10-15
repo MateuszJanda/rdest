@@ -1,4 +1,4 @@
-use rdest::{RawFinder, DeepFinder};
+use rdest::{DeepFinder, RawFinder};
 
 #[test]
 fn find_raw_int_value() {

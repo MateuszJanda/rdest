@@ -1,5 +1,5 @@
 use rdest::hashmap;
-use rdest::{Metainfo, Error, File, BValue};
+use rdest::{BValue, Error, File, Metainfo};
 
 #[test]
 fn find_announce_incorrect() {
@@ -53,7 +53,9 @@ fn find_piece_length_incorrect() {
         Metainfo::find_piece_length(
             &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"piece length".to_vec() => BValue::ByteStr(b"BAD".to_vec())])]
         ),
-        Err(Error::Meta("Incorrect or missing 'piece length' value".into()))
+        Err(Error::Meta(
+            "Incorrect or missing 'piece length' value".into()
+        ))
     );
 }
 

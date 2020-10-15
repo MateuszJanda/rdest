@@ -1,6 +1,6 @@
-use crate::Error;
 use crate::bdecoder::BValue;
 use crate::raw_finder::RawFinder;
+use crate::Error;
 use std::iter::Enumerate;
 use std::slice::Iter;
 
@@ -28,7 +28,12 @@ impl DeepFinder {
                 }
                 b'd' if key.is_none() => values.append(&mut Self::raw_dict(it, extract)?),
                 b'e' if with_end => return Ok(values),
-                _ => return Err(Error::Decode(format!("Raw Loop [{}]: Incorrect character", pos))),
+                _ => {
+                    return Err(Error::Decode(format!(
+                        "Raw Loop [{}]: Incorrect character",
+                        pos
+                    )))
+                }
             }
         }
         Ok(values)
@@ -90,7 +95,12 @@ impl DeepFinder {
                         }
                     }
                     b'e' => break,
-                    _ => return Err(Error::Decode(format!("Traverse [{}] : Incorrect character", pos))),
+                    _ => {
+                        return Err(Error::Decode(format!(
+                            "Traverse [{}] : Incorrect character",
+                            pos
+                        )))
+                    }
                 };
             } else if !key_turn {
                 let mut dict_it = it.clone();
@@ -123,7 +133,12 @@ impl DeepFinder {
             b'i' => values.append(&mut Self::raw_int(it, pos, extract)?),
             b'l' => values.append(&mut Self::raw_list(it, extract)?),
             b'd' => values.append(&mut Self::raw_dict(it, extract)?),
-            _ => return Err(Error::Decode(format!("Extract dict val [{}]: Incorrect character", pos))),
+            _ => {
+                return Err(Error::Decode(format!(
+                    "Extract dict val [{}]: Incorrect character",
+                    pos
+                )))
+            }
         }
 
         Ok(values)

@@ -1,5 +1,5 @@
-use crate::Error;
 use crate::raw_finder::RawFinder;
+use crate::Error;
 use crate::{BDecoder, BValue, DeepFinder};
 use std::collections::HashMap;
 use std::convert::TryFrom;
@@ -96,10 +96,12 @@ impl Metainfo {
     pub fn find_piece_length(dict: &HashMap<Vec<u8>, BValue>) -> Result<u64, Error> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"piece length".to_vec()) {
-                Some(BValue::Int(length)) => {
-                    u64::try_from(*length).or(Err(Error::Meta("Can't convert 'piece length' to u64".into())))
-                }
-                _ => Err(Error::Meta("Incorrect or missing 'piece length' value".into())),
+                Some(BValue::Int(length)) => u64::try_from(*length).or(Err(Error::Meta(
+                    "Can't convert 'piece length' to u64".into(),
+                ))),
+                _ => Err(Error::Meta(
+                    "Incorrect or missing 'piece length' value".into(),
+                )),
             },
             _ => Err(Error::Meta("Incorrect or missing 'info' value".into())),
         }
