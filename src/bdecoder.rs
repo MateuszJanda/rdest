@@ -13,17 +13,39 @@ pub enum BValue {
     Dict(HashMap<Key, BValue>),
 }
 
+enum Delimiter {
+    Num,
+    Int,
+    List,
+    Dict,
+    End,
+    Unknown,
+}
+
+impl From<&u8> for Delimiter {
+    fn from(byte: &u8) ->Self {
+        match byte {
+            b'0'..=b'9' => Delimiter::Num,
+            b'i' => Delimiter::Int,
+            b'l' => Delimiter::List,
+            b'd' => Delimiter::Dict,
+            b'e' => Delimiter::End,
+            _ => Delimiter::Unknown,
+        }
+    }
+}
+
 impl BValue {
     fn values_vector(it: &mut Enumerate<Iter<u8>>, with_end: bool) -> Result<Vec<BValue>, Error> {
         let mut values = vec![];
 
         while let Some((pos, b)) = it.next() {
-            match b {
-                b'0'..=b'9' => values.push(Self::value_byte_str(it, pos, b)?),
-                b'i' => values.push(Self::value_int(it, pos)?),
-                b'l' => values.push(Self::value_list(it)?),
-                b'd' => values.push(Self::value_dict(it, pos)?),
-                b'e' if with_end => return Ok(values),
+            match b.into() {
+                Delimiter::Num => values.push(Self::value_byte_str(it, pos, b)?),
+                Delimiter::Int => values.push(Self::value_int(it, pos)?),
+                Delimiter::List => values.push(Self::value_list(it)?),
+                Delimiter::Dict => values.push(Self::value_dict(it, pos)?),
+                Delimiter::End if with_end => return Ok(values),
                 _ => {
                     return Err(Error::Decode(format!(
                         "Loop [{}]: Incorrect character",
