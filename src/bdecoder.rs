@@ -23,7 +23,7 @@ enum Delimiter {
 }
 
 impl From<&u8> for Delimiter {
-    fn from(byte: &u8) ->Self {
+    fn from(byte: &u8) -> Self {
         match byte {
             b'0'..=b'9' => Delimiter::Num,
             b'i' => Delimiter::Int,

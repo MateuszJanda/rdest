@@ -1,3 +1,4 @@
+use crate::frame::MsgId::HaveId;
 use crate::Error;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
@@ -18,14 +19,45 @@ pub enum Frame {
     Port(Port),
 }
 
-pub struct Handshake {}
+pub struct Handshake {
+    info_hash: [u8; 20],
+    peer_id: [u8; 20],
+}
 
 impl Handshake {
     const PROTOCOL_ID: &'static [u8; 19] = b"BitTorrent protocol";
     const ID_FROM_PROTOCOL: u8 = Handshake::PROTOCOL_ID[2];
     const PREFIX_LEN: usize = 1;
-    const LEN: usize = 48 + Handshake::PROTOCOL_ID.len();
+    const RESERVED_LEN: usize = 8;
+    const HASH_LEN: usize = 20;
+    const PEER_ID_LEN: usize = 20;
+    const LEN: usize = Handshake::PROTOCOL_ID.len()
+        + Handshake::RESERVED_LEN
+        + Handshake::HASH_LEN
+        + Handshake::PEER_ID_LEN;
     const FULL_LEN: usize = Handshake::PREFIX_LEN + Handshake::LEN;
+
+    fn new(hash: &[u8; 20], peer_id: &[u8; 20]) -> Handshake {
+        Handshake {
+            info_hash: hash.clone(),
+            peer_id: peer_id.clone(),
+        }
+    }
+
+    fn from(crs: &Cursor<&[u8]>) -> Handshake {
+        let start = Handshake::PREFIX_LEN + Handshake::PROTOCOL_ID.len() + Handshake::RESERVED_LEN;
+        let mut info_hash = [0; Handshake::HASH_LEN];
+        info_hash.clone_from_slice(&crs.get_ref()[start..start + Handshake::HASH_LEN]);
+
+        let start = Handshake::PREFIX_LEN
+            + Handshake::PROTOCOL_ID.len()
+            + Handshake::RESERVED_LEN
+            + Handshake::HASH_LEN;
+        let mut peer_id = [0; Handshake::PEER_ID_LEN];
+        peer_id.clone_from_slice(&crs.get_ref()[start..start + Handshake::PEER_ID_LEN]);
+
+        Handshake { info_hash, peer_id }
+    }
 }
 
 pub struct KeepAlive {}
@@ -244,7 +276,7 @@ impl Frame {
                 }
             }
             crs.set_position(Handshake::FULL_LEN as u64);
-            return Ok(Frame::Handshake(Handshake {}));
+            return Ok(Frame::Handshake(Handshake::from(crs)));
         }
 
         let available_data = Self::available_data(crs);
