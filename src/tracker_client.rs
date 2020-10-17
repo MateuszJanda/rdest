@@ -20,11 +20,11 @@ impl TrackerClient {
 
     pub async fn connect1(metafile: &Metainfo) -> Result<TrackerResp, Box<dyn std::error::Error>> {
         let u = metafile.url();
-        let hash: String = form_urlencoded::byte_serialize(&metafile.hash).collect();
-        let url = u + "?info_hash=" + hash.as_str();
+        let info_hash: String = form_urlencoded::byte_serialize(&metafile.info_hash).collect();
+        let url = u + "?info_hash=" + info_hash.as_str();
 
         println!("url = {:?}", url);
-        println!("hash = {:?}", metafile.hash);
+        println!("info_hash = {:?}", metafile.info_hash);
 
         let peer_id = rand::thread_rng()
             .sample_iter(&Alphanumeric)
@@ -35,7 +35,7 @@ impl TrackerClient {
 
         let params = [
             ("peer_id", peer_id),
-            ("port", "6882".to_string()),
+            ("port", "6881".to_string()),
             ("uploaded", "0".to_string()),
             ("downloaded", "0".to_string()),
             ("left", metafile.length().to_string()),

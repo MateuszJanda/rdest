@@ -29,34 +29,45 @@ impl Handshake {
     const ID_FROM_PROTOCOL: u8 = Handshake::PROTOCOL_ID[2];
     const PREFIX_LEN: usize = 1;
     const RESERVED_LEN: usize = 8;
-    const HASH_LEN: usize = 20;
+    const INFO_HASH_LEN: usize = 20;
     const PEER_ID_LEN: usize = 20;
     const LEN: usize = Handshake::PROTOCOL_ID.len()
         + Handshake::RESERVED_LEN
-        + Handshake::HASH_LEN
+        + Handshake::INFO_HASH_LEN
         + Handshake::PEER_ID_LEN;
     const FULL_LEN: usize = Handshake::PREFIX_LEN + Handshake::LEN;
 
-    fn new(hash: &[u8; 20], peer_id: &[u8; 20]) -> Handshake {
+    pub fn new(info_hash: &[u8; 20], peer_id: &[u8; 20]) -> Handshake {
         Handshake {
-            info_hash: hash.clone(),
+            info_hash: info_hash.clone(),
             peer_id: peer_id.clone(),
         }
     }
 
     fn from(crs: &Cursor<&[u8]>) -> Handshake {
         let start = Handshake::PREFIX_LEN + Handshake::PROTOCOL_ID.len() + Handshake::RESERVED_LEN;
-        let mut info_hash = [0; Handshake::HASH_LEN];
-        info_hash.clone_from_slice(&crs.get_ref()[start..start + Handshake::HASH_LEN]);
+        let mut info_hash = [0; Handshake::INFO_HASH_LEN];
+        info_hash.clone_from_slice(&crs.get_ref()[start..start + Handshake::INFO_HASH_LEN]);
 
         let start = Handshake::PREFIX_LEN
             + Handshake::PROTOCOL_ID.len()
             + Handshake::RESERVED_LEN
-            + Handshake::HASH_LEN;
+            + Handshake::INFO_HASH_LEN;
         let mut peer_id = [0; Handshake::PEER_ID_LEN];
         peer_id.clone_from_slice(&crs.get_ref()[start..start + Handshake::PEER_ID_LEN]);
 
         Handshake { info_hash, peer_id }
+    }
+
+    pub fn to_vec(&self) -> Vec<u8> {
+        let mut vec = vec![];
+        vec.push(Handshake::PROTOCOL_ID.len() as u8);
+        vec.extend_from_slice(Handshake::PROTOCOL_ID);
+        vec.extend_from_slice(&[0; Handshake::RESERVED_LEN]);
+        vec.extend_from_slice(&self.info_hash);
+        vec.extend_from_slice(&self.peer_id);
+
+        vec
     }
 }
 

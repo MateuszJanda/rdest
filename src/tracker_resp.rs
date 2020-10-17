@@ -116,4 +116,11 @@ impl TrackerResp {
             })
             .collect()
     }
+
+    pub fn peers(&self) -> Vec<String> {
+        self.peers
+            .iter()
+            .map(|peer| peer.ip.clone() + ":" + peer.port.to_string().as_str())
+            .collect()
+    }
 }

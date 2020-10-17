@@ -15,7 +15,7 @@ pub struct Metainfo {
     pub pieces: Vec<Vec<u8>>,
     pub length: Option<u64>,
     pub files: Option<Vec<File>>,
-    pub hash: [u8; 20],
+    pub info_hash: [u8; 20],
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -62,7 +62,7 @@ impl Metainfo {
             pieces: Self::find_pieces(dict)?,
             length: Self::find_length(dict),
             files: Self::find_files(dict),
-            hash: Self::info_hash(data),
+            info_hash: Self::info_hash(data),
         };
 
         if !torrent.is_valid() {
