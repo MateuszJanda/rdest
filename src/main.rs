@@ -10,6 +10,10 @@ use std::error;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn error::Error>> {
 
+    // let r = TrackerResp::from_file("response.data".to_string()).unwrap();
+    let t = Metainfo::from_file(String::from("ubuntu-20.04.1-desktop-amd64.iso.torrent")).unwrap();
+    let r = TrackerClient::connect1(&t).await.unwrap(); // TODO
+
     let mut stream = TcpStream::connect("89.134.168.224:16881").await?;
 
     let mut buffer =BytesMut::with_capacity(10);
@@ -21,8 +25,7 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
     };
 
     let peer_id = b"ABCDEFGHIJKLMNOPQRST";
-    let info_hash = b"ABCDEFGHIJKLMNOPQRST";
-    connection.init_frame(info_hash, peer_id).await?;
+    connection.init_frame(&t.info_hash, peer_id).await?;
 
     // let n = stream.read(&mut buffer).await?;
 
