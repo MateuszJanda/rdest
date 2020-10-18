@@ -4,6 +4,9 @@ use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use std::io::Cursor;
 
+const PREFIX_LEN: usize = 4;
+const ID_LEN: usize = 1;
+
 #[derive(Debug)]
 pub enum Frame {
     Handshake(Handshake),
@@ -78,7 +81,7 @@ pub struct KeepAlive {}
 
 impl KeepAlive {
     const LEN: usize = 0;
-    const PREFIX_LEN: usize = 2;
+    const PREFIX_LEN: usize = PREFIX_LEN;
     const FULL_LEN: usize = KeepAlive::PREFIX_LEN;
 }
 
@@ -87,7 +90,7 @@ pub struct Choke {}
 
 impl Choke {
     const ID: u8 = 0;
-    const PREFIX_LEN: usize = 2;
+    const PREFIX_LEN: usize = PREFIX_LEN;
     const LEN: usize = 1;
     const FULL_LEN: usize = Choke::PREFIX_LEN + Choke::LEN;
 }
@@ -97,7 +100,7 @@ pub struct Unchoke {}
 
 impl Unchoke {
     const ID: u8 = 1;
-    const PREFIX_LEN: usize = 2;
+    const PREFIX_LEN: usize = PREFIX_LEN;
     const LEN: usize = 1;
     const FULL_LEN: usize = Unchoke::PREFIX_LEN + Unchoke::LEN;
 }
@@ -107,7 +110,7 @@ pub struct Interested {}
 
 impl Interested {
     const ID: u8 = 2;
-    const PREFIX_LEN: usize = 2;
+    const PREFIX_LEN: usize = PREFIX_LEN;
     const LEN: usize = 1;
     const FULL_LEN: usize = Interested::PREFIX_LEN + Interested::LEN;
 }
@@ -117,7 +120,7 @@ pub struct NotInterested {}
 
 impl NotInterested {
     const ID: u8 = 3;
-    const PREFIX_LEN: usize = 2;
+    const PREFIX_LEN: usize = PREFIX_LEN;
     const LEN: usize = 1;
     const FULL_LEN: usize = NotInterested::PREFIX_LEN + NotInterested::LEN;
 }
@@ -127,7 +130,7 @@ pub struct Have {}
 
 impl Have {
     const ID: u8 = 4;
-    const PREFIX_LEN: usize = 2;
+    const PREFIX_LEN: usize = PREFIX_LEN;
     const LEN: usize = 5;
     const FULL_LEN: usize = Have::PREFIX_LEN + Have::LEN;
 }
@@ -137,7 +140,7 @@ pub struct Bitfield {}
 
 impl Bitfield {
     const ID: u8 = 5;
-    const PREFIX_LEN: usize = 2;
+    const PREFIX_LEN: usize = PREFIX_LEN;
 }
 
 #[derive(Debug)]
@@ -145,7 +148,7 @@ pub struct Request {}
 
 impl Request {
     const ID: u8 = 6;
-    const PREFIX_LEN: usize = 2;
+    const PREFIX_LEN: usize = PREFIX_LEN;
     const LEN: usize = 13;
     const FULL_LEN: usize = Request::PREFIX_LEN + Request::LEN;
 }
@@ -155,7 +158,7 @@ pub struct Piece {}
 
 impl Piece {
     const ID: u8 = 7;
-    const PREFIX_LEN: usize = 2;
+    const PREFIX_LEN: usize = PREFIX_LEN;
     const MIN_LEN: usize = 9;
 }
 
@@ -164,7 +167,7 @@ pub struct Cancel {}
 
 impl Cancel {
     const ID: u8 = 8;
-    const PREFIX_LEN: usize = 2;
+    const PREFIX_LEN: usize = PREFIX_LEN;
     const LEN: usize = 13;
     const FULL_LEN: usize = Cancel::PREFIX_LEN + Cancel::LEN;
 }
@@ -174,7 +177,7 @@ pub struct Port {}
 
 impl Port {
     const ID: u8 = 9;
-    const PREFIX_LEN: usize = 2;
+    const PREFIX_LEN: usize = PREFIX_LEN;
     const LEN: usize = 3;
     const FULL_LEN: usize = Port::PREFIX_LEN + Port::LEN;
 }
@@ -193,9 +196,6 @@ enum MsgId {
     CancelId = Cancel::ID,
     PortId = Port::ID,
 }
-
-const PREFIX_LEN: usize = 2;
-const ID_LEN: usize = 1;
 
 impl Frame {
     pub fn check(crs: &mut Cursor<&[u8]>) -> Result<(), Error> {
@@ -256,8 +256,9 @@ impl Frame {
         let end = crs.get_ref().len();
 
         if end - start >= PREFIX_LEN as usize {
-            let b = [crs.get_ref()[0], crs.get_ref()[1]];
-            return Ok(u16::from_be_bytes(b) as usize);
+            let mut b = [0; PREFIX_LEN];
+            b.copy_from_slice(&crs.get_ref()[0..PREFIX_LEN]);
+            return Ok(u32::from_be_bytes(b) as usize);
         }
 
         Err(Error::Incomplete)
