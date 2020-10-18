@@ -5,18 +5,35 @@ use tokio;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use bytes::{Buf, BytesMut};
+use std::error;
 
-// fn main() {
-//     let t = Torrent::from_file(String::from("ubuntu-20.04.1-desktop-amd64.iso.torrent"));
-//     println!("{:?}", t);
-//     match TrackerClient::connect1(&t.unwrap()) {
-//         Ok(_) => println!("Http Ok"),
-//         Err(e) => println!("Http Problem {:?}", e),
-//     }
-//
-//     // println!("{:?}", ResponseParser::from_file("response.data".to_string()));
-// }
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn error::Error>> {
 
+    let mut stream = TcpStream::connect("89.134.168.224:16881").await?;
+
+    let mut buffer =BytesMut::with_capacity(10);
+    // let mut buffer = [0; 10];
+
+    let mut connection = Connection {
+        stream,
+        buffer,
+    };
+
+    let peer_id = b"ABCDEFGHIJKLMNOPQRST";
+    let info_hash = b"ABCDEFGHIJKLMNOPQRST";
+    connection.init_frame(info_hash, peer_id).await?;
+
+    // let n = stream.read(&mut buffer).await?;
+
+    connection.read_frame().await?;
+
+    // println!("{}", n);
+
+    Ok(())
+}
+
+/*
 #[tokio::main]
 async fn main() {
     println!("Hello, world!");
@@ -39,7 +56,8 @@ async fn main() {
     // println!("{:?}", ResponseParser::from_file("response.data".to_string()));
 
     {
-        let addr = &r.peers()[0];
+        let addr = &r.peers()[1];
+        println!("Try connect to {}", addr);
         let socket = TcpStream::connect(addr).await.unwrap();
         let connection = Connection::new(socket);
         println!("connect");
@@ -75,7 +93,10 @@ async fn main() {
     //         }
     //     });
     // }
+
+    println!("koniec");
 }
+*/
 
 struct Handler {
     connection: Connection,
@@ -96,8 +117,18 @@ impl Handler {
         peer_id: &[u8; 20],
     ) -> Result<(), Box<dyn std::error::Error>> {
 
-        self.connection.init_frame(info_hash, peer_id).await?;
+        // self.connection.init_frame(info_hash, peer_id).await?;
         let res = self.connection.read_frame().await?;
+        let res = match self.connection.read_frame().await {
+            Err(e) => {
+                println!("coś nie tak {}", e);
+                Err(e)?
+            }
+            Ok(r) => {
+                println!("jest ok");
+                r
+            },
+        };
 
         println!("{:?}", res.unwrap());
 
@@ -136,19 +167,41 @@ impl Connection {
 
     pub async fn read_frame(&mut self) -> Result<Option<Frame>, Box<dyn std::error::Error>> {
         loop {
+            println!("before check");
             if let Some(frame) = self.parse_frame()? {
 
+                println!("is frame");
                 return Ok(Some(frame));
             }
 
-            // let n = self.stream.read(&mut self.buffer[self.cursor..]).await?;
-            if self.stream.read_buf(&mut self.buffer).await? == 0 {
+
+            println!("A before read");
+            // let n = self.stream.read_buf(&mut self.buffer).await?;
+            let n = self.stream.read(&mut self.buffer).await?;
+            // let n = match self.stream.read_buf(&mut self.buffer) {
+            //     Err(e) => {
+            //         println!("tutaj");
+            //         println!("{:?}", e);
+            //         0
+            //     },
+            //     Ok(n) => {
+            //         println!("tutaj dobrze");
+            //         n
+            //     },
+            //     _ => {
+            //         println!("coś jescze");
+            //         0
+            //     }
+            // };
+            println!("read n {}", n);
+            if n == 0 {
                 return if self.buffer.is_empty() {
                     Ok(None)
                 } else {
                     Err(Error::Peer("connection reset by peer".into()).into())
                 }
             }
+
         }
     }
 
@@ -173,7 +226,10 @@ impl Connection {
                 Ok(Some(frame))
             }
             // Not enough data has been buffered
-            Err(Error::Incomplete) => Ok(None),
+            Err(Error::Incomplete) => {
+                println!("Incomplete");
+                Ok(None)
+            },
             // An error was encountered
             Err(e) => Err(e.into()),
         }
