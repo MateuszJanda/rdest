@@ -15,6 +15,7 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
     let r = TrackerClient::connect1(&t).await.unwrap(); // TODO
 
     let mut stream = TcpStream::connect("89.134.168.224:16881").await?;
+    // let mut stream = TcpStream::connect("127.0.0.1:8888").await?;
 
     let mut buffer =BytesMut::with_capacity(10);
     // let mut buffer = [0; 10];
@@ -160,8 +161,10 @@ impl Connection {
         peer_id: &[u8; 20],
     ) -> Result<(), Box<dyn std::error::Error>> {
         // self.stream.read(&mut self.buffer[self.cursor..]).await?;
+
         self.stream
-            .write_all(Handshake::new(info_hash, peer_id).to_vec().as_slice());
+            .write_all(Handshake::new(info_hash, peer_id).to_vec().as_slice()).await?;
+        // self.stream.write_all(b"asdf").await?;
 
         println!("Handshake send");
 
