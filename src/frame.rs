@@ -4,6 +4,7 @@ use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use std::io::Cursor;
 
+#[derive(Debug)]
 pub enum Frame {
     Handshake(Handshake),
     KeepAlive(KeepAlive),
@@ -19,6 +20,7 @@ pub enum Frame {
     Port(Port),
 }
 
+#[derive(Debug)]
 pub struct Handshake {
     info_hash: [u8; 20],
     peer_id: [u8; 20],
@@ -71,6 +73,7 @@ impl Handshake {
     }
 }
 
+#[derive(Debug)]
 pub struct KeepAlive {}
 
 impl KeepAlive {
@@ -79,6 +82,7 @@ impl KeepAlive {
     const FULL_LEN: usize = KeepAlive::PREFIX_LEN;
 }
 
+#[derive(Debug)]
 pub struct Choke {}
 
 impl Choke {
@@ -88,6 +92,7 @@ impl Choke {
     const FULL_LEN: usize = Choke::PREFIX_LEN + Choke::LEN;
 }
 
+#[derive(Debug)]
 pub struct Unchoke {}
 
 impl Unchoke {
@@ -97,6 +102,7 @@ impl Unchoke {
     const FULL_LEN: usize = Unchoke::PREFIX_LEN + Unchoke::LEN;
 }
 
+#[derive(Debug)]
 pub struct Interested {}
 
 impl Interested {
@@ -106,6 +112,7 @@ impl Interested {
     const FULL_LEN: usize = Interested::PREFIX_LEN + Interested::LEN;
 }
 
+#[derive(Debug)]
 pub struct NotInterested {}
 
 impl NotInterested {
@@ -115,6 +122,7 @@ impl NotInterested {
     const FULL_LEN: usize = NotInterested::PREFIX_LEN + NotInterested::LEN;
 }
 
+#[derive(Debug)]
 pub struct Have {}
 
 impl Have {
@@ -124,6 +132,7 @@ impl Have {
     const FULL_LEN: usize = Have::PREFIX_LEN + Have::LEN;
 }
 
+#[derive(Debug)]
 pub struct Bitfield {}
 
 impl Bitfield {
@@ -131,6 +140,7 @@ impl Bitfield {
     const PREFIX_LEN: usize = 2;
 }
 
+#[derive(Debug)]
 pub struct Request {}
 
 impl Request {
@@ -140,6 +150,7 @@ impl Request {
     const FULL_LEN: usize = Request::PREFIX_LEN + Request::LEN;
 }
 
+#[derive(Debug)]
 pub struct Piece {}
 
 impl Piece {
@@ -148,6 +159,7 @@ impl Piece {
     const MIN_LEN: usize = 9;
 }
 
+#[derive(Debug)]
 pub struct Cancel {}
 
 impl Cancel {
@@ -157,6 +169,7 @@ impl Cancel {
     const FULL_LEN: usize = Cancel::PREFIX_LEN + Cancel::LEN;
 }
 
+#[derive(Debug)]
 pub struct Port {}
 
 impl Port {

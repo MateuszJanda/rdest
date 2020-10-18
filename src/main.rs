@@ -94,9 +94,12 @@ impl Handler {
         info_hash: &[u8; 20],
         peer_id: &[u8; 20],
     ) -> Result<(), Box<dyn std::error::Error>> {
-        loop {
-            let res = self.connection.init_frame(info_hash, peer_id).await?;
-        }
+
+        self.connection.init_frame(info_hash, peer_id).await?;
+        let res = self.connection.read_frame().await?;
+
+        println!("{:?}", res.unwrap());
+
 
         Ok(())
     }
@@ -123,14 +126,14 @@ impl Connection {
         &mut self,
         info_hash: &[u8; 20],
         peer_id: &[u8; 20],
-    ) -> Result<Option<Frame>, Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         // self.stream.read(&mut self.buffer[self.cursor..]).await?;
         self.stream
             .write_all(Handshake::new(info_hash, peer_id).to_vec().as_slice());
 
         println!("Handshake send");
 
-        loop {}
+        Ok(())
     }
 
     pub async fn read_frame(&mut self) -> Result<Option<Frame>, Box<dyn std::error::Error>> {
