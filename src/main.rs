@@ -14,7 +14,7 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
     let t = Metainfo::from_file(String::from("ubuntu-20.04.1-desktop-amd64.iso.torrent")).unwrap();
     let r = TrackerClient::connect1(&t).await.unwrap(); // TODO
 
-    let addr = &r.peers()[1];
+    let addr = &r.peers()[3];
     println!("Try connect to {}", addr);
     let mut stream = TcpStream::connect(addr).await?;
 

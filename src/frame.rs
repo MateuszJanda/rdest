@@ -5,6 +5,7 @@ use num_traits::FromPrimitive;
 use std::io::Cursor;
 
 const PREFIX_LEN: usize = 4;
+const ID_POS: usize = PREFIX_LEN;
 const ID_LEN: usize = 1;
 
 #[derive(Debug)]
@@ -31,7 +32,7 @@ pub struct Handshake {
 
 impl Handshake {
     const PROTOCOL_ID: &'static [u8; 19] = b"BitTorrent protocol";
-    const ID_FROM_PROTOCOL: u8 = Handshake::PROTOCOL_ID[2];
+    const ID_FROM_PROTOCOL: u8 = Handshake::PROTOCOL_ID[3];
     const PREFIX_LEN: usize = 1;
     const RESERVED_LEN: usize = 8;
     const INFO_HASH_LEN: usize = 20;
@@ -205,13 +206,19 @@ impl Frame {
         }
 
         let msg_id = Self::get_message_id(crs)?;
+        // println!("{} {}", msg_id, Handshake::ID_FROM_PROTOCOL);
+        // println!("{} {}", Self::get_protocol_id_length(crs)?, Handshake::PROTOCOL_ID.len());
+        // println!("{} {}", Self::available_data(crs), Handshake::FULL_LEN);
 
         if msg_id == Handshake::ID_FROM_PROTOCOL
-            && Self::get_handshake_length(crs)? == Handshake::LEN
+            && Self::get_protocol_id_length(crs)? == Handshake::PROTOCOL_ID.len()
             && Self::available_data(crs) >= Handshake::FULL_LEN
         {
-            for idx in 0..Handshake::LEN {
+            println!("checking protocol id");
+            for idx in 0..Handshake::PROTOCOL_ID.len() {
                 if crs.get_ref()[idx + 1] != Handshake::PROTOCOL_ID[idx] {
+
+                    println!("invalid header {}", idx);
                     return Err(Error::InvalidHeader);
                 }
             }
@@ -240,7 +247,7 @@ impl Frame {
         }
     }
 
-    fn get_handshake_length(crs: &Cursor<&[u8]>) -> Result<usize, Error> {
+    fn get_protocol_id_length(crs: &Cursor<&[u8]>) -> Result<usize, Error> {
         let start = crs.position() as usize;
         let end = crs.get_ref().len();
 
@@ -269,7 +276,7 @@ impl Frame {
         let end = crs.get_ref().len();
 
         if end - start >= (PREFIX_LEN + ID_LEN) as usize {
-            return Ok(crs.get_ref()[3]);
+            return Ok(crs.get_ref()[ID_POS]);
         }
 
         Err(Error::Incomplete)
@@ -292,10 +299,10 @@ impl Frame {
         let msg_id = Self::get_message_id(crs)?;
 
         if msg_id == Handshake::ID_FROM_PROTOCOL
-            && Self::get_handshake_length(crs)? == Handshake::LEN
+            && Self::get_protocol_id_length(crs)? == Handshake::PROTOCOL_ID.len()
             && Self::available_data(crs) >= Handshake::FULL_LEN
         {
-            for idx in 0..Handshake::LEN {
+            for idx in 0..Handshake::PROTOCOL_ID.len() {
                 if crs.get_ref()[idx + 1] != Handshake::PROTOCOL_ID[idx] {
                     return Err(Error::InvalidHeader);
                 }
