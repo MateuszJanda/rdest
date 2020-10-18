@@ -4,6 +4,7 @@ use std::net::Ipv4Addr;
 use tokio;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
+use bytes::{Buf, BytesMut};
 
 // fn main() {
 //     let t = Torrent::from_file(String::from("ubuntu-20.04.1-desktop-amd64.iso.torrent"));
@@ -100,15 +101,13 @@ impl Handler {
 
         println!("{:?}", res.unwrap());
 
-
         Ok(())
     }
 }
 
 struct Connection {
     stream: TcpStream,
-    buffer: Vec<u8>,
-    cursor: usize,
+    buffer: BytesMut,
 }
 
 const BUFFER_SIZE: usize = 65536 + 2;
@@ -117,8 +116,7 @@ impl Connection {
     pub fn new(stream: TcpStream) -> Connection {
         Connection {
             stream,
-            buffer: vec![0; BUFFER_SIZE],
-            cursor: 0,
+            buffer: BytesMut::with_capacity(BUFFER_SIZE),
         }
     }
 
@@ -139,44 +137,17 @@ impl Connection {
     pub async fn read_frame(&mut self) -> Result<Option<Frame>, Box<dyn std::error::Error>> {
         loop {
             if let Some(frame) = self.parse_frame()? {
+
                 return Ok(Some(frame));
             }
 
-            // // Ensure the buffer has capacity
-            // if self.buffer.len() == self.cursor {
-            //     // Grow the buffer
-            //     self.buffer.resize(self.cursor * 2, 0);
-            // }
-
-            // Read into the buffer, tracking the number
-            // of bytes read
-
-            // let mut stream = BufReader::new(self.stream);
-
-            let n = self.stream.read(&mut self.buffer[self.cursor..]).await?;
-
-            // let mut line = String::new();
-            // stream.read_line(&mut line).await.unwrap();
-
-            // let mut bb = [20; 0];
-            // self.stream.read(&mut bb).await?;
-
-            // let mut line = String::new();
-            // self.stream.read_line(&mut line).await.unwrap();
-
-            // self.stream.read_buf(&mut self.buffer[self.cursor..]).await?;
-            // self.stream.read_exact(&mut self.buffer[self.cursor..]).await?;
-            let n = 0;
-
-            if 0 == n {
-                if self.cursor == 0 {
-                    return Ok(None);
+            // let n = self.stream.read(&mut self.buffer[self.cursor..]).await?;
+            if self.stream.read_buf(&mut self.buffer).await? == 0 {
+                return if self.buffer.is_empty() {
+                    Ok(None)
                 } else {
-                    return Err(Error::Peer("connection reset by peer".into()).into());
+                    Err(Error::Peer("connection reset by peer".into()).into())
                 }
-            } else {
-                // Update our cursor
-                self.cursor += n;
             }
         }
     }
@@ -191,9 +162,12 @@ impl Connection {
                 let frame = Frame::parse(&mut crs)?;
 
                 // Discard the frame from the buffer
+
                 let len = crs.position() as usize;
-                self.buffer.drain(..len);
-                self.buffer.resize(BUFFER_SIZE, 0);
+                // self.buffer.drain(..len);
+                // self.buffer.resize(BUFFER_SIZE, 0);
+
+                self.buffer.advance(len);
 
                 // Return the frame to the caller.
                 Ok(Some(frame))
