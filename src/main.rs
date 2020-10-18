@@ -14,10 +14,14 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
     let t = Metainfo::from_file(String::from("ubuntu-20.04.1-desktop-amd64.iso.torrent")).unwrap();
     let r = TrackerClient::connect1(&t).await.unwrap(); // TODO
 
-    let mut stream = TcpStream::connect("89.134.168.224:16881").await?;
+    let addr = &r.peers()[1];
+    println!("Try connect to {}", addr);
+    let mut stream = TcpStream::connect(addr).await?;
+
     // let mut stream = TcpStream::connect("127.0.0.1:8888").await?;
 
-    let mut buffer =BytesMut::with_capacity(10);
+    let mut buffer =BytesMut::with_capacity(4096);
+    println!("buf len {}", buffer.len());
     // let mut buffer = [0; 10];
 
     let mut connection = Connection {
@@ -27,11 +31,9 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
 
     let peer_id = b"ABCDEFGHIJKLMNOPQRST";
     connection.init_frame(&t.info_hash, peer_id).await?;
-
-    // let n = stream.read(&mut buffer).await?;
-
     connection.read_frame().await?;
 
+    // let n = stream.read_buf(&mut buffer).await?;
     // println!("{}", n);
 
     Ok(())
@@ -172,6 +174,10 @@ impl Connection {
     }
 
     pub async fn read_frame(&mut self) -> Result<Option<Frame>, Box<dyn std::error::Error>> {
+        // let n = self.stream.read_buf(&mut self.buffer).await?;
+        // println!("read n {} {}", n, self.buffer.is_empty());
+        // Ok(None)
+
         loop {
             println!("before check");
             if let Some(frame) = self.parse_frame()? {
@@ -182,8 +188,8 @@ impl Connection {
 
 
             println!("A before read");
-            // let n = self.stream.read_buf(&mut self.buffer).await?;
-            let n = self.stream.read(&mut self.buffer).await?;
+            let n = self.stream.read_buf(&mut self.buffer).await?;
+            // let n = self.stream.read(&mut self.buffer).await?;
             // let n = match self.stream.read_buf(&mut self.buffer) {
             //     Err(e) => {
             //         println!("tutaj");
@@ -199,7 +205,7 @@ impl Connection {
             //         0
             //     }
             // };
-            println!("read n {}", n);
+            println!("read n {} {}", n, self.buffer.is_empty());
             if n == 0 {
                 return if self.buffer.is_empty() {
                     Ok(None)
@@ -209,6 +215,7 @@ impl Connection {
             }
 
         }
+
     }
 
     fn parse_frame(&mut self) -> Result<Option<Frame>, Error> {

@@ -236,7 +236,7 @@ impl Frame {
             Some(MsgId::CancelId) => Err(Error::Incomplete),
             Some(MsgId::PortId) if available_data >= Port::FULL_LEN => Ok(()),
             Some(MsgId::PortId) => Err(Error::Incomplete),
-            None => Err(Error::UnknownId),
+            None => Err(Error::UnknownId(msg_id)),
         }
     }
 
@@ -358,7 +358,7 @@ impl Frame {
             _ => {
                 // Skip unknown message
                 crs.set_position((PREFIX_LEN + length) as u64);
-                Err(Error::UnknownId)
+                Err(Error::UnknownId(msg_id))
             }
         }
     }
