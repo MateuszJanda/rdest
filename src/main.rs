@@ -55,7 +55,7 @@ async fn main() {
     // println!("{:?}", t);
 
     // let r = TrackerResp::from_file("response.data".to_string()).unwrap();
-    // let r = TrackerClient::connect1(&t).await.unwrap(); // TODO
+    let r = TrackerClient::connect1(&t).await.unwrap(); // TODO
 
     // for v in r.peers {
     //     println!("{:?}", v);
@@ -63,39 +63,42 @@ async fn main() {
 
     // println!("{:?}", ResponseParser::from_file("response.data".to_string()));
 
-    // {
-    //     let addr = &r.peers()[1];
-    //     println!("Try connect to {}", addr);
-    //     let socket = TcpStream::connect(addr).await.unwrap();
-    //     let connection = Connection::new(socket);
-    //     println!("connect");
-    //
-    //     let mut handler2 = Handler { connection };
-    //
-    //     let info_hash = t.info_hash;
-    //     let peer_id = b"ABCDEFGHIJKLMNOPQRST";
-    //     tokio::spawn(async move {
-    //         // Process the connection. If an error is encountered, log it.
-    //         if let Err(err) = handler2.run2(&info_hash, peer_id).await {
-    //             // error!(cause = ?err, "connection error");
-    //             panic!("jkl");
-    //         }
-    //     });
-    // }
-
     {
-        let addr = "127.0.0.1:8888";
+        let addr = &r.peers()[1];
+        // let addr = "127.0.0.1:8888";
+        println!("Try connect to {}", addr);
         let socket = TcpStream::connect(addr).await.unwrap();
         let connection = Connection::new(socket);
+        println!("connect");
 
-        let mut handler3 = Handler { connection };
+        let mut handler2 = Handler { connection };
 
+        let info_hash = t.info_hash;
+        let peer_id = b"ABCDEFGHIJKLMNOPQRST";
         tokio::spawn(async move {
-            if let Err(err) = handler3.run3().await {
+            // Process the connection. If an error is encountered, log it.
+            if let Err(err) = handler2.run2(&info_hash, peer_id).await {
+                // error!(cause = ?err, "connection error");
                 panic!("jkl");
             }
         });
     }
+
+    loop {}
+
+    // {
+    //     let addr = "127.0.0.1:8888";
+    //     let socket = TcpStream::connect(addr).await.unwrap();
+    //     let connection = Connection::new(socket);
+    //
+    //     let mut handler3 = Handler { connection };
+    //
+    //     tokio::spawn(async move {
+    //         if let Err(err) = handler3.run3().await {
+    //             panic!("jkl");
+    //         }
+    //     });
+    // }
 
     // loop {
     //     println!("Listening");
@@ -175,8 +178,11 @@ const BUFFER_SIZE: usize = 65536 + 2;
 
 impl Connection {
     pub fn new(stream: TcpStream) -> Connection {
+        // let (read_stream, write_stream) = stream.split();
         Connection {
             stream,
+            // read_stream,
+            // write_stream,
             buffer: BytesMut::with_capacity(BUFFER_SIZE),
         }
     }
@@ -212,23 +218,23 @@ impl Connection {
 
 
             println!("A before read");
-            let n = self.stream.read_buf(&mut self.buffer).await?;
+            // let n = self.stream.read_buf(&mut self.buffer).await;
+            // println!("po");
+            // let n = n.unwrap();
+            // println!("więc n {}", n);
+
             // let n = self.stream.read(&mut self.buffer).await?;
-            // let n = match self.stream.read_buf(&mut self.buffer) {
-            //     Err(e) => {
-            //         println!("tutaj");
-            //         println!("{:?}", e);
-            //         0
-            //     },
-            //     Ok(n) => {
-            //         println!("tutaj dobrze");
-            //         n
-            //     },
-            //     _ => {
-            //         println!("coś jescze");
-            //         0
-            //     }
-            // };
+            let n = match self.stream.read_buf(&mut self.buffer).await {
+                Err(e) => {
+                    println!("tutaj");
+                    println!("{:?}", e);
+                    0
+                },
+                Ok(n) => {
+                    println!("tutaj dobrze");
+                    n
+                },
+            };
             println!("read n {} {}", n, self.buffer.is_empty());
             if n == 0 {
                 return if self.buffer.is_empty() {
