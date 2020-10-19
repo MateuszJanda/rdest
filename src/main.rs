@@ -7,6 +7,7 @@ use tokio::net::{TcpListener, TcpStream};
 use bytes::{Buf, BytesMut};
 use std::error;
 
+/*
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn error::Error>> {
 
@@ -39,7 +40,8 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
     Ok(())
 }
 
-/*
+
+ */
 #[tokio::main]
 async fn main() {
     println!("Hello, world!");
@@ -102,7 +104,6 @@ async fn main() {
 
     println!("koniec");
 }
-*/
 
 struct Handler {
     connection: Connection,
@@ -123,18 +124,18 @@ impl Handler {
         peer_id: &[u8; 20],
     ) -> Result<(), Box<dyn std::error::Error>> {
 
-        // self.connection.init_frame(info_hash, peer_id).await?;
+        self.connection.init_frame(info_hash, peer_id).await?;
         let res = self.connection.read_frame().await?;
-        let res = match self.connection.read_frame().await {
-            Err(e) => {
-                println!("coś nie tak {}", e);
-                Err(e)?
-            }
-            Ok(r) => {
-                println!("jest ok");
-                r
-            },
-        };
+        // let res = match self.connection.read_frame().await {
+        //     Err(e) => {
+        //         println!("coś nie tak {}", e);
+        //         Err(e)?
+        //     }
+        //     Ok(r) => {
+        //         println!("jest ok");
+        //         r
+        //     },
+        // };
 
         println!("{:?}", res.unwrap());
 
