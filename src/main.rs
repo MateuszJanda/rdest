@@ -55,7 +55,7 @@ async fn main() {
     // println!("{:?}", t);
 
     // let r = TrackerResp::from_file("response.data".to_string()).unwrap();
-    let r = TrackerClient::connect1(&t).await.unwrap(); // TODO
+    // let r = TrackerClient::connect1(&t).await.unwrap(); // TODO
 
     // for v in r.peers {
     //     println!("{:?}", v);
@@ -63,21 +63,35 @@ async fn main() {
 
     // println!("{:?}", ResponseParser::from_file("response.data".to_string()));
 
+    // {
+    //     let addr = &r.peers()[1];
+    //     println!("Try connect to {}", addr);
+    //     let socket = TcpStream::connect(addr).await.unwrap();
+    //     let connection = Connection::new(socket);
+    //     println!("connect");
+    //
+    //     let mut handler2 = Handler { connection };
+    //
+    //     let info_hash = t.info_hash;
+    //     let peer_id = b"ABCDEFGHIJKLMNOPQRST";
+    //     tokio::spawn(async move {
+    //         // Process the connection. If an error is encountered, log it.
+    //         if let Err(err) = handler2.run2(&info_hash, peer_id).await {
+    //             // error!(cause = ?err, "connection error");
+    //             panic!("jkl");
+    //         }
+    //     });
+    // }
+
     {
-        let addr = &r.peers()[1];
-        println!("Try connect to {}", addr);
+        let addr = "127.0.0.1:8888";
         let socket = TcpStream::connect(addr).await.unwrap();
         let connection = Connection::new(socket);
-        println!("connect");
 
-        let mut handler2 = Handler { connection };
+        let mut handler3 = Handler { connection };
 
-        let info_hash = t.info_hash;
-        let peer_id = b"ABCDEFGHIJKLMNOPQRST";
         tokio::spawn(async move {
-            // Process the connection. If an error is encountered, log it.
-            if let Err(err) = handler2.run2(&info_hash, peer_id).await {
-                // error!(cause = ?err, "connection error");
+            if let Err(err) = handler3.run3().await {
                 panic!("jkl");
             }
         });
@@ -138,6 +152,15 @@ impl Handler {
         // };
 
         println!("{:?}", res.unwrap());
+
+        Ok(())
+    }
+
+    async fn run3(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        println!("run3");
+        self.connection.stream.write_all(b"asdf").await?;
+        let n = self.connection.stream.read_buf(&mut self.connection.buffer).await?;
+        println!("the n {}", n);
 
         Ok(())
     }
