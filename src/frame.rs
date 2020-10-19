@@ -137,11 +137,43 @@ impl Have {
 }
 
 #[derive(Debug)]
-pub struct Bitfield {}
+pub struct Bitfield {
+    pieces : Vec<bool>
+}
 
 impl Bitfield {
     const ID: u8 = 5;
     const PREFIX_LEN: usize = PREFIX_LEN;
+
+    fn from(crs: &Cursor<&[u8]>) -> Bitfield {
+        let end = crs.position();
+
+        let mut aa = vec![];
+        for b in crs.get_ref()[..end].iter() {
+            let mut bb = *b;
+            for i in 0..8 {
+                if bb & 0b1000_0000 != 0 {
+                    aa.push(true);
+                }  else {
+                    aa.push(false);
+                }
+
+                bb = bb << 1;
+            }
+        }
+
+        Bitfield {
+            pieces : aa,
+        }
+    }
+
+    fn check(available_data: usize, length: usize) -> Result<usize, Error> {
+        if available_data >= Bitfield::PREFIX_LEN + length {
+            Ok(Bitfield::PREFIX_LEN + length)
+        }
+
+        Err(Error::Incomplete)
+    }
 }
 
 #[derive(Debug)]
@@ -335,9 +367,10 @@ impl Frame {
                 crs.set_position(Have::FULL_LEN as u64);
                 Ok(Frame::Have(Have {}))
             }
-            Some(MsgId::BitfieldId) if available_data >= Bitfield::PREFIX_LEN + length => {
-                crs.set_position((Bitfield::PREFIX_LEN + length) as u64);
-                Ok(Frame::Bitfield(Bitfield {}))
+            Some(MsgId::BitfieldId) => {
+                let pos = Bitfield::check(available_data, length)?;
+                crs.set_position(pos as u64);
+                Ok(Frame::Bitfield(Bitfield::from(crs)))
             }
             Some(MsgId::RequestId)
                 if length == Request::LEN && available_data >= Request::PREFIX_LEN + length =>

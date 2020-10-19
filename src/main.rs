@@ -119,7 +119,7 @@ async fn main() {
     //     });
     // }
 
-    println!("koniec");
+    println!("-==[ koniec ]==-");
 }
 
 struct Handler {
