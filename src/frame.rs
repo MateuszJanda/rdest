@@ -65,6 +65,25 @@ impl Handshake {
         Handshake { info_hash, peer_id }
     }
 
+    pub fn check(protocol_id_length: usize, available_data: usize) -> Return<usize, Error> {
+        if protocol_id_length == Handshake::PROTOCOL_ID.len()
+        {
+            if available_data < Handshake::FULL_LEN {
+                return Err(Error::Incomplete)
+            }
+
+            for idx in 0..Handshake::PROTOCOL_ID.len() {
+                if crs.get_ref()[idx + 1] != Handshake::PROTOCOL_ID[idx] {
+                    return Err(Error::Invalid);
+                }
+            }
+
+            return Ok(Handshake::FULL_LEN);
+        }
+
+        return Err(Error::Invalid);
+    }
+
     pub fn to_vec(&self) -> Vec<u8> {
         let mut vec = vec![];
         vec.push(Handshake::PROTOCOL_ID.len() as u8);
@@ -218,6 +237,7 @@ impl Port {
 #[derive(FromPrimitive)]
 #[repr(u8)]
 enum MsgId {
+    HandshakeId = Handshake::ID_FROM_PROTOCOL,
     ChokeId = Choke::ID,
     UnchokeId = Unchoke::ID,
     InterestedId = Interested::ID,
@@ -259,6 +279,7 @@ impl Frame {
 
         let available_data = Self::available_data(crs);
         match FromPrimitive::from_u8(msg_id) {
+            Some(MsgId::HandshakeId) => Ok(()),
             Some(MsgId::ChokeId) => Ok(()),
             Some(MsgId::UnchokeId) => Ok(()),
             Some(MsgId::InterestedId) => Ok(()),
@@ -329,25 +350,15 @@ impl Frame {
         }
 
         let msg_id = Self::get_message_id(crs)?;
+        let protocol_id_length = Self::get_protocol_id_length(crs)?;
         let available_data = Self::available_data(crs);
 
-        if msg_id == Handshake::ID_FROM_PROTOCOL
-            && Self::get_protocol_id_length(crs)? == Handshake::PROTOCOL_ID.len()
-        {
-            if available_data < Handshake::FULL_LEN {
-                return Err(Error::Incomplete)
-            }
-
-            for idx in 0..Handshake::PROTOCOL_ID.len() {
-                if crs.get_ref()[idx + 1] != Handshake::PROTOCOL_ID[idx] {
-                    return Err(Error::Invalid);
-                }
-            }
-            crs.set_position(Handshake::FULL_LEN as u64);
-            return Ok(Frame::Handshake(Handshake::from(crs)));
-        }
-
         match FromPrimitive::from_u8(msg_id) {
+            Some(MsgId::HandshakeId) => {
+                let pos = Handshake::check(protocol_id_length, available_data)?;
+                crs.set_position(pos as u64);
+                Ok(Frame::Handshake(Handshake::from(crs)))
+            }
             Some(MsgId::ChokeId) if length == Choke::LEN => {
                 crs.set_position(Choke::FULL_LEN as u64);
                 Ok(Frame::Choke(Choke {}))
