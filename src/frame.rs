@@ -123,6 +123,14 @@ impl Unchoke {
     const PREFIX_LEN: usize = PREFIX_LEN;
     const LEN: usize = 1;
     const FULL_LEN: usize = Unchoke::PREFIX_LEN + Unchoke::LEN;
+
+    pub fn check(length: usize) -> Result<usize, Error> {
+        if length == Unchoke::LEN {
+            Ok(Unchoke::FULL_LEN)
+        }
+
+        Err(Error::Incomplete)
+    }
 }
 
 #[derive(Debug)]
@@ -133,6 +141,14 @@ impl Interested {
     const PREFIX_LEN: usize = PREFIX_LEN;
     const LEN: usize = 1;
     const FULL_LEN: usize = Interested::PREFIX_LEN + Interested::LEN;
+
+    pub fn check(length: usize) -> Result<usize, Error> {
+        if length == Interested::LEN {
+            Ok(Interested::FULL_LEN)
+        }
+
+        Err(Error::Incomplete)
+    }
 }
 
 #[derive(Debug)]
@@ -203,6 +219,14 @@ impl Request {
     const PREFIX_LEN: usize = PREFIX_LEN;
     const LEN: usize = 13;
     const FULL_LEN: usize = Request::PREFIX_LEN + Request::LEN;
+
+    fn check(available_data: usize, length: usize) -> Result<usize, Error> {
+        if length == Request::LEN && available_data >= Request::PREFIX_LEN + length {
+            Ok(Request::FULL_LEN)
+        }
+
+        Err(Error::Incomplete)
+    }
 }
 
 #[derive(Debug)]
@@ -212,6 +236,14 @@ impl Piece {
     const ID: u8 = 7;
     const PREFIX_LEN: usize = PREFIX_LEN;
     const MIN_LEN: usize = 9;
+
+    fn check(available_data: usize, length: usize) -> Result<usize, Error> {
+        if length >= Piece::MIN_LEN && available_data >= Piece::PREFIX_LEN + length {
+            Ok(Piece::PREFIX_LEN + length)
+        }
+
+        Err(Error::Incomplete)
+    }
 }
 
 #[derive(Debug)]
@@ -355,8 +387,7 @@ impl Frame {
 
         match FromPrimitive::from_u8(msg_id) {
             Some(MsgId::HandshakeId) => {
-                let pos = Handshake::check(protocol_id_length, available_data)?;
-                crs.set_position(pos as u64);
+                crs.set_position(Handshake::check(protocol_id_length, available_data)? as u64);
                 Ok(Frame::Handshake(Handshake::from(crs)))
             }
             Some(MsgId::ChokeId) if length == Choke::LEN => {
@@ -364,11 +395,11 @@ impl Frame {
                 Ok(Frame::Choke(Choke {}))
             }
             Some(MsgId::UnchokeId) if length == Unchoke::LEN => {
-                crs.set_position(Unchoke::FULL_LEN as u64);
+                crs.set_position(Unchoke::check(length)? as u64);
                 Ok(Frame::Unchoke(Unchoke {}))
             }
-            Some(MsgId::InterestedId) if length == Interested::LEN => {
-                crs.set_position(Interested::FULL_LEN as u64);
+            Some(MsgId::InterestedId) => {
+                crs.set_position(Interested::check(length)? as u64);
                 Ok(Frame::Interested(Interested {}))
             }
             Some(MsgId::NotInterestedId) if length == NotInterested::LEN => {
@@ -382,20 +413,15 @@ impl Frame {
                 Ok(Frame::Have(Have {}))
             }
             Some(MsgId::BitfieldId) => {
-                let pos = Bitfield::check(available_data, length)?;
-                crs.set_position(pos as u64);
+                crs.set_position(Bitfield::check(available_data, length)? as u64);
                 Ok(Frame::Bitfield(Bitfield::from(crs)))
             }
-            Some(MsgId::RequestId)
-                if length == Request::LEN && available_data >= Request::PREFIX_LEN + length =>
-            {
-                crs.set_position(Request::FULL_LEN as u64);
+            Some(MsgId::RequestId) => {
+                crs.set_position(Request::check(available_data, length)? as u64);
                 Ok(Frame::Request(Request {}))
             }
-            Some(MsgId::PieceId)
-                if length >= Piece::MIN_LEN && available_data >= Piece::PREFIX_LEN + length =>
-            {
-                crs.set_position((Piece::PREFIX_LEN + length) as u64);
+            Some(MsgId::PieceId) => {
+                crs.set_position(Piece::check(available_data, length)? as u64);
                 Ok(Frame::Piece(Piece {}))
             }
             Some(MsgId::CancelId)
