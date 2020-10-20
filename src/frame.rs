@@ -329,21 +329,24 @@ impl Frame {
         }
 
         let msg_id = Self::get_message_id(crs)?;
+        let available_data = Self::available_data(crs);
 
         if msg_id == Handshake::ID_FROM_PROTOCOL
             && Self::get_protocol_id_length(crs)? == Handshake::PROTOCOL_ID.len()
-            && Self::available_data(crs) >= Handshake::FULL_LEN
         {
+            if available_data < Handshake::FULL_LEN {
+                return Err(Error::Incomplete)
+            }
+
             for idx in 0..Handshake::PROTOCOL_ID.len() {
                 if crs.get_ref()[idx + 1] != Handshake::PROTOCOL_ID[idx] {
-                    return Err(Error::InvalidHeader);
+                    return Err(Error::Invalid);
                 }
             }
             crs.set_position(Handshake::FULL_LEN as u64);
             return Ok(Frame::Handshake(Handshake::from(crs)));
         }
 
-        let available_data = Self::available_data(crs);
         match FromPrimitive::from_u8(msg_id) {
             Some(MsgId::ChokeId) if length == Choke::LEN => {
                 crs.set_position(Choke::FULL_LEN as u64);

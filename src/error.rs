@@ -3,7 +3,7 @@ use std::fmt;
 #[derive(PartialEq, Clone, Debug)]
 pub enum Error {
     Incomplete,
-    InvalidHeader,
+    Invalid,
     UnknownId(u8),
     Decode(String),
     Meta(String),
