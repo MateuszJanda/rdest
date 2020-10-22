@@ -1,4 +1,3 @@
-use crate::frame::MsgId::HaveId;
 use crate::Error;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
@@ -84,7 +83,7 @@ impl Handshake {
         return Err(Error::Invalid);
     }
 
-    pub fn to_vec(&self) -> Vec<u8> {
+    pub fn data(&self) -> Vec<u8> {
         let mut vec = vec![];
         vec.push(Handshake::PROTOCOL_ID.len() as u8);
         vec.extend_from_slice(Handshake::PROTOCOL_ID);
@@ -202,6 +201,10 @@ impl Bitfield {
         }
     }
 
+    pub fn available_pieces(&self) -> Vec<bool> {
+        vec![]
+    }
+
     fn check(available_data: usize, length: usize) -> Result<usize, Error> {
         if available_data >= Bitfield::PREFIX_LEN + length {
             return Ok(Bitfield::PREFIX_LEN + length)
@@ -212,13 +215,60 @@ impl Bitfield {
 }
 
 #[derive(Debug)]
-pub struct Request {}
+pub struct Request {
+    index: u32,
+    begin: u32,
+    length: u32,
+}
 
 impl Request {
+    const LEN: usize = 13;
     const ID: u8 = 6;
     const PREFIX_LEN: usize = PREFIX_LEN;
-    const LEN: usize = 13;
+    const ID_LEN: usize = ID_LEN;
+    const INDEX_LEN: usize = 4;
+    const BEGIN_LEN: usize = 4;
+    const LENGTH_LEN: usize = 4;
     const FULL_LEN: usize = Request::PREFIX_LEN + Request::LEN;
+
+    pub fn new(index: usize, begin: usize, length: usize) -> Request {
+        Request {
+            index: index as u32,
+            begin: begin as u32,
+            length: length as u32,
+        }
+    }
+
+    fn from(crs: &Cursor<&[u8]>) -> Request {
+        let start = Request::PREFIX_LEN + Request::ID_LEN;
+        let mut index = [0; Request::INDEX_LEN];
+        index.copy_from_slice(&crs.get_ref()[start..start + Request::INDEX_LEN]);
+
+        let start = start + Request::INDEX_LEN;
+        let mut begin = [0; Request::BEGIN_LEN];
+        begin.clone_from_slice(&crs.get_ref()[start..start + Request::BEGIN_LEN]);
+
+        let start = start + Request::BEGIN_LEN;
+        let mut length = [0; Request::LENGTH_LEN];
+        length.clone_from_slice(&crs.get_ref()[start..start + Request::LENGTH_LEN]);
+
+        Request {
+            index: u32::from_be_bytes(index),
+            begin: u32::from_be_bytes(begin),
+            length: u32::from_be_bytes(length),
+        }
+    }
+
+    pub fn data(&self) -> Vec<u8> {
+        let mut vec = vec![];
+        vec.extend_from_slice(&Request::FULL_LEN.to_be_bytes());
+        vec.push(Request::ID);
+        vec.extend_from_slice(&self.index.to_be_bytes());
+        vec.extend_from_slice(&self.begin.to_be_bytes());
+        vec.extend_from_slice(&self.length.to_be_bytes());
+
+        vec
+    }
 
     fn check(available_data: usize, length: usize) -> Result<usize, Error> {
         if length == Request::LEN && available_data >= Request::PREFIX_LEN + length {
@@ -418,7 +468,7 @@ impl Frame {
             }
             Some(MsgId::RequestId) => {
                 crs.set_position(Request::check(available_data, length)? as u64);
-                Ok(Frame::Request(Request {}))
+                Ok(Frame::Request(Request::from(crs)))
             }
             Some(MsgId::PieceId) => {
                 crs.set_position(Piece::check(available_data, length)? as u64);

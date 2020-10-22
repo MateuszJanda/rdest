@@ -75,11 +75,20 @@ async fn main() {
 
     let (mut tx, mut rx) = mpsc::channel(32);
 
+    let pieces_len = t.pieces.len();
+    let piece_length = t.piece_length;
     let manager = tokio::spawn(async move {
+        let pieces = vec![false; pieces_len];
         while let Some(Recv { key, frame, channel }) = rx.recv().await {
             match frame {
                 Frame::Bitfield(bitfield) => {
-                    channel.send(Frame::Request(Request {}));
+                    let available = bitfield.available_pieces();
+                    for i in 0..pieces.len() {
+                        if pieces[i] == false && available[i] == true {
+                            channel.send(Frame::Request(Request::new(i, 0, piece_length as usize)));
+                            break;
+                        }
+                    }
                 }
                 _ => ()
             }
@@ -220,7 +229,7 @@ impl Connection {
         // self.stream.read(&mut self.buffer[self.cursor..]).await?;
 
         self.stream
-            .write_all(Handshake::new(info_hash, peer_id).to_vec().as_slice()).await?;
+            .write_all(Handshake::new(info_hash, peer_id).data().as_slice()).await?;
         // self.stream.write_all(b"asdf").await?;
 
         println!("Handshake send");
