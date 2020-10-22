@@ -1,11 +1,12 @@
-use rdest::{Error, Frame, Handshake, Metainfo, TrackerClient, TrackerResp};
+use rdest::{Error, Frame, Handshake, Request, Metainfo, TrackerClient, TrackerResp};
 use std::io::Cursor;
 use std::net::Ipv4Addr;
 use tokio;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
-use bytes::{Buf, BytesMut};
+use bytes::{Buf, BytesMut, Bytes};
 use std::error;
+use tokio::sync::{mpsc, oneshot};
 
 /*
 #[tokio::main]
@@ -39,9 +40,17 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
 
     Ok(())
 }
-
-
  */
+
+
+#[derive(Debug)]
+struct Recv {
+    key: String,
+    frame: Frame,
+    channel: oneshot::Sender<Frame>,
+}
+
+
 #[tokio::main]
 async fn main() {
     println!("Hello, world!");
@@ -62,6 +71,20 @@ async fn main() {
     // }
 
     // println!("{:?}", ResponseParser::from_file("response.data".to_string()));
+
+
+    let (mut tx, mut rx) = mpsc::channel(32);
+
+    let manager = tokio::spawn(async move {
+        while let Some(Recv { key, frame, channel }) = rx.recv().await {
+            match frame {
+                Frame::Bitfield(bitfield) => {
+                    channel.send(Frame::Request(Request {}));
+                }
+                _ => ()
+            }
+        }
+    });
 
     {
         let addr = &r.peers()[1];
@@ -85,6 +108,8 @@ async fn main() {
     }
 
     loop {}
+    manager.await.unwrap();
+
 
     // {
     //     let addr = "127.0.0.1:8888";
