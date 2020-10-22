@@ -7,6 +7,7 @@ use tokio::net::{TcpListener, TcpStream};
 use bytes::{Buf, BytesMut, Bytes};
 use std::error;
 use tokio::sync::{mpsc, oneshot};
+use tokio::macros::support::Future;
 
 /*
 #[tokio::main]
@@ -45,10 +46,10 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
 
 #[derive(Debug)]
 struct Recv {
-    key: String,
-    frame: Frame,
-    channel: oneshot::Sender<Frame>,
-}
+        key: String,
+        frame: Frame,
+        channel: oneshot::Sender<Frame>,
+    }
 
 
 #[tokio::main]
@@ -95,28 +96,29 @@ async fn main() {
         }
     });
 
-    {
-        let addr = &r.peers()[1];
+    let addr = r.peers()[2].clone();
+    let info_hash = t.info_hash;
+    let peer_id = b"ABCDEFGHIJKLMNOPQRST";
+    let mut tx2 = tx.clone();
+
+    let job = tokio::spawn(async move {
+
         // let addr = "127.0.0.1:8888";
-        println!("Try connect to {}", addr);
-        let socket = TcpStream::connect(addr).await.unwrap();
-        let connection = Connection::new(socket);
+        println!("Try connect to {}", &addr);
+        let socket = TcpStream::connect(&addr).await.unwrap();
+        let connection = Connection::new(addr, socket);
         println!("connect");
 
-        let mut handler2 = Handler { connection };
+        let mut handler2 = Handler { connection, tx: tx2 };
 
-        let info_hash = t.info_hash;
-        let peer_id = b"ABCDEFGHIJKLMNOPQRST";
-        tokio::spawn(async move {
-            // Process the connection. If an error is encountered, log it.
-            if let Err(err) = handler2.run2(&info_hash, peer_id).await {
-                // error!(cause = ?err, "connection error");
-                panic!("jkl");
-            }
-        });
-    }
+        // Process the connection. If an error is encountered, log it.
+        if let Err(err) = handler2.run2(&info_hash, peer_id).await {
+            // error!(cause = ?err, "connection error");
+            panic!("jkl");
+        }
+    });
 
-    loop {}
+    job.await.unwrap();
     manager.await.unwrap();
 
 
@@ -156,8 +158,10 @@ async fn main() {
     println!("-==[ koniec ]==-");
 }
 
+
 struct Handler {
     connection: Connection,
+    tx: mpsc::Sender<Recv>,
 }
 
 impl Handler {
@@ -175,21 +179,44 @@ impl Handler {
         peer_id: &[u8; 20],
     ) -> Result<(), Box<dyn std::error::Error>> {
 
-        self.connection.init_frame(info_hash, peer_id).await?;
-        let res = self.connection.read_frame().await?;
-        // let res = match self.connection.read_frame().await {
-        //     Err(e) => {
-        //         println!("coś nie tak {}", e);
-        //         Err(e)?
-        //     }
-        //     Ok(r) => {
-        //         println!("jest ok");
-        //         r
-        //     },
-        // };
+        self.connection.init_frame(info_hash, peer_id).await.unwrap();
 
-        println!("{:?}", res.unwrap());
+        loop {
+            // let res = self.connection.read_frame().await?;
 
+            match self.connection.read_frame().await.unwrap() {
+                Some(Frame::Handshake(_)) => {
+                    println!("Time to verify handshake");
+                },
+                Some(Frame::Request(r)) => {
+                    let (resp_tx, resp_rx) = oneshot::channel();
+                    self.tx.send(Recv{key: self.connection.addr.clone(), frame: Frame::Request(r), channel: resp_tx}).await.unwrap();
+
+                    if let Frame::Request(res) = resp_rx.await.unwrap()
+                    {
+                        println!("{:?}", res);
+                        self.connection.write_frame(res.data().as_slice()).await.unwrap();
+                    }
+
+                }
+                _ => {
+
+                }
+            }
+
+            // let res = match self.connection.read_frame().await {
+            //     Err(e) => {
+            //         println!("coś nie tak {}", e);
+            //         Err(e)?
+            //     }
+            //     Ok(r) => {
+            //         println!("jest ok");
+            //         r
+            //     },
+            // };
+
+
+        }
         Ok(())
     }
 
@@ -204,6 +231,7 @@ impl Handler {
 }
 
 struct Connection {
+    addr: String,
     stream: TcpStream,
     buffer: BytesMut,
 }
@@ -211,9 +239,10 @@ struct Connection {
 const BUFFER_SIZE: usize = 65536 + 2;
 
 impl Connection {
-    pub fn new(stream: TcpStream) -> Connection {
+    pub fn new(addr: String, stream: TcpStream) -> Connection {
         // let (read_stream, write_stream) = stream.split();
         Connection {
+            addr,
             stream,
             // read_stream,
             // write_stream,
@@ -233,6 +262,13 @@ impl Connection {
         // self.stream.write_all(b"asdf").await?;
 
         println!("Handshake send");
+
+        Ok(())
+    }
+
+    pub async fn write_frame(&mut self, data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
+        self.stream
+            .write_all(data).await?;
 
         Ok(())
     }
