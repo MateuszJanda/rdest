@@ -216,7 +216,6 @@ impl Connection {
                 return Ok(Some(frame));
             }
 
-
             println!("A before read");
             // let n = self.stream.read_buf(&mut self.buffer).await;
             // println!("po");
@@ -252,17 +251,10 @@ impl Connection {
         let mut crs = Cursor::new(&self.buffer[..]);
 
         // Check whether a full frame is available
-        match Frame::check(&mut crs) {
-            Ok(_) => {
-                // Parse the frame
-                let frame = Frame::parse(&mut crs)?;
-
+        match Frame::parse(&mut crs) {
+            Ok(frame) => {
                 // Discard the frame from the buffer
-
                 let len = crs.position() as usize;
-                // self.buffer.drain(..len);
-                // self.buffer.resize(BUFFER_SIZE, 0);
-
                 self.buffer.advance(len);
 
                 // Return the frame to the caller.

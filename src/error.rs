@@ -15,7 +15,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Error::Incomplete => write!(f, "Incomplete"),
-            Error::InvalidHeader => write!(f, "InvalidHeader"),
+            Error::Invalid => write!(f, "Invalid"),
             Error::UnknownId(msg_id) => write!(f, "UnknownId({})", msg_id),
             Error::Decode(s) => write!(f, "{}", s),
             Error::Meta(s) => write!(f, "{}", s),

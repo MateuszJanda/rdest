@@ -65,7 +65,7 @@ impl Handshake {
         Handshake { info_hash, peer_id }
     }
 
-    pub fn check(protocol_id_length: usize, available_data: usize) -> Return<usize, Error> {
+    pub fn check(crs: &Cursor<&[u8]>, protocol_id_length: usize, available_data: usize) -> Result<usize, Error> {
         if protocol_id_length == Handshake::PROTOCOL_ID.len()
         {
             if available_data < Handshake::FULL_LEN {
@@ -126,7 +126,7 @@ impl Unchoke {
 
     pub fn check(length: usize) -> Result<usize, Error> {
         if length == Unchoke::LEN {
-            Ok(Unchoke::FULL_LEN)
+            return Ok(Unchoke::FULL_LEN)
         }
 
         Err(Error::Incomplete)
@@ -144,7 +144,7 @@ impl Interested {
 
     pub fn check(length: usize) -> Result<usize, Error> {
         if length == Interested::LEN {
-            Ok(Interested::FULL_LEN)
+            return Ok(Interested::FULL_LEN)
         }
 
         Err(Error::Incomplete)
@@ -181,12 +181,12 @@ impl Bitfield {
     const PREFIX_LEN: usize = PREFIX_LEN;
 
     fn from(crs: &Cursor<&[u8]>) -> Bitfield {
-        let end = crs.position();
+        let end = crs.position() as usize;
 
         let mut aa = vec![];
         for b in crs.get_ref()[..end].iter() {
             let mut bb = *b;
-            for i in 0..8 {
+            for _ in 0..8 {
                 if bb & 0b1000_0000 != 0 {
                     aa.push(true);
                 }  else {
@@ -204,7 +204,7 @@ impl Bitfield {
 
     fn check(available_data: usize, length: usize) -> Result<usize, Error> {
         if available_data >= Bitfield::PREFIX_LEN + length {
-            Ok(Bitfield::PREFIX_LEN + length)
+            return Ok(Bitfield::PREFIX_LEN + length)
         }
 
         Err(Error::Incomplete)
@@ -222,7 +222,7 @@ impl Request {
 
     fn check(available_data: usize, length: usize) -> Result<usize, Error> {
         if length == Request::LEN && available_data >= Request::PREFIX_LEN + length {
-            Ok(Request::FULL_LEN)
+            return Ok(Request::FULL_LEN)
         }
 
         Err(Error::Incomplete)
@@ -239,7 +239,7 @@ impl Piece {
 
     fn check(available_data: usize, length: usize) -> Result<usize, Error> {
         if length >= Piece::MIN_LEN && available_data >= Piece::PREFIX_LEN + length {
-            Ok(Piece::PREFIX_LEN + length)
+            return Ok(Piece::PREFIX_LEN + length)
         }
 
         Err(Error::Incomplete)
@@ -283,54 +283,54 @@ enum MsgId {
 }
 
 impl Frame {
-    pub fn check(crs: &mut Cursor<&[u8]>) -> Result<(), Error> {
-        let length = Self::get_message_length(crs)?;
-        if length == KeepAlive::LEN {
-            return Ok(());
-        }
-
-        let msg_id = Self::get_message_id(crs)?;
-        // println!("{} {}", msg_id, Handshake::ID_FROM_PROTOCOL);
-        // println!("{} {}", Self::get_protocol_id_length(crs)?, Handshake::PROTOCOL_ID.len());
-        // println!("{} {}", Self::available_data(crs), Handshake::FULL_LEN);
-
-        if msg_id == Handshake::ID_FROM_PROTOCOL
-            && Self::get_protocol_id_length(crs)? == Handshake::PROTOCOL_ID.len()
-            && Self::available_data(crs) >= Handshake::FULL_LEN
-        {
-            println!("checking protocol id");
-            for idx in 0..Handshake::PROTOCOL_ID.len() {
-                if crs.get_ref()[idx + 1] != Handshake::PROTOCOL_ID[idx] {
-
-                    println!("invalid header {}", idx);
-                    return Err(Error::InvalidHeader);
-                }
-            }
-            return Ok(());
-        }
-
-        let available_data = Self::available_data(crs);
-        match FromPrimitive::from_u8(msg_id) {
-            Some(MsgId::HandshakeId) => Ok(()),
-            Some(MsgId::ChokeId) => Ok(()),
-            Some(MsgId::UnchokeId) => Ok(()),
-            Some(MsgId::InterestedId) => Ok(()),
-            Some(MsgId::NotInterestedId) => Ok(()),
-            Some(MsgId::HaveId) if available_data >= Have::FULL_LEN => Ok(()),
-            Some(MsgId::HaveId) => Err(Error::Incomplete),
-            Some(MsgId::BitfieldId) if available_data >= Bitfield::PREFIX_LEN + length => Ok(()),
-            Some(MsgId::BitfieldId) => Err(Error::Incomplete),
-            Some(MsgId::RequestId) if available_data >= Have::FULL_LEN => Ok(()),
-            Some(MsgId::RequestId) => Err(Error::Incomplete),
-            Some(MsgId::PieceId) if available_data >= Piece::PREFIX_LEN + length => Ok(()),
-            Some(MsgId::PieceId) => Err(Error::Incomplete),
-            Some(MsgId::CancelId) if available_data >= Cancel::FULL_LEN => Ok(()),
-            Some(MsgId::CancelId) => Err(Error::Incomplete),
-            Some(MsgId::PortId) if available_data >= Port::FULL_LEN => Ok(()),
-            Some(MsgId::PortId) => Err(Error::Incomplete),
-            None => Err(Error::UnknownId(msg_id)),
-        }
-    }
+    // pub fn check(crs: &mut Cursor<&[u8]>) -> Result<(), Error> {
+    //     let length = Self::get_message_length(crs)?;
+    //     if length == KeepAlive::LEN {
+    //         return Ok(());
+    //     }
+    //
+    //     let msg_id = Self::get_message_id(crs)?;
+    //     // println!("{} {}", msg_id, Handshake::ID_FROM_PROTOCOL);
+    //     // println!("{} {}", Self::get_protocol_id_length(crs)?, Handshake::PROTOCOL_ID.len());
+    //     // println!("{} {}", Self::available_data(crs), Handshake::FULL_LEN);
+    //
+    //     if msg_id == Handshake::ID_FROM_PROTOCOL
+    //         && Self::get_protocol_id_length(crs)? == Handshake::PROTOCOL_ID.len()
+    //         && Self::available_data(crs) >= Handshake::FULL_LEN
+    //     {
+    //         println!("checking protocol id");
+    //         for idx in 0..Handshake::PROTOCOL_ID.len() {
+    //             if crs.get_ref()[idx + 1] != Handshake::PROTOCOL_ID[idx] {
+    //
+    //                 println!("invalid header {}", idx);
+    //                 return Err(Error::InvalidHeader);
+    //             }
+    //         }
+    //         return Ok(());
+    //     }
+    //
+    //     let available_data = Self::available_data(crs);
+    //     match FromPrimitive::from_u8(msg_id) {
+    //         Some(MsgId::HandshakeId) => Ok(()),
+    //         Some(MsgId::ChokeId) => Ok(()),
+    //         Some(MsgId::UnchokeId) => Ok(()),
+    //         Some(MsgId::InterestedId) => Ok(()),
+    //         Some(MsgId::NotInterestedId) => Ok(()),
+    //         Some(MsgId::HaveId) if available_data >= Have::FULL_LEN => Ok(()),
+    //         Some(MsgId::HaveId) => Err(Error::Incomplete),
+    //         Some(MsgId::BitfieldId) if available_data >= Bitfield::PREFIX_LEN + length => Ok(()),
+    //         Some(MsgId::BitfieldId) => Err(Error::Incomplete),
+    //         Some(MsgId::RequestId) if available_data >= Have::FULL_LEN => Ok(()),
+    //         Some(MsgId::RequestId) => Err(Error::Incomplete),
+    //         Some(MsgId::PieceId) if available_data >= Piece::PREFIX_LEN + length => Ok(()),
+    //         Some(MsgId::PieceId) => Err(Error::Incomplete),
+    //         Some(MsgId::CancelId) if available_data >= Cancel::FULL_LEN => Ok(()),
+    //         Some(MsgId::CancelId) => Err(Error::Incomplete),
+    //         Some(MsgId::PortId) if available_data >= Port::FULL_LEN => Ok(()),
+    //         Some(MsgId::PortId) => Err(Error::Incomplete),
+    //         None => Err(Error::UnknownId(msg_id)),
+    //     }
+    // }
 
     fn get_protocol_id_length(crs: &Cursor<&[u8]>) -> Result<usize, Error> {
         let start = crs.position() as usize;
@@ -387,7 +387,7 @@ impl Frame {
 
         match FromPrimitive::from_u8(msg_id) {
             Some(MsgId::HandshakeId) => {
-                crs.set_position(Handshake::check(protocol_id_length, available_data)? as u64);
+                crs.set_position(Handshake::check(crs, protocol_id_length, available_data)? as u64);
                 Ok(Frame::Handshake(Handshake::from(crs)))
             }
             Some(MsgId::ChokeId) if length == Choke::LEN => {
