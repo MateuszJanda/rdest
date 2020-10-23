@@ -24,3 +24,4 @@ pub use crate::tracker_resp::TrackerResp;
 pub use crate::frame::Frame;
 pub use crate::frame::Handshake;
 pub use crate::frame::Request;
+pub use crate::frame::KeepAlive;

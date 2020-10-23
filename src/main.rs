@@ -1,4 +1,4 @@
-use rdest::{Error, Frame, Handshake, Request, Metainfo, TrackerClient, TrackerResp};
+use rdest::{Error, Frame, Handshake, Request, KeepAlive, Metainfo, TrackerClient, TrackerResp};
 use std::io::Cursor;
 use std::net::Ipv4Addr;
 use tokio;
@@ -99,24 +99,28 @@ async fn main() {
     let addr = r.peers()[2].clone();
     let info_hash = t.info_hash;
     let peer_id = b"ABCDEFGHIJKLMNOPQRST";
-    let mut tx2 = tx.clone();
 
-    let job = tokio::spawn(async move {
+    let tx2 = mpsc::Sender::clone(&tx);
+    // let mut tx2 = tx.clone();
 
-        // let addr = "127.0.0.1:8888";
-        println!("Try connect to {}", &addr);
-        let socket = TcpStream::connect(&addr).await.unwrap();
-        let connection = Connection::new(addr, socket);
-        println!("connect");
+    // let job = tokio::spawn(async move {
+    //
+    //     // let addr = "127.0.0.1:8888";
+    //     println!("Try connect to {}", &addr);
+    //     let socket = TcpStream::connect(&addr).await.unwrap();
+    //     let connection = Connection::new(addr, socket);
+    //     println!("connect");
+    //
+    //     let mut handler2 = Handler { connection, tx: tx2 };
+    //
+    //     // Process the connection. If an error is encountered, log it.
+    //     if let Err(err) = handler2.run2(&info_hash, peer_id).await {
+    //         // error!(cause = ?err, "connection error");
+    //         panic!("jkl");
+    //     }
+    // });
 
-        let mut handler2 = Handler { connection, tx: tx2 };
-
-        // Process the connection. If an error is encountered, log it.
-        if let Err(err) = handler2.run2(&info_hash, peer_id).await {
-            // error!(cause = ?err, "connection error");
-            panic!("jkl");
-        }
-    });
+    let job = tokio::spawn(fff(addr, info_hash, *peer_id, tx2));
 
     job.await.unwrap();
     manager.await.unwrap();
@@ -159,6 +163,23 @@ async fn main() {
 }
 
 
+async fn fff(addr: String, info_hash: [u8; 20], peer_id: [u8; 20], tx2: mpsc::Sender<Recv>) {
+    // let addr = "127.0.0.1:8888";
+    println!("Try connect to {}", &addr);
+    let socket = TcpStream::connect(&addr).await.unwrap();
+    let connection = Connection::new(addr, socket);
+    println!("connect");
+
+    let mut handler2 = Handler { connection, tx: tx2 };
+
+    // Process the connection. If an error is encountered, log it.
+    if let Err(err) = handler2.run2(&info_hash, &peer_id).await {
+        // error!(cause = ?err, "connection error");
+        panic!("jkl");
+    }
+}
+
+
 struct Handler {
     connection: Connection,
     tx: mpsc::Sender<Recv>,
@@ -168,6 +189,7 @@ impl Handler {
     async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         loop {
             let res = self.connection.read_frame().await?;
+            break;
         }
 
         Ok(())
@@ -177,13 +199,11 @@ impl Handler {
         &mut self,
         info_hash: &[u8; 20],
         peer_id: &[u8; 20],
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Error> {
 
         self.connection.init_frame(info_hash, peer_id).await.unwrap();
 
         loop {
-            // let res = self.connection.read_frame().await?;
-
             match self.connection.read_frame().await.unwrap() {
                 Some(Frame::Handshake(_)) => {
                     println!("Time to verify handshake");
@@ -273,7 +293,7 @@ impl Connection {
         Ok(())
     }
 
-    pub async fn read_frame(&mut self) -> Result<Option<Frame>, Box<dyn std::error::Error>> {
+    pub async fn read_frame(&mut self) -> Result<Option<Frame>, Error> {
         // let n = self.stream.read_buf(&mut self.buffer).await?;
         // println!("read n {} {}", n, self.buffer.is_empty());
         // Ok(None)
