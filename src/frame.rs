@@ -64,11 +64,14 @@ impl Handshake {
         Handshake { info_hash, peer_id }
     }
 
-    pub fn check(crs: &Cursor<&[u8]>, protocol_id_length: usize, available_data: usize) -> Result<usize, Error> {
-        if protocol_id_length == Handshake::PROTOCOL_ID.len()
-        {
+    pub fn check(
+        crs: &Cursor<&[u8]>,
+        protocol_id_length: usize,
+        available_data: usize,
+    ) -> Result<usize, Error> {
+        if protocol_id_length == Handshake::PROTOCOL_ID.len() {
             if available_data < Handshake::FULL_LEN {
-                return Err(Error::Incomplete)
+                return Err(Error::Incomplete);
             }
 
             for idx in 0..Handshake::PROTOCOL_ID.len() {
@@ -125,7 +128,7 @@ impl Unchoke {
 
     pub fn check(length: usize) -> Result<usize, Error> {
         if length == Unchoke::LEN {
-            return Ok(Unchoke::FULL_LEN)
+            return Ok(Unchoke::FULL_LEN);
         }
 
         Err(Error::Incomplete)
@@ -143,7 +146,7 @@ impl Interested {
 
     pub fn check(length: usize) -> Result<usize, Error> {
         if length == Interested::LEN {
-            return Ok(Interested::FULL_LEN)
+            return Ok(Interested::FULL_LEN);
         }
 
         Err(Error::Incomplete)
@@ -172,7 +175,7 @@ impl Have {
 
 #[derive(Debug)]
 pub struct Bitfield {
-    pieces : Vec<bool>
+    pieces: Vec<u8>,
 }
 
 impl Bitfield {
@@ -183,12 +186,19 @@ impl Bitfield {
         let end = crs.position() as usize;
 
         let mut aa = vec![];
-        for b in crs.get_ref()[..end].iter() {
+        aa.extend_from_slice(&crs.get_ref()[..end]);
+
+        Bitfield { pieces: aa }
+    }
+
+    pub fn available_pieces(&self) -> Vec<bool> {
+        let mut aa = vec![];
+        for b in self.pieces.iter() {
             let mut bb = *b;
             for _ in 0..8 {
                 if bb & 0b1000_0000 != 0 {
                     aa.push(true);
-                }  else {
+                } else {
                     aa.push(false);
                 }
 
@@ -196,18 +206,12 @@ impl Bitfield {
             }
         }
 
-        Bitfield {
-            pieces : aa,
-        }
-    }
-
-    pub fn available_pieces(&self) -> Vec<bool> {
-        vec![]
+        aa
     }
 
     fn check(available_data: usize, length: usize) -> Result<usize, Error> {
         if available_data >= Bitfield::PREFIX_LEN + length {
-            return Ok(Bitfield::PREFIX_LEN + length)
+            return Ok(Bitfield::PREFIX_LEN + length);
         }
 
         Err(Error::Incomplete)
@@ -272,7 +276,7 @@ impl Request {
 
     fn check(available_data: usize, length: usize) -> Result<usize, Error> {
         if length == Request::LEN && available_data >= Request::PREFIX_LEN + length {
-            return Ok(Request::FULL_LEN)
+            return Ok(Request::FULL_LEN);
         }
 
         Err(Error::Incomplete)
@@ -289,7 +293,7 @@ impl Piece {
 
     fn check(available_data: usize, length: usize) -> Result<usize, Error> {
         if length >= Piece::MIN_LEN && available_data >= Piece::PREFIX_LEN + length {
-            return Ok(Piece::PREFIX_LEN + length)
+            return Ok(Piece::PREFIX_LEN + length);
         }
 
         Err(Error::Incomplete)

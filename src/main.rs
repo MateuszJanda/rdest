@@ -1,13 +1,13 @@
-use rdest::{Error, Frame, Handshake, Request, KeepAlive, Metainfo, TrackerClient, TrackerResp};
+use bytes::{Buf, Bytes, BytesMut};
+use rdest::{Error, Frame, Handshake, KeepAlive, Metainfo, Request, TrackerClient, TrackerResp};
+use std::error;
 use std::io::Cursor;
 use std::net::Ipv4Addr;
 use tokio;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpListener, TcpStream};
-use bytes::{Buf, BytesMut, Bytes};
-use std::error;
-use tokio::sync::{mpsc, oneshot};
 use tokio::macros::support::Future;
+use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::{mpsc, oneshot};
 
 /*
 #[tokio::main]
@@ -43,14 +43,12 @@ async fn main() -> Result<(), Box<dyn error::Error>> {
 }
  */
 
-
 #[derive(Debug)]
 struct Recv {
-        key: String,
-        frame: Frame,
-        channel: oneshot::Sender<Frame>,
-    }
-
+    key: String,
+    frame: Frame,
+    channel: oneshot::Sender<Frame>,
+}
 
 #[tokio::main]
 async fn main() {
@@ -73,14 +71,18 @@ async fn main() {
 
     // println!("{:?}", ResponseParser::from_file("response.data".to_string()));
 
-
     let (mut tx, mut rx) = mpsc::channel(32);
 
     let pieces_len = t.pieces.len();
     let piece_length = t.piece_length;
     let manager = tokio::spawn(async move {
         let pieces = vec![false; pieces_len];
-        while let Some(Recv { key, frame, channel }) = rx.recv().await {
+        while let Some(Recv {
+            key,
+            frame,
+            channel,
+        }) = rx.recv().await
+        {
             match frame {
                 Frame::Bitfield(bitfield) => {
                     let available = bitfield.available_pieces();
@@ -91,7 +93,7 @@ async fn main() {
                         }
                     }
                 }
-                _ => ()
+                _ => (),
             }
         }
     });
@@ -124,7 +126,6 @@ async fn main() {
 
     job.await.unwrap();
     manager.await.unwrap();
-
 
     // {
     //     let addr = "127.0.0.1:8888";
@@ -162,7 +163,6 @@ async fn main() {
     println!("-==[ koniec ]==-");
 }
 
-
 async fn fff(addr: String, info_hash: [u8; 20], peer_id: [u8; 20], tx2: mpsc::Sender<Recv>) {
     // let addr = "127.0.0.1:8888";
     println!("Try connect to {}", &addr);
@@ -170,7 +170,10 @@ async fn fff(addr: String, info_hash: [u8; 20], peer_id: [u8; 20], tx2: mpsc::Se
     let connection = Connection::new(addr, socket);
     println!("connect");
 
-    let mut handler2 = Handler { connection, tx: tx2 };
+    let mut handler2 = Handler {
+        connection,
+        tx: tx2,
+    };
 
     // Process the connection. If an error is encountered, log it.
     if let Err(err) = handler2.run2(&info_hash, &peer_id).await {
@@ -178,7 +181,6 @@ async fn fff(addr: String, info_hash: [u8; 20], peer_id: [u8; 20], tx2: mpsc::Se
         panic!("jkl");
     }
 }
-
 
 struct Handler {
     connection: Connection,
@@ -195,33 +197,44 @@ impl Handler {
         Ok(())
     }
 
-    async fn run2(
-        &mut self,
-        info_hash: &[u8; 20],
-        peer_id: &[u8; 20],
-    ) -> Result<(), Error> {
-
-        self.connection.init_frame(info_hash, peer_id).await.unwrap();
+    async fn run2(&mut self, info_hash: &[u8; 20], peer_id: &[u8; 20]) -> Result<(), Error> {
+        self.connection
+            .init_frame(info_hash, peer_id)
+            .await
+            .unwrap();
 
         loop {
             match self.connection.read_frame().await.unwrap() {
                 Some(Frame::Handshake(_)) => {
                     println!("Time to verify handshake");
-                },
-                Some(Frame::Request(r)) => {
+                }
+                Some(Frame::Bitfield(b)) => {
+                    println!("Przybył bitfields");
                     let (resp_tx, resp_rx) = oneshot::channel();
-                    self.tx.send(Recv{key: self.connection.addr.clone(), frame: Frame::Request(r), channel: resp_tx}).await.unwrap();
+                    self.tx
+                        .send(Recv {
+                            key: self.connection.addr.clone(),
+                            frame: Frame::Bitfield(b),
+                            channel: resp_tx,
+                        })
+                        .await
+                        .unwrap();
 
-                    if let Frame::Request(res) = resp_rx.await.unwrap()
-                    {
-                        println!("{:?}", res);
-                        self.connection.write_frame(res.data().as_slice()).await.unwrap();
+                    if let Frame::Request(res) = resp_rx.await.unwrap() {
+                        println!("Odsyłam Requst {:?}", res);
+                        self.connection
+                            .write_frame(res.data().as_slice())
+                            .await
+                            .unwrap();
                     }
-
                 }
-                _ => {
-
+                Some(Frame::Piece(_)) => {
+                    println!("Time to save Piece");
                 }
+                Some(f) => {
+                    println!("Frame {:?}", f);
+                }
+                _ => {}
             }
 
             // let res = match self.connection.read_frame().await {
@@ -234,8 +247,6 @@ impl Handler {
             //         r
             //     },
             // };
-
-
         }
         Ok(())
     }
@@ -243,7 +254,11 @@ impl Handler {
     async fn run3(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         println!("run3");
         self.connection.stream.write_all(b"asdf").await?;
-        let n = self.connection.stream.read_buf(&mut self.connection.buffer).await?;
+        let n = self
+            .connection
+            .stream
+            .read_buf(&mut self.connection.buffer)
+            .await?;
         println!("the n {}", n);
 
         Ok(())
@@ -278,7 +293,8 @@ impl Connection {
         // self.stream.read(&mut self.buffer[self.cursor..]).await?;
 
         self.stream
-            .write_all(Handshake::new(info_hash, peer_id).data().as_slice()).await?;
+            .write_all(Handshake::new(info_hash, peer_id).data().as_slice())
+            .await?;
         // self.stream.write_all(b"asdf").await?;
 
         println!("Handshake send");
@@ -287,8 +303,7 @@ impl Connection {
     }
 
     pub async fn write_frame(&mut self, data: &[u8]) -> Result<(), Box<dyn std::error::Error>> {
-        self.stream
-            .write_all(data).await?;
+        self.stream.write_all(data).await?;
 
         Ok(())
     }
@@ -301,7 +316,6 @@ impl Connection {
         loop {
             println!("before check");
             if let Some(frame) = self.parse_frame()? {
-
                 println!("is frame");
                 return Ok(Some(frame));
             }
@@ -318,11 +332,11 @@ impl Connection {
                     println!("tutaj");
                     println!("{:?}", e);
                     0
-                },
+                }
                 Ok(n) => {
                     println!("tutaj dobrze");
                     n
-                },
+                }
             };
             println!("read n {} {}", n, self.buffer.is_empty());
             if n == 0 {
@@ -330,11 +344,9 @@ impl Connection {
                     Ok(None)
                 } else {
                     Err(Error::Peer("connection reset by peer".into()).into())
-                }
+                };
             }
-
         }
-
     }
 
     fn parse_frame(&mut self) -> Result<Option<Frame>, Error> {
@@ -354,7 +366,7 @@ impl Connection {
             Err(Error::Incomplete) => {
                 println!("Incomplete");
                 Ok(None)
-            },
+            }
             // An error was encountered
             Err(e) => Err(e.into()),
         }
