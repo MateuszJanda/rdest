@@ -1,11 +1,9 @@
-use bytes::{Buf, Bytes, BytesMut};
-use rdest::{Error, Frame, Handshake, KeepAlive, Metainfo, Request, TrackerClient, TrackerResp};
-use std::error;
+use bytes::{Buf, BytesMut};
+use rdest::{Error, Frame, Handshake, Metainfo, Request, TrackerClient};
 use std::io::Cursor;
 use std::net::Ipv4Addr;
 use tokio;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::macros::support::Future;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, oneshot};
 

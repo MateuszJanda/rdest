@@ -46,7 +46,13 @@ impl BValue {
                 Delimiter::List => values.push(Self::value_list(it)?),
                 Delimiter::Dict => values.push(Self::value_dict(it, pos)?),
                 Delimiter::End if with_end => return Ok(values),
-                _ => {
+                Delimiter::End => {
+                    return Err(Error::Decode(format!(
+                        "Loop [{}]: Unexpected end character",
+                        pos
+                    )))
+                }
+                Delimiter::Unknown => {
                     return Err(Error::Decode(format!(
                         "Loop [{}]: Incorrect character",
                         pos

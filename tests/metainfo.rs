@@ -260,7 +260,7 @@ fn length_only() {
         pieces: vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
         length: Some(111),
         files: None,
-        hash: *b"AAAAABBBBBCCCCCDDDDD",
+        info_hash: *b"AAAAABBBBBCCCCCDDDDD",
     };
     assert_eq!(torrent.is_valid(), true);
 }
@@ -274,7 +274,7 @@ fn missing_length_and_files() {
         pieces: vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
         length: None,
         files: None,
-        hash: *b"AAAAABBBBBCCCCCDDDDD",
+        info_hash: *b"AAAAABBBBBCCCCCDDDDD",
     };
     assert_eq!(torrent.is_valid(), false);
 }
@@ -288,7 +288,7 @@ fn files_only() {
         pieces: vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
         length: None,
         files: Some(vec![]),
-        hash: *b"AAAAABBBBBCCCCCDDDDD",
+        info_hash: *b"AAAAABBBBBCCCCCDDDDD",
     };
     assert_eq!(torrent.is_valid(), true);
 }
@@ -302,7 +302,7 @@ fn both_length_and_files() {
         pieces: vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
         length: Some(111),
         files: Some(vec![]),
-        hash: *b"AAAAABBBBBCCCCCDDDDD",
+        info_hash: *b"AAAAABBBBBCCCCCDDDDD",
     };
     assert_eq!(torrent.is_valid(), false);
 }
@@ -358,6 +358,6 @@ fn torrent_correct() {
             pieces : vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
             length : Some(111),
             files: None,
-            hash: *b"AAAAABBBBBCCCCCDDDDD",
+            info_hash: *b"AAAAABBBBBCCCCCDDDDD",
         }));
 }
