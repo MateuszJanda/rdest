@@ -116,6 +116,14 @@ impl Choke {
     const PREFIX_SIZE: usize = PREFIX_SIZE;
     const LEN: usize = 1;
     const FULL_LEN: usize = Choke::PREFIX_SIZE + Choke::LEN;
+
+    pub fn check(length: usize) -> Result<usize, Error> {
+        if length == Choke::LEN {
+            return Ok(Choke::FULL_LEN);
+        }
+
+        Err(Error::Incomplete)
+    }
 }
 
 #[derive(Debug)]
@@ -162,6 +170,14 @@ impl NotInterested {
     const PREFIX_SIZE: usize = PREFIX_SIZE;
     const LEN: usize = 1;
     const FULL_LEN: usize = NotInterested::PREFIX_SIZE + NotInterested::LEN;
+
+    pub fn check(length: usize) -> Result<usize, Error> {
+        if length == NotInterested::LEN {
+            return Ok(NotInterested::FULL_LEN);
+        }
+
+        Err(Error::Incomplete)
+    }
 }
 
 #[derive(Debug)]
@@ -172,6 +188,14 @@ impl Have {
     const PREFIX_SIZE: usize = PREFIX_SIZE;
     const LEN: usize = 5;
     const FULL_LEN: usize = Have::PREFIX_SIZE + Have::LEN;
+
+    fn check(available_data: usize, length: usize) -> Result<usize, Error> {
+        if length == Have::LEN && available_data >= Have::PREFIX_SIZE + length {
+            return Ok(Have::FULL_LEN);
+        }
+
+        Err(Error::Incomplete)
+    }
 }
 
 #[derive(Debug)]
@@ -309,6 +333,14 @@ impl Cancel {
     const PREFIX_SIZE: usize = PREFIX_SIZE;
     const LEN: usize = 13;
     const FULL_LEN: usize = Cancel::PREFIX_SIZE + Cancel::LEN;
+
+    fn check(available_data: usize, length: usize) -> Result<usize, Error> {
+        if length == Have::LEN && available_data >= Have::PREFIX_SIZE + length {
+            return Ok(Have::FULL_LEN);
+        }
+
+        Err(Error::Incomplete)
+    }
 }
 
 #[derive(Debug)]
@@ -319,6 +351,14 @@ impl Port {
     const PREFIX_SIZE: usize = PREFIX_SIZE;
     const LEN: usize = 3;
     const FULL_LEN: usize = Port::PREFIX_SIZE + Port::LEN;
+
+    fn check(available_data: usize, length: usize) -> Result<usize, Error> {
+        if length == Port::LEN && available_data >= Port::PREFIX_SIZE + length {
+            return Ok(Port::FULL_LEN);
+        }
+
+        Err(Error::Incomplete)
+    }
 }
 
 #[derive(FromPrimitive)]
@@ -354,11 +394,11 @@ impl Frame {
                 crs.set_position(Handshake::check(crs, protocol_id_length, available_data)? as u64);
                 Ok(Frame::Handshake(Handshake::from(crs)))
             }
-            Some(MsgId::ChokeId) if length == Choke::LEN => {
-                crs.set_position(Choke::FULL_LEN as u64);
+            Some(MsgId::ChokeId) => {
+                crs.set_position(Choke::check(length)? as u64);
                 Ok(Frame::Choke(Choke {}))
             }
-            Some(MsgId::UnchokeId) if length == Unchoke::LEN => {
+            Some(MsgId::UnchokeId) => {
                 crs.set_position(Unchoke::check(length)? as u64);
                 Ok(Frame::Unchoke(Unchoke {}))
             }
@@ -366,14 +406,12 @@ impl Frame {
                 crs.set_position(Interested::check(length)? as u64);
                 Ok(Frame::Interested(Interested {}))
             }
-            Some(MsgId::NotInterestedId) if length == NotInterested::LEN => {
-                crs.set_position(NotInterested::FULL_LEN as u64);
+            Some(MsgId::NotInterestedId) => {
+                crs.set_position(NotInterested::check(length)? as u64);
                 Ok(Frame::NotInterested(NotInterested {}))
             }
-            Some(MsgId::HaveId)
-                if length == Have::LEN && available_data >= Have::PREFIX_SIZE + length =>
-            {
-                crs.set_position(Have::FULL_LEN as u64);
+            Some(MsgId::HaveId) => {
+                crs.set_position(Have::check(available_data, length)? as u64);
                 Ok(Frame::Have(Have {}))
             }
             Some(MsgId::BitfieldId) => {
@@ -388,19 +426,15 @@ impl Frame {
                 crs.set_position(Piece::check(available_data, length)? as u64);
                 Ok(Frame::Piece(Piece {}))
             }
-            Some(MsgId::CancelId)
-                if length == Cancel::LEN && available_data >= Cancel::PREFIX_SIZE + length =>
-            {
-                crs.set_position(Cancel::FULL_LEN as u64);
+            Some(MsgId::CancelId) => {
+                crs.set_position(Cancel::check(available_data, length)? as u64);
                 Ok(Frame::Cancel(Cancel {}))
             }
-            Some(MsgId::PortId)
-                if length == Port::LEN && available_data >= Port::PREFIX_SIZE + length =>
-            {
-                crs.set_position(Port::FULL_LEN as u64);
+            Some(MsgId::PortId) => {
+                crs.set_position(Port::check(available_data, length)? as u64);
                 Ok(Frame::Port(Port {}))
             }
-            _ => {
+            None => {
                 // Skip unknown message
                 crs.set_position((PREFIX_SIZE + length) as u64);
                 Err(Error::UnknownId(msg_id))
