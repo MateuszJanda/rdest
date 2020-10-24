@@ -434,7 +434,7 @@ impl Frame {
                 Ok(Frame::Port(Port {}))
             }
             None => {
-                // Skip unknown message
+                // To skip unknown message
                 crs.set_position((PREFIX_SIZE + length) as u64);
                 Err(Error::UnknownId(msg_id))
             }
