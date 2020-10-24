@@ -209,29 +209,28 @@ impl Bitfield {
 
     fn from(crs: &Cursor<&[u8]>) -> Bitfield {
         let end = crs.position() as usize;
+        let mut pieces = vec![];
+        pieces.extend_from_slice(&crs.get_ref()[..end]);
 
-        let mut aa = vec![];
-        aa.extend_from_slice(&crs.get_ref()[..end]);
-
-        Bitfield { pieces: aa }
+        Bitfield { pieces }
     }
 
     pub fn available_pieces(&self) -> Vec<bool> {
-        let mut aa = vec![];
+        let mut pieces = vec![];
         for b in self.pieces.iter() {
-            let mut bb = *b;
+            let mut byte = *b;
             for _ in 0..8 {
-                if bb & 0b1000_0000 != 0 {
-                    aa.push(true);
+                if byte & 0b1000_0000 != 0 {
+                    pieces.push(true);
                 } else {
-                    aa.push(false);
+                    pieces.push(false);
                 }
 
-                bb = bb << 1;
+                byte = byte << 1;
             }
         }
 
-        aa
+        pieces
     }
 
     fn check(available_data: usize, length: usize) -> Result<usize, Error> {
