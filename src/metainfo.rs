@@ -6,14 +6,16 @@ use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::fs;
 
+const HASH_SIZE: usize = 20;
+
 #[derive(PartialEq, Debug)]
 pub struct Metainfo {
     announce: String,
     name: String,
     piece_length: u64,
-    pieces: Vec<[u8; 20]>,
+    pieces: Vec<[u8; HASH_SIZE]>,
     files: Vec<File>,
-    info_hash: [u8; 20],
+    info_hash: [u8; HASH_SIZE],
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -119,15 +121,15 @@ impl Metainfo {
         }
     }
 
-    pub fn find_pieces(dict: &HashMap<Vec<u8>, BValue>) -> Result<Vec<[u8; 20]>, Error> {
+    pub fn find_pieces(dict: &HashMap<Vec<u8>, BValue>) -> Result<Vec<[u8; HASH_SIZE]>, Error> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"pieces".to_vec()) {
                 Some(BValue::ByteStr(pieces)) => {
-                    if pieces.len() % 20 != 0 {
+                    if pieces.len() % HASH_SIZE != 0 {
                         return Err(Error::Meta("'pieces' not divisible by 20".into()));
                     }
                     Ok(pieces
-                        .chunks(20)
+                        .chunks(HASH_SIZE)
                         .map(|chunk| chunk.try_into().unwrap())
                         .collect())
                 }
@@ -180,7 +182,7 @@ impl Metainfo {
             .collect()
     }
 
-    fn calculate_hash(data: &[u8]) -> Result<[u8; 20], Error> {
+    fn calculate_hash(data: &[u8]) -> Result<[u8; HASH_SIZE], Error> {
         if let Some(info) = DeepFinder::find_first("4:info", data) {
             let mut m = sha1::Sha1::new();
             m.update(info.as_ref());
@@ -194,7 +196,7 @@ impl Metainfo {
         self.announce.clone()
     }
 
-    pub fn pieces(&self) -> Vec<[u8; 20]> {
+    pub fn pieces(&self) -> Vec<[u8; HASH_SIZE]> {
         self.pieces.clone()
     }
 
@@ -206,7 +208,7 @@ impl Metainfo {
         self.files.iter().map(|f| f.length).sum()
     }
 
-    pub fn info_hash(&self) -> [u8; 20] {
+    pub fn info_hash(&self) -> [u8; HASH_SIZE] {
         self.info_hash.clone()
     }
 }
