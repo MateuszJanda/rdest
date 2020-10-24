@@ -1,4 +1,4 @@
-/target
-.idea/
-rdest.iml
+target
 Cargo.lock
+*.pcapng
+*.torrent
