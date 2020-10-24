@@ -8,30 +8,11 @@ use url::form_urlencoded;
 pub struct TrackerClient {}
 
 impl TrackerClient {
-    pub fn connect(metafile: &Metainfo) -> Result<(), reqwest::Error> {
-        let _url = metafile.tracker_url();
-        println!("{:?}", metafile.tracker_url());
-
-        // let info_hash = metafile.info_hash();
-        let _params = [("info_hash", "xxx"), ("peer_id", "ABCDEFGHIJKLMNOPQRST")];
-
-        Ok(())
-    }
-
-    pub async fn connect1(metafile: &Metainfo) -> Result<TrackerResp, Box<dyn std::error::Error>> {
-        let u = metafile.tracker_url();
-        let info_hash: String = form_urlencoded::byte_serialize(&metafile.info_hash()).collect();
-        let url = u + "?info_hash=" + info_hash.as_str();
-
-        println!("url = {:?}", url);
-        println!("info_hash = {:?}", metafile.info_hash());
-
+    pub async fn connect(metafile: &Metainfo) -> Result<TrackerResp, Box<dyn std::error::Error>> {
         let peer_id = rand::thread_rng()
             .sample_iter(&Alphanumeric)
             .take(20)
             .collect::<String>();
-
-        println!("{:?}", peer_id);
 
         let params = [
             ("peer_id", peer_id),
@@ -44,15 +25,23 @@ impl TrackerClient {
         ];
 
         let client = reqwest::Client::new();
-        let resp = client.get(&url).query(&params).send().await?;
-        println!("resp = {:?}", resp);
+        let resp = client
+            .get(&Self::get_url(metafile))
+            .query(&params)
+            .send()
+            .await?;
         let body = resp.bytes().await?;
-        println!("body = {:?}", body);
 
-        fs::write("response.data", &body).unwrap();
+        fs::write("response.data", &body).unwrap(); // TODO: remove
 
-        let rrr = TrackerResp::from_bencode(body.as_ref())?;
+        let data = TrackerResp::from_bencode(body.as_ref())?;
+        Ok(data)
+    }
 
-        Ok(rrr)
+    fn get_url(metafile: &Metainfo) -> String {
+        let info_hash: String = form_urlencoded::byte_serialize(&metafile.info_hash()).collect();
+        let url = metafile.tracker_url() + "?info_hash=" + info_hash.as_str();
+
+        return url;
     }
 }

@@ -61,7 +61,7 @@ async fn main() {
     // println!("{:?}", t);
 
     // let r = TrackerResp::from_file("response.data".to_string()).unwrap();
-    let r = TrackerClient::connect1(&t).await.unwrap(); // TODO
+    let r = TrackerClient::connect(&t).await.unwrap(); // TODO
 
     // for v in r.peers {
     //     println!("{:?}", v);
