@@ -1,6 +1,6 @@
 use crate::bdecoder::BValue;
 use crate::raw_finder::RawFinder;
-use crate::Error;
+use crate::{Delimiter, Error};
 use std::iter::Enumerate;
 use std::slice::Iter;
 
@@ -16,19 +16,25 @@ impl DeepFinder {
         let mut values = vec![];
 
         while let Some((pos, b)) = it.next() {
-            match b {
-                b'0'..=b'9' => values.append(&mut Self::raw_byte_str(it, pos, b, extract)?),
-                b'i' => values.append(&mut Self::raw_int(it, pos, extract)?),
-                b'l' => values.append(&mut Self::raw_list(it, extract)?),
-                b'd' if key.is_some() => {
+            match b.into() {
+                Delimiter::Num => values.append(&mut Self::raw_byte_str(it, pos, b, extract)?),
+                Delimiter::Int => values.append(&mut Self::raw_int(it, pos, extract)?),
+                Delimiter::List => values.append(&mut Self::raw_list(it, extract)?),
+                Delimiter::Dict if key.is_some() => {
                     let val = Self::traverse_dict(it, key.unwrap())?;
                     if val.len() > 0 {
                         return Ok(val);
                     }
                 }
-                b'd' if key.is_none() => values.append(&mut Self::raw_dict(it, extract)?),
-                b'e' if with_end => return Ok(values),
-                _ => {
+                Delimiter::Dict => values.append(&mut Self::raw_dict(it, extract)?),
+                Delimiter::End if with_end => return Ok(values),
+                Delimiter::End => {
+                    return Err(Error::Decode(format!(
+                        "Raw Loop [{}]: Unexpected end character",
+                        pos
+                    )))
+                }
+                Delimiter::Unknown => {
                     return Err(Error::Decode(format!(
                         "Raw Loop [{}]: Incorrect character",
                         pos
@@ -77,13 +83,13 @@ impl DeepFinder {
         let mut key_turn = true;
         while let Some((pos, b)) = it.next() {
             if key_turn {
-                match b {
-                    b'0'..=b'9' => {
+                match b.into() {
+                    Delimiter::Num => {
                         extract_value = &*Self::raw_byte_str(it, pos, b, EXTRACT_KEY)? == key
                     }
-                    b'i' => extract_value = &*Self::raw_int(it, pos, EXTRACT_KEY)? == key,
-                    b'l' => extract_value = &*Self::raw_list(it, EXTRACT_KEY)? == key,
-                    b'd' => {
+                    Delimiter::Int => extract_value = &*Self::raw_int(it, pos, EXTRACT_KEY)? == key,
+                    Delimiter::List => extract_value = &*Self::raw_list(it, EXTRACT_KEY)? == key,
+                    Delimiter::Dict => {
                         let mut dict_it = it.clone();
                         if &*Self::raw_dict(it, EXTRACT_KEY)? == key {
                             extract_value = true;
@@ -94,8 +100,8 @@ impl DeepFinder {
                             }
                         }
                     }
-                    b'e' => break,
-                    _ => {
+                    Delimiter::End => break,
+                    Delimiter::Unknown => {
                         return Err(Error::Decode(format!(
                             "Traverse [{}] : Incorrect character",
                             pos
@@ -128,12 +134,18 @@ impl DeepFinder {
     ) -> Result<Vec<u8>, Error> {
         let mut values = vec![];
         let extract = true;
-        match b {
-            b'0'..=b'9' => values.append(&mut BValue::parse_byte_str(it, pos, b)?.1),
-            b'i' => values.append(&mut Self::raw_int(it, pos, extract)?),
-            b'l' => values.append(&mut Self::raw_list(it, extract)?),
-            b'd' => values.append(&mut Self::raw_dict(it, extract)?),
-            _ => {
+        match b.into() {
+            Delimiter::Num => values.append(&mut BValue::parse_byte_str(it, pos, b)?.1),
+            Delimiter::Int => values.append(&mut Self::raw_int(it, pos, extract)?),
+            Delimiter::List => values.append(&mut Self::raw_list(it, extract)?),
+            Delimiter::Dict => values.append(&mut Self::raw_dict(it, extract)?),
+            Delimiter::End => {
+                return Err(Error::Decode(format!(
+                    "Extract dict val [{}]: Unexpected end character",
+                    pos
+                )))
+            }
+            Delimiter::Unknown => {
                 return Err(Error::Decode(format!(
                     "Extract dict val [{}]: Incorrect character",
                     pos

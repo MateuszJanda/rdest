@@ -3,17 +3,7 @@ use std::collections::HashMap;
 use std::iter::Enumerate;
 use std::slice::Iter;
 
-type Key = Vec<u8>;
-
-#[derive(PartialEq, Clone, Debug)]
-pub enum BValue {
-    Int(i64),
-    ByteStr(Vec<u8>),
-    List(Vec<BValue>),
-    Dict(HashMap<Key, BValue>),
-}
-
-enum Delimiter {
+pub enum Delimiter {
     Num,
     Int,
     List,
@@ -33,6 +23,16 @@ impl From<&u8> for Delimiter {
             _ => Delimiter::Unknown,
         }
     }
+}
+
+type Key = Vec<u8>;
+
+#[derive(PartialEq, Clone, Debug)]
+pub enum BValue {
+    Int(i64),
+    ByteStr(Vec<u8>),
+    List(Vec<BValue>),
+    Dict(HashMap<Key, BValue>),
 }
 
 impl BValue {
