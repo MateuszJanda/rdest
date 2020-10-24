@@ -4,6 +4,7 @@ use std::fmt;
 pub enum Error {
     Incomplete,
     Invalid,
+    HashCalculation,
     UnknownId(u8),
     Decode(String),
     Meta(String),
@@ -16,6 +17,7 @@ impl fmt::Display for Error {
         match self {
             Error::Incomplete => write!(f, "Incomplete"),
             Error::Invalid => write!(f, "Invalid"),
+            Error::HashCalculation => write!(f, "HashCalculation"),
             Error::UnknownId(msg_id) => write!(f, "UnknownId({})", msg_id),
             Error::Decode(s) => write!(f, "{}", s),
             Error::Meta(s) => write!(f, "{}", s),

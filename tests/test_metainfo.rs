@@ -121,10 +121,7 @@ fn find_pieces_ok() {
         Metainfo::find_pieces(
             &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"pieces".to_vec() => BValue::ByteStr(b"aaaaabbbbbcccccdddddAAAAABBBBBCCCCCDDDDD".to_vec())])]
         ),
-        Ok(vec![
-            *b"aaaaabbbbbcccccddddd",
-            *b"AAAAABBBBBCCCCCDDDDD",
-        ])
+        Ok(vec![*b"aaaaabbbbbcccccddddd", *b"AAAAABBBBBCCCCCDDDDD",])
     );
 }
 
@@ -306,7 +303,14 @@ fn torrent_with_one_file() {
     assert_eq!(m.total_length(), 111);
     assert_eq!(m.piece_length(), 999);
     assert_eq!(m.pieces(), vec![*b"AAAAABBBBBCCCCCDDDDD"]);
-    assert_eq!(m.info_hash(), [0xaf, 0xee, 0xde, 0xee, 0x6c, 0x1a, 0xb8, 0x35, 0x6b, 0x8e, 0x2a, 0xf, 0x7d, 0xa7, 0x4d, 0x8c, 0x33, 0xe3, 0x68, 0x6a], "Hash mismatch");
+    assert_eq!(
+        m.info_hash(),
+        [
+            0xaf, 0xee, 0xde, 0xee, 0x6c, 0x1a, 0xb8, 0x35, 0x6b, 0x8e, 0x2a, 0xf, 0x7d, 0xa7,
+            0x4d, 0x8c, 0x33, 0xe3, 0x68, 0x6a
+        ],
+        "Hash mismatch"
+    );
 }
 
 #[test]
@@ -316,5 +320,12 @@ fn torrent_with_multi_files() {
     assert_eq!(m.total_length(), 777);
     assert_eq!(m.piece_length(), 999);
     assert_eq!(m.pieces(), vec![*b"AAAAABBBBBCCCCCDDDDD"]);
-    assert_eq!(m.info_hash(), [0x69, 0xc7, 0xa3, 0x43, 0xb4, 0x22, 0x68, 0xaa, 0x00, 0x94, 0xcf, 0x3e, 0x95, 0xa6, 0xfd, 0x48, 0xc4, 0x1f, 0x08, 0xa7], "Hash mismatch");
+    assert_eq!(
+        m.info_hash(),
+        [
+            0x69, 0xc7, 0xa3, 0x43, 0xb4, 0x22, 0x68, 0xaa, 0x00, 0x94, 0xcf, 0x3e, 0x95, 0xa6,
+            0xfd, 0x48, 0xc4, 0x1f, 0x08, 0xa7
+        ],
+        "Hash mismatch"
+    );
 }

@@ -1,10 +1,10 @@
 use crate::raw_finder::RawFinder;
 use crate::Error;
 use crate::{BDecoder, BValue, DeepFinder};
+use sha1;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::fs;
-use sha1;
 
 #[derive(PartialEq, Debug)]
 pub struct Metainfo {
@@ -57,19 +57,17 @@ impl Metainfo {
 
         if length.is_some() && multi_files.is_some() {
             return Err(Error::Meta(
-                "Conflicting 'length' and 'files' values present. Only one is allowed".into()
+                "Conflicting 'length' and 'files' values present. Only one is allowed".into(),
             ));
         } else if length.is_none() && multi_files.is_none() {
-            return Err(Error::Meta(
-                "Missing 'length' or 'files'".into()
-            ));
+            return Err(Error::Meta("Missing 'length' or 'files'".into()));
         }
 
         let name = Self::find_name(dict)?;
         let mut files = vec![];
         if length.is_some() {
             files.push(File {
-                length : length.unwrap(),
+                length: length.unwrap(),
                 path: name.clone(),
             });
         } else if multi_files.is_some() {
@@ -82,7 +80,7 @@ impl Metainfo {
             piece_length: Self::find_piece_length(dict)?,
             pieces: Self::find_pieces(dict)?,
             files,
-            info_hash: Self::calculate_hash(data),
+            info_hash: Self::calculate_hash(data)?,
         };
 
         Ok(metainfo)
@@ -128,7 +126,10 @@ impl Metainfo {
                     if pieces.len() % 20 != 0 {
                         return Err(Error::Meta("'pieces' not divisible by 20".into()));
                     }
-                    Ok(pieces.chunks(20).map(|chunk| chunk.try_into().unwrap()).collect())
+                    Ok(pieces
+                        .chunks(20)
+                        .map(|chunk| chunk.try_into().unwrap())
+                        .collect())
                 }
                 _ => Err(Error::Meta("Incorrect or missing 'pieces' value".into())),
             },
@@ -179,17 +180,14 @@ impl Metainfo {
             .collect()
     }
 
-    fn calculate_hash(data: &[u8]) -> [u8; 20] {
-        let info = DeepFinder::find_first("4:info", data).unwrap(); // TODO
-        let mut m = sha1::Sha1::new();
+    fn calculate_hash(data: &[u8]) -> Result<[u8; 20], Error> {
+        if let Some(info) = DeepFinder::find_first("4:info", data) {
+            let mut m = sha1::Sha1::new();
+            m.update(info.as_ref());
+            return Ok(m.digest().bytes());
+        }
 
-        // let v: Vec<u8> = vec![1, 2, 3];
-
-        // m.update(b"Hello World!");
-        m.update(info.as_ref());
-        println!("{:?}", m.digest().to_string());
-
-        m.digest().bytes()
+        Err(Error::HashCalculation)
     }
 
     pub fn tracker_url(&self) -> String {
@@ -211,5 +209,4 @@ impl Metainfo {
     pub fn info_hash(&self) -> [u8; 20] {
         self.info_hash.clone()
     }
-
 }
