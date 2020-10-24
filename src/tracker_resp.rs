@@ -26,16 +26,15 @@ impl TrackerResp {
 
     pub fn from_bencode(data: &[u8]) -> Result<TrackerResp, Error> {
         let bvalues = BDecoder::from_array(data)?;
-        // let raw_info = BValue::cut_raw_info(arg)?;
 
         if bvalues.is_empty() {
-            return Err(Error::Tracker("Empty torrent".into()));
+            return Err(Error::Tracker("Empty bencode".into()));
         }
 
         let mut err = Err(Error::Tracker("Missing data".into()));
         for val in bvalues {
             match val {
-                BValue::Dict(dict) => match Self::create_response(&dict) {
+                BValue::Dict(dict) => match Self::parse(&dict) {
                     Ok(torrent) => return Ok(torrent),
                     Err(e) => err = Err(e),
                 },
@@ -46,7 +45,7 @@ impl TrackerResp {
         err
     }
 
-    fn create_response(dict: &HashMap<Vec<u8>, BValue>) -> Result<TrackerResp, Error> {
+    fn parse(dict: &HashMap<Vec<u8>, BValue>) -> Result<TrackerResp, Error> {
         if let Some(reason) = Self::find_failure_reason(dict) {
             return Err(Error::Tracker(reason));
         }
