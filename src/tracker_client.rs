@@ -9,8 +9,8 @@ pub struct TrackerClient {}
 
 impl TrackerClient {
     pub fn connect(metafile: &Metainfo) -> Result<(), reqwest::Error> {
-        let _url = metafile.url();
-        println!("{:?}", metafile.url());
+        let _url = metafile.tracker_url();
+        println!("{:?}", metafile.tracker_url());
 
         // let info_hash = metafile.info_hash();
         let _params = [("info_hash", "xxx"), ("peer_id", "ABCDEFGHIJKLMNOPQRST")];
@@ -19,12 +19,12 @@ impl TrackerClient {
     }
 
     pub async fn connect1(metafile: &Metainfo) -> Result<TrackerResp, Box<dyn std::error::Error>> {
-        let u = metafile.url();
-        let info_hash: String = form_urlencoded::byte_serialize(&metafile.info_hash).collect();
+        let u = metafile.tracker_url();
+        let info_hash: String = form_urlencoded::byte_serialize(&metafile.info_hash()).collect();
         let url = u + "?info_hash=" + info_hash.as_str();
 
         println!("url = {:?}", url);
-        println!("info_hash = {:?}", metafile.info_hash);
+        println!("info_hash = {:?}", metafile.info_hash());
 
         let peer_id = rand::thread_rng()
             .sample_iter(&Alphanumeric)
@@ -38,7 +38,7 @@ impl TrackerClient {
             ("port", "6881".to_string()),
             ("uploaded", "0".to_string()),
             ("downloaded", "0".to_string()),
-            ("left", metafile.length().to_string()),
+            ("left", metafile.total_length().to_string()),
             ("event", "started".to_string()),
             ("numwant", "50".to_string()),
         ];

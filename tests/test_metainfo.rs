@@ -122,8 +122,8 @@ fn find_pieces_ok() {
             &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"pieces".to_vec() => BValue::ByteStr(b"aaaaabbbbbcccccdddddAAAAABBBBBCCCCCDDDDD".to_vec())])]
         ),
         Ok(vec![
-            b"aaaaabbbbbcccccddddd".to_vec(),
-            b"AAAAABBBBBCCCCCDDDDD".to_vec()
+            *b"aaaaabbbbbcccccddddd",
+            *b"AAAAABBBBBCCCCCDDDDD",
         ])
     );
 }
@@ -251,67 +251,67 @@ fn find_files_valid_and_invalid_dict() {
     );
 }
 
-#[test]
-fn length_only() {
-    let torrent = Metainfo {
-        announce: "URL".to_string(),
-        name: "NAME".to_string(),
-        piece_length: 999,
-        pieces: vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
-        length: Some(111),
-        files: None,
-        info_hash: *b"AAAAABBBBBCCCCCDDDDD",
-    };
-    assert_eq!(torrent.is_valid(), true);
-}
+// #[test]
+// fn length_only() {
+//     let torrent = Metainfo {
+//         announce: "URL".to_string(),
+//         name: "NAME".to_string(),
+//         piece_length: 999,
+//         pieces: vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
+//         length: Some(111),
+//         files: None,
+//         info_hash: *b"AAAAABBBBBCCCCCDDDDD",
+//     };
+//     assert_eq!(torrent.is_valid(), true);
+// }
 
-#[test]
-fn missing_length_and_files() {
-    let torrent = Metainfo {
-        announce: "URL".to_string(),
-        name: "NAME".to_string(),
-        piece_length: 999,
-        pieces: vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
-        length: None,
-        files: None,
-        info_hash: *b"AAAAABBBBBCCCCCDDDDD",
-    };
-    assert_eq!(torrent.is_valid(), false);
-}
+// #[test]
+// fn missing_length_and_files() {
+//     let torrent = Metainfo {
+//         announce: "URL".to_string(),
+//         name: "NAME".to_string(),
+//         piece_length: 999,
+//         pieces: vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
+//         length: None,
+//         files: None,
+//         info_hash: *b"AAAAABBBBBCCCCCDDDDD",
+//     };
+//     assert_eq!(torrent.is_valid(), false);
+// }
 
-#[test]
-fn files_only() {
-    let torrent = Metainfo {
-        announce: "URL".to_string(),
-        name: "NAME".to_string(),
-        piece_length: 999,
-        pieces: vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
-        length: None,
-        files: Some(vec![]),
-        info_hash: *b"AAAAABBBBBCCCCCDDDDD",
-    };
-    assert_eq!(torrent.is_valid(), true);
-}
+// #[test]
+// fn files_only() {
+//     let torrent = Metainfo {
+//         announce: "URL".to_string(),
+//         name: "NAME".to_string(),
+//         piece_length: 999,
+//         pieces: vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
+//         length: None,
+//         files: Some(vec![]),
+//         info_hash: *b"AAAAABBBBBCCCCCDDDDD",
+//     };
+//     assert_eq!(torrent.is_valid(), true);
+// }
 
-#[test]
-fn both_length_and_files() {
-    let torrent = Metainfo {
-        announce: "URL".to_string(),
-        name: "NAME".to_string(),
-        piece_length: 999,
-        pieces: vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
-        length: Some(111),
-        files: Some(vec![]),
-        info_hash: *b"AAAAABBBBBCCCCCDDDDD",
-    };
-    assert_eq!(torrent.is_valid(), false);
-}
+// #[test]
+// fn both_length_and_files() {
+//     let torrent = Metainfo {
+//         announce: "URL".to_string(),
+//         name: "NAME".to_string(),
+//         piece_length: 999,
+//         pieces: vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
+//         length: Some(111),
+//         files: Some(vec![]),
+//         info_hash: *b"AAAAABBBBBCCCCCDDDDD",
+//     };
+//     assert_eq!(torrent.is_valid(), false);
+// }
 
 #[test]
 fn empty_input_incorrect() {
     assert_eq!(
         Metainfo::from_bencode(b""),
-        Err(Error::Meta("Empty torrent".into()))
+        Err(Error::Meta("Empty bencode".into()))
     );
 }
 
@@ -326,10 +326,11 @@ fn incorrect_bencode() {
 #[test]
 fn missing_announce() {
     assert_eq!(
-        Metainfo::from_bencode(b"d8:announcei1ee"),
+        Metainfo::from_bencode(b"d8:announcei1e4:infod4:name4:NAME6:lengthi111ee"),
         Err(Error::Meta("Incorrect or missing 'announce' value".into()))
     );
 }
+
 
 #[test]
 fn torrent_incorrect() {
@@ -343,21 +344,37 @@ fn torrent_incorrect() {
 fn torrent_missing_length_and_files() {
     assert_eq!(
         Metainfo::from_bencode(b"d8:announce3:URL4:infod4:name4:NAME12:piece lengthi999e6:pieces20:AAAAABBBBBCCCCCDDDDDee"),
-        Err(Error::Meta("Conflicting values 'length' and 'files'. Only one is allowed".into()))
+        Err(Error::Meta("Missing 'length' or 'files'".into()))
     );
 }
 
 #[test]
-fn torrent_correct() {
+fn torrent_with_both_length_and_files() {
     assert_eq!(
-        Metainfo::from_bencode(b"d8:announce3:URL4:infod4:name4:NAME12:piece lengthi999e6:pieces20:AAAAABBBBBCCCCCDDDDD6:lengthi111eee"),
-        Ok(Metainfo {
-            announce: "URL".to_string(),
-            name : "NAME".to_string(),
-            piece_length : 999,
-            pieces : vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
-            length : Some(111),
-            files: None,
-            info_hash: *b"AAAAABBBBBCCCCCDDDDD",
-        }));
+        Metainfo::from_bencode(b"d8:announce3:URL4:infod4:name4:NAME12:piece lengthi999e6:pieces20:AAAAABBBBBCCCCCDDDDD6:lengthi1e5:filesleee"),
+        Err(Error::Meta("Conflicting 'length' and 'files' values present. Only one is allowed".into()))
+    );
+}
+
+#[test]
+fn torrent_with_one_file() {
+    let m = Metainfo::from_bencode(b"d8:announce3:URL4:infod4:name4:NAME12:piece lengthi999e6:pieces20:AAAAABBBBBCCCCCDDDDD6:lengthi111eee").unwrap();
+    assert_eq!(m.tracker_url(), "URL".to_string());
+
+    // assert_eq!(
+    //     Metainfo::from_bencode(b"d8:announce3:URL4:infod4:name4:NAME12:piece lengthi999e6:pieces20:AAAAABBBBBCCCCCDDDDD6:lengthi111eee"),
+    //     Ok(Metainfo {
+    //         announce: "URL".to_string(),
+    //         name : "NAME".to_string(),
+    //         piece_length : 999,
+    //         pieces : vec![b"AAAAABBBBBCCCCCDDDDD".to_vec()],
+    //         length : Some(111),
+    //         files: None,
+    //         info_hash: *b"AAAAABBBBBCCCCCDDDDD",
+    //     }));
+}
+
+#[test]
+fn torrent_with_multi_file() {
+
 }

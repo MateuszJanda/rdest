@@ -2,20 +2,18 @@ use crate::raw_finder::RawFinder;
 use crate::Error;
 use crate::{BDecoder, BValue, DeepFinder};
 use std::collections::HashMap;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::fs;
-
-extern crate sha1;
+use sha1;
 
 #[derive(PartialEq, Debug)]
 pub struct Metainfo {
-    pub announce: String,
-    pub name: String,
-    pub piece_length: u64,
-    pub pieces: Vec<Vec<u8>>,
-    pub length: Option<u64>,
-    pub files: Option<Vec<File>>,
-    pub info_hash: [u8; 20],
+    announce: String,
+    name: String,
+    piece_length: u64,
+    pieces: Vec<[u8; 20]>,
+    files: Vec<File>,
+    info_hash: [u8; 20],
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -34,16 +32,15 @@ impl Metainfo {
 
     pub fn from_bencode(data: &[u8]) -> Result<Metainfo, Error> {
         let bvalues = BDecoder::from_array(data)?;
-        // let raw_info = BValue::cut_raw_info(arg)?;
 
         if bvalues.is_empty() {
-            return Err(Error::Meta(format!("Empty torrent")));
+            return Err(Error::Meta("Empty bencode".into()));
         }
 
-        let mut err = Err(Error::Meta(format!("Missing data")));
+        let mut err = Err(Error::Meta("Missing data".into()));
         for val in bvalues {
             match val {
-                BValue::Dict(dict) => match Self::create(data, &dict) {
+                BValue::Dict(dict) => match Self::parse(data, &dict) {
                     Ok(torrent) => return Ok(torrent),
                     Err(e) => err = Err(e),
                 },
@@ -54,24 +51,41 @@ impl Metainfo {
         err
     }
 
-    fn create(data: &[u8], dict: &HashMap<Vec<u8>, BValue>) -> Result<Metainfo, Error> {
-        let torrent = Metainfo {
-            announce: Self::find_announce(dict)?,
-            name: Self::find_name(dict)?,
-            piece_length: Self::find_piece_length(dict)?,
-            pieces: Self::find_pieces(dict)?,
-            length: Self::find_length(dict),
-            files: Self::find_files(dict),
-            info_hash: Self::info_hash(data),
-        };
+    fn parse(data: &[u8], dict: &HashMap<Vec<u8>, BValue>) -> Result<Metainfo, Error> {
+        let length = Self::find_length(dict);
+        let multi_files = Self::find_files(dict);
 
-        if !torrent.is_valid() {
-            return Err(Error::Meta(format!(
-                "Conflicting values 'length' and 'files'. Only one is allowed"
-            )));
+        if length.is_some() && multi_files.is_some() {
+            return Err(Error::Meta(
+                "Conflicting 'length' and 'files' values present. Only one is allowed".into()
+            ));
+        } else if length.is_none() && multi_files.is_none() {
+            return Err(Error::Meta(
+                "Missing 'length' or 'files'".into()
+            ));
         }
 
-        Ok(torrent)
+        let name = Self::find_name(dict)?;
+        let mut files = vec![];
+        if length.is_some() {
+            files.push(File {
+                length : length.unwrap(),
+                path: name.clone(),
+            });
+        } else if multi_files.is_some() {
+            files = multi_files.unwrap();
+        }
+
+        let metainfo = Metainfo {
+            announce: Self::find_announce(dict)?,
+            name,
+            piece_length: Self::find_piece_length(dict)?,
+            pieces: Self::find_pieces(dict)?,
+            files,
+            info_hash: Self::calculate_hash(data),
+        };
+
+        Ok(metainfo)
     }
 
     pub fn find_announce(dict: &HashMap<Vec<u8>, BValue>) -> Result<String, Error> {
@@ -107,14 +121,14 @@ impl Metainfo {
         }
     }
 
-    pub fn find_pieces(dict: &HashMap<Vec<u8>, BValue>) -> Result<Vec<Vec<u8>>, Error> {
+    pub fn find_pieces(dict: &HashMap<Vec<u8>, BValue>) -> Result<Vec<[u8; 20]>, Error> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"pieces".to_vec()) {
                 Some(BValue::ByteStr(pieces)) => {
                     if pieces.len() % 20 != 0 {
                         return Err(Error::Meta("'pieces' not divisible by 20".into()));
                     }
-                    Ok(pieces.chunks(20).map(|chunk| chunk.to_vec()).collect())
+                    Ok(pieces.chunks(20).map(|chunk| chunk.try_into().unwrap()).collect())
                 }
                 _ => Err(Error::Meta("Incorrect or missing 'pieces' value".into())),
             },
@@ -165,26 +179,7 @@ impl Metainfo {
             .collect()
     }
 
-    pub fn is_valid(&self) -> bool {
-        if self.length.is_some() && self.files.is_some() {
-            return false;
-        } else if self.length.is_none() && self.files.is_none() {
-            return false;
-        }
-
-        return true;
-    }
-
-    pub fn url(&self) -> String {
-        self.announce.clone()
-    }
-
-    pub fn length(&self) -> u64 {
-        // TODO
-        return self.length.unwrap();
-    }
-
-    fn info_hash(data: &[u8]) -> [u8; 20] {
+    fn calculate_hash(data: &[u8]) -> [u8; 20] {
         let info = DeepFinder::find_first("4:info", data).unwrap(); // TODO
         let mut m = sha1::Sha1::new();
 
@@ -196,4 +191,25 @@ impl Metainfo {
 
         m.digest().bytes()
     }
+
+    pub fn tracker_url(&self) -> String {
+        self.announce.clone()
+    }
+
+    pub fn pieces(&self) -> Vec<[u8; 20]> {
+        self.pieces.clone()
+    }
+
+    pub fn piece_length(&self) -> usize {
+        self.piece_length as usize
+    }
+
+    pub fn total_length(&self) -> u64 {
+        self.files.iter().map(|f| f.length).sum()
+    }
+
+    pub fn info_hash(&self) -> [u8; 20] {
+        self.info_hash.clone()
+    }
+
 }

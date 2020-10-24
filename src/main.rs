@@ -71,8 +71,8 @@ async fn main() {
 
     let (mut tx, mut rx) = mpsc::channel(32);
 
-    let pieces_len = t.pieces.len();
-    let piece_length = t.piece_length;
+    let pieces_len = t.pieces().len();
+    let piece_length = t.piece_length();
     let manager = tokio::spawn(async move {
         let pieces = vec![false; pieces_len];
         while let Some(Recv {
@@ -97,7 +97,7 @@ async fn main() {
     });
 
     let addr = r.peers()[2].clone();
-    let info_hash = t.info_hash;
+    let info_hash = t.info_hash();
     let peer_id = b"ABCDEFGHIJKLMNOPQRST";
 
     let tx2 = mpsc::Sender::clone(&tx);

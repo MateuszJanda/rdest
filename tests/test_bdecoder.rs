@@ -151,11 +151,6 @@ fn int_above_u32() {
     );
 }
 
-// TODO: bit int support needed
-//    fn int_above_i64() {
-//        assert_eq!(BDecoder::from_array(b"i9223372036854775808e"), Ok(vec![BValue::Int(9223372036854775808)]));
-//    }
-
 #[test]
 fn list_of_strings() {
     assert_eq!(
