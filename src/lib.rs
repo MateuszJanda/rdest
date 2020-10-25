@@ -1,4 +1,5 @@
 mod bdecoder;
+mod connection;
 mod deep_finder;
 mod error;
 mod frame;
@@ -7,7 +8,6 @@ mod raw_finder;
 mod tracker_client;
 mod tracker_resp;
 mod utils;
-mod connection;
 
 pub use crate::error::Error;
 

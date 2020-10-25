@@ -23,6 +23,10 @@ pub enum Frame {
     Port(Port),
 }
 
+pub trait Serializer {
+    fn data(&self) -> Vec<u8>;
+}
+
 #[derive(Debug)]
 pub struct Handshake {
     info_hash: [u8; 20],
@@ -86,8 +90,10 @@ impl Handshake {
 
         return Err(Error::Invalid);
     }
+}
 
-    pub fn data(&self) -> Vec<u8> {
+impl Serializer for Handshake {
+    fn data(&self) -> Vec<u8> {
         let mut vec = vec![];
         vec.push(Handshake::PROTOCOL_ID.len() as u8);
         vec.extend_from_slice(Handshake::PROTOCOL_ID);

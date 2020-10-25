@@ -1,9 +1,6 @@
-use bytes::{Buf, BytesMut};
-use rdest::{Error, Frame, Handshake, Metainfo, Request, TrackerClient, Connection};
-use std::io::Cursor;
+use rdest::{Connection, Error, Frame, Handshake, Metainfo, Request, TrackerClient};
 use std::net::Ipv4Addr;
 use tokio;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, oneshot};
 
@@ -186,18 +183,18 @@ struct Handler {
 }
 
 impl Handler {
-    async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        loop {
-            let res = self.connection.read_frame().await?;
-            break;
-        }
-
-        Ok(())
-    }
+    // async fn run(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    //     loop {
+    //         let res = self.connection.read_frame().await?;
+    //         break;
+    //     }
+    //
+    //     Ok(())
+    // }
 
     async fn run2(&mut self, info_hash: &[u8; 20], peer_id: &[u8; 20]) -> Result<(), Error> {
         self.connection
-            .init_frame(info_hash, peer_id)
+            .init_frame(&Handshake::new(info_hash, peer_id))
             .await
             .unwrap();
 
@@ -249,17 +246,16 @@ impl Handler {
         Ok(())
     }
 
-    async fn run3(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        println!("run3");
-        self.connection.stream.write_all(b"asdf").await?;
-        let n = self
-            .connection
-            .stream
-            .read_buf(&mut self.connection.buffer)
-            .await?;
-        println!("the n {}", n);
-
-        Ok(())
-    }
+    // async fn run3(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    //     println!("run3");
+    //     self.connection.stream.write_all(b"asdf").await?;
+    //     let n = self
+    //         .connection
+    //         .stream
+    //         .read_buf(&mut self.connection.buffer)
+    //         .await?;
+    //     println!("the n {}", n);
+    //
+    //     Ok(())
+    // }
 }
-

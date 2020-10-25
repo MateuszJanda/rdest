@@ -1,8 +1,9 @@
-use tokio::net::TcpStream;
-use bytes::{BytesMut, Buf};
-use crate::{Handshake, Frame, Error};
-use tokio::io::{AsyncWriteExt, AsyncReadExt};
+use crate::frame::Serializer;
+use crate::{Error, Frame};
+use bytes::{Buf, BytesMut};
 use std::io::Cursor;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
 
 pub struct Connection {
     pub addr: String,
@@ -24,16 +25,13 @@ impl Connection {
         }
     }
 
-    pub async fn init_frame(
+    pub async fn init_frame<T: Serializer>(
         &mut self,
-        info_hash: &[u8; 20],
-        peer_id: &[u8; 20],
+        msg: &T,
     ) -> Result<(), Box<dyn std::error::Error>> {
         // self.stream.read(&mut self.buffer[self.cursor..]).await?;
 
-        self.stream
-            .write_all(Handshake::new(info_hash, peer_id).data().as_slice())
-            .await?;
+        self.stream.write_all(msg.data().as_slice()).await?;
         // self.stream.write_all(b"asdf").await?;
 
         println!("Handshake send");
