@@ -114,6 +114,12 @@ impl KeepAlive {
     const FULL_LEN: usize = KeepAlive::PREFIX_SIZE;
 }
 
+impl Serializer for KeepAlive {
+    fn data(&self) -> Vec<u8> {
+        vec![KeepAlive::LEN as u8; KeepAlive::PREFIX_SIZE]
+    }
+}
+
 #[derive(Debug)]
 pub struct Choke {}
 
@@ -129,6 +135,16 @@ impl Choke {
         }
 
         Err(Error::Incomplete)
+    }
+}
+
+impl Serializer for Choke {
+    fn data(&self) -> Vec<u8> {
+        let mut vec = vec![];
+        vec.extend_from_slice(&(Choke::LEN as u32).to_be_bytes());
+        vec.push(Choke::ID);
+
+        vec
     }
 }
 
@@ -150,6 +166,16 @@ impl Unchoke {
     }
 }
 
+impl Serializer for Unchoke {
+    fn data(&self) -> Vec<u8> {
+        let mut vec = vec![];
+        vec.extend_from_slice(&(Unchoke::LEN as u32).to_be_bytes());
+        vec.push(Unchoke::ID);
+
+        vec
+    }
+}
+
 #[derive(Debug)]
 pub struct Interested {}
 
@@ -165,6 +191,16 @@ impl Interested {
         }
 
         Err(Error::Incomplete)
+    }
+}
+
+impl Serializer for Interested {
+    fn data(&self) -> Vec<u8> {
+        let mut vec = vec![];
+        vec.extend_from_slice(&(Interested::LEN as u32).to_be_bytes());
+        vec.push(Interested::ID);
+
+        vec
     }
 }
 
@@ -186,6 +222,16 @@ impl NotInterested {
     }
 }
 
+impl Serializer for NotInterested {
+    fn data(&self) -> Vec<u8> {
+        let mut vec = vec![];
+        vec.extend_from_slice(&(NotInterested::LEN as u32).to_be_bytes());
+        vec.push(NotInterested::ID);
+
+        vec
+    }
+}
+
 #[derive(Debug)]
 pub struct Have {}
 
@@ -201,6 +247,17 @@ impl Have {
         }
 
         Err(Error::Incomplete)
+    }
+}
+
+impl Serializer for Have {
+    fn data(&self) -> Vec<u8> {
+        let mut vec = vec![];
+        vec.extend_from_slice(&(Have::LEN as u32).to_be_bytes());
+        vec.push(Have::ID);
+        // vec.extend_from_slice(&self.piece_index.to_be_bytes());
+
+        vec
     }
 }
 
@@ -248,6 +305,17 @@ impl Bitfield {
     }
 }
 
+impl Serializer for Bitfield {
+    fn data(&self) -> Vec<u8> {
+        let mut vec = vec![];
+        vec.extend_from_slice(&((ID_SIZE + self.pieces.len()) as u32).to_be_bytes());
+        vec.push(Bitfield::ID);
+        vec.copy_from_slice(self.pieces.as_slice());
+
+        vec
+    }
+}
+
 #[derive(Debug)]
 pub struct Request {
     index: u32,
@@ -260,9 +328,9 @@ impl Request {
     const ID: u8 = 6;
     const PREFIX_SIZE: usize = PREFIX_SIZE;
     const ID_SIZE: usize = ID_SIZE;
-    const INDEX_LEN: usize = 4;
-    const BEGIN_LEN: usize = 4;
-    const LENGTH_LEN: usize = 4;
+    const INDEX_SIZE: usize = 4;
+    const BEGIN_SIZE: usize = 4;
+    const LENGTH_SIZE: usize = 4;
     const FULL_LEN: usize = Request::PREFIX_SIZE + Request::LEN;
 
     pub fn new(index: usize, begin: usize, length: usize) -> Request {
@@ -275,16 +343,16 @@ impl Request {
 
     fn from(crs: &Cursor<&[u8]>) -> Request {
         let start = Request::PREFIX_SIZE + Request::ID_SIZE;
-        let mut index = [0; Request::INDEX_LEN];
-        index.copy_from_slice(&crs.get_ref()[start..start + Request::INDEX_LEN]);
+        let mut index = [0; Request::INDEX_SIZE];
+        index.copy_from_slice(&crs.get_ref()[start..start + Request::INDEX_SIZE]);
 
-        let start = start + Request::INDEX_LEN;
-        let mut begin = [0; Request::BEGIN_LEN];
-        begin.clone_from_slice(&crs.get_ref()[start..start + Request::BEGIN_LEN]);
+        let start = start + Request::INDEX_SIZE;
+        let mut begin = [0; Request::BEGIN_SIZE];
+        begin.clone_from_slice(&crs.get_ref()[start..start + Request::BEGIN_SIZE]);
 
-        let start = start + Request::BEGIN_LEN;
-        let mut length = [0; Request::LENGTH_LEN];
-        length.clone_from_slice(&crs.get_ref()[start..start + Request::LENGTH_LEN]);
+        let start = start + Request::BEGIN_SIZE;
+        let mut length = [0; Request::LENGTH_SIZE];
+        length.clone_from_slice(&crs.get_ref()[start..start + Request::LENGTH_SIZE]);
 
         Request {
             index: u32::from_be_bytes(index),
@@ -305,7 +373,7 @@ impl Request {
 impl Serializer for Request {
     fn data(&self) -> Vec<u8> {
         let mut vec = vec![];
-        vec.extend_from_slice(&Request::FULL_LEN.to_be_bytes());
+        vec.extend_from_slice(&(Request::LEN as u32).to_be_bytes());
         vec.push(Request::ID);
         vec.extend_from_slice(&self.index.to_be_bytes());
         vec.extend_from_slice(&self.begin.to_be_bytes());
@@ -332,6 +400,17 @@ impl Piece {
     }
 }
 
+impl Serializer for Piece {
+    fn data(&self) -> Vec<u8> {
+        let mut vec = vec![];
+        // vec.extend_from_slice(&(ID_SIZE + self.data.len() as u32).to_be_bytes());
+        vec.push(Piece::ID);
+        // vec.copy_from_slice(self.data.as_slice());
+
+        vec
+    }
+}
+
 #[derive(Debug)]
 pub struct Cancel {}
 
@@ -342,11 +421,22 @@ impl Cancel {
     const FULL_LEN: usize = Cancel::PREFIX_SIZE + Cancel::LEN;
 
     fn check(available_data: usize, length: usize) -> Result<usize, Error> {
-        if length == Have::LEN && available_data >= Have::PREFIX_SIZE + length {
-            return Ok(Have::FULL_LEN);
+        if length == Cancel::LEN && available_data >= Cancel::PREFIX_SIZE + length {
+            return Ok(Cancel::FULL_LEN);
         }
 
         Err(Error::Incomplete)
+    }
+}
+
+impl Serializer for Cancel {
+    fn data(&self) -> Vec<u8> {
+        let mut vec = vec![];
+        vec.extend_from_slice(&(Cancel::LEN as u32).to_be_bytes());
+        vec.push(Cancel::ID);
+        // vec.extend_from_slice(&self.piece_index.to_be_bytes());
+
+        vec
     }
 }
 
@@ -365,6 +455,17 @@ impl Port {
         }
 
         Err(Error::Incomplete)
+    }
+}
+
+impl Serializer for Port {
+    fn data(&self) -> Vec<u8> {
+        let mut vec = vec![];
+        vec.extend_from_slice(&(Port::LEN as u32).to_be_bytes());
+        vec.push(Port::ID);
+        // vec.extend_from_slice(&self.port.to_be_bytes());
+
+        vec
     }
 }
 
