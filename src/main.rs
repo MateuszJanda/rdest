@@ -194,7 +194,7 @@ impl Handler {
 
     async fn run2(&mut self, info_hash: &[u8; 20], peer_id: &[u8; 20]) -> Result<(), Error> {
         self.connection
-            .init_frame(&Handshake::new(info_hash, peer_id))
+            .write_frame(&Handshake::new(info_hash, peer_id))
             .await
             .unwrap();
 
@@ -218,7 +218,7 @@ impl Handler {
                     if let Frame::Request(res) = resp_rx.await.unwrap() {
                         println!("Odsyłam Requst {:?}", res);
                         self.connection
-                            .write_frame(res.data().as_slice())
+                            .write_frame(&res)
                             .await
                             .unwrap();
                     }

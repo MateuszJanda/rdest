@@ -293,7 +293,17 @@ impl Request {
         }
     }
 
-    pub fn data(&self) -> Vec<u8> {
+    fn check(available_data: usize, length: usize) -> Result<usize, Error> {
+        if length == Request::LEN && available_data >= Request::PREFIX_SIZE + length {
+            return Ok(Request::FULL_LEN);
+        }
+
+        Err(Error::Incomplete)
+    }
+}
+
+impl Serializer for Request {
+    fn data(&self) -> Vec<u8> {
         let mut vec = vec![];
         vec.extend_from_slice(&Request::FULL_LEN.to_be_bytes());
         vec.push(Request::ID);
@@ -302,14 +312,6 @@ impl Request {
         vec.extend_from_slice(&self.length.to_be_bytes());
 
         vec
-    }
-
-    fn check(available_data: usize, length: usize) -> Result<usize, Error> {
-        if length == Request::LEN && available_data >= Request::PREFIX_SIZE + length {
-            return Ok(Request::FULL_LEN);
-        }
-
-        Err(Error::Incomplete)
     }
 }
 
