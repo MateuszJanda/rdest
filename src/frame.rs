@@ -81,14 +81,14 @@ impl Handshake {
 
             for idx in 0..Handshake::PROTOCOL_ID.len() {
                 if crs.get_ref()[idx + 1] != Handshake::PROTOCOL_ID[idx] {
-                    return Err(Error::Invalid);
+                    return Err(Error::InvalidProtocolId);
                 }
             }
 
             return Ok(Handshake::FULL_LEN);
         }
 
-        return Err(Error::Invalid);
+        return Err(Error::InvalidProtocolId);
     }
 }
 
