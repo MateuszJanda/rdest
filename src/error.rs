@@ -5,11 +5,12 @@ pub enum Error {
     Incomplete,
     Invalid,
     HashCalculation,
+    SocketWrite,
+    ConnectionReset,
     UnknownId(u8),
     Decode(String),
     Meta(String),
     Tracker(String),
-    Peer(String),
 }
 
 impl fmt::Display for Error {
@@ -18,11 +19,12 @@ impl fmt::Display for Error {
             Error::Incomplete => write!(f, "Incomplete"),
             Error::Invalid => write!(f, "Invalid"),
             Error::HashCalculation => write!(f, "HashCalculation"),
+            Error::SocketWrite => write!(f, "SocketWrite"),
+            Error::ConnectionReset => write!(f, "Connection reset by peer"),
             Error::UnknownId(msg_id) => write!(f, "UnknownId({})", msg_id),
             Error::Decode(s) => write!(f, "{}", s),
             Error::Meta(s) => write!(f, "{}", s),
             Error::Tracker(s) => write!(f, "{}", s),
-            Error::Peer(s) => write!(f, "{}", s),
         }
     }
 }

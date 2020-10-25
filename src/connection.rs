@@ -22,7 +22,10 @@ impl Connection {
         }
     }
 
-    pub async fn write_frame<T: Serializer>(&mut self,  msg: &T) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn write_frame<T: Serializer>(
+        &mut self,
+        msg: &T,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         self.stream.write_all(msg.data().as_slice()).await?;
 
         Ok(())
@@ -34,30 +37,16 @@ impl Connection {
                 return Ok(Some(frame));
             }
 
-            println!("A before read");
-            // let n = self.stream.read_buf(&mut self.buffer).await;
-            // println!("po");
-            // let n = n.unwrap();
-            // println!("więc n {}", n);
-
-            // let n = self.stream.read(&mut self.buffer).await?;
             let n = match self.stream.read_buf(&mut self.buffer).await {
-                Err(e) => {
-                    println!("tutaj");
-                    println!("{:?}", e);
-                    0
-                }
-                Ok(n) => {
-                    println!("tutaj dobrze");
-                    n
-                }
+                Err(_) => return Err(Error::SocketWrite),
+                Ok(n) => n,
             };
-            println!("read n {} {}", n, self.buffer.is_empty());
+
             if n == 0 {
                 return if self.buffer.is_empty() {
                     Ok(None)
                 } else {
-                    Err(Error::Peer("connection reset by peer".into()).into())
+                    Err(Error::ConnectionReset)
                 };
             }
         }
@@ -76,9 +65,8 @@ impl Connection {
                 // Return the frame to the caller
                 Ok(Some(frame))
             }
-            // Not enough data has been buffered
             Err(Error::Incomplete) => {
-                println!("Incomplete");
+                // Not enough data has been buffered
                 Ok(None)
             }
             Err(e) => Err(e.into()),

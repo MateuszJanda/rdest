@@ -199,12 +199,12 @@ impl Handler {
             .unwrap();
 
         loop {
-            match self.connection.read_frame().await.unwrap() {
+            match self.connection.read_frame().await? {
                 Some(Frame::Handshake(_)) => {
-                    println!("Time to verify handshake");
+                    println!("Handshake");
                 }
                 Some(Frame::Bitfield(b)) => {
-                    println!("Przybył bitfields");
+                    println!("Bitfield");
                     let (resp_tx, resp_rx) = oneshot::channel();
                     self.tx
                         .send(Recv {
@@ -217,31 +217,17 @@ impl Handler {
 
                     if let Frame::Request(res) = resp_rx.await.unwrap() {
                         println!("Odsyłam Requst {:?}", res);
-                        self.connection
-                            .write_frame(&res)
-                            .await
-                            .unwrap();
+                        self.connection.write_frame(&res).await.unwrap();
                     }
                 }
                 Some(Frame::Piece(_)) => {
-                    println!("Time to save Piece");
+                    println!("Piece");
                 }
                 Some(f) => {
-                    println!("Frame {:?}", f);
+                    println!("Frame: {:?}", f);
                 }
                 _ => {}
             }
-
-            // let res = match self.connection.read_frame().await {
-            //     Err(e) => {
-            //         println!("coś nie tak {}", e);
-            //         Err(e)?
-            //     }
-            //     Ok(r) => {
-            //         println!("jest ok");
-            //         r
-            //     },
-            // };
         }
         Ok(())
     }
