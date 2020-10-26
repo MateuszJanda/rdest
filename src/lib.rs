@@ -8,6 +8,7 @@ mod raw_finder;
 mod tracker_client;
 mod tracker_resp;
 mod utils;
+mod handler;
 
 pub use crate::error::Error;
 
@@ -24,6 +25,8 @@ pub use crate::tracker_client::TrackerClient;
 pub use crate::tracker_resp::TrackerResp;
 
 pub use crate::connection::Connection;
+pub use crate::handler::Recv;
+pub use crate::handler::fff;
 pub use crate::frame::Frame;
 pub use crate::frame::Handshake;
 pub use crate::frame::KeepAlive;

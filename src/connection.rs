@@ -64,6 +64,13 @@ impl Connection {
 
                 Ok(Some(frame))
             }
+            Err(Error::UnknownId(_)) => {
+                // Discard the frame from the buffer
+                let len = crs.position() as usize;
+                self.buffer.advance(len);
+
+                Ok(None)
+            }
             Err(Error::Incomplete) => {
                 // Not enough data has been buffered
                 Ok(None)
