@@ -1,9 +1,8 @@
-use rdest::{Connection, Error, Frame, Handshake, Metainfo, Request, TrackerClient, fff, Recv};
+use rdest::{Connection, Error, Frame, Handler, Handshake, Metainfo, Recv, Request, TrackerClient};
 use std::net::Ipv4Addr;
 use tokio;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, oneshot};
-use std::alloc::handle_alloc_error;
 
 #[tokio::main]
 async fn main() {
@@ -77,7 +76,7 @@ async fn main() {
     //     }
     // });
 
-    let job = tokio::spawn(fff(addr, info_hash, *peer_id, tx2));
+    let job = tokio::spawn(Handler::fff(addr, info_hash, *peer_id, tx2));
 
     job.await.unwrap();
     manager.await.unwrap();
@@ -117,4 +116,3 @@ async fn main() {
 
     println!("-==[ koniec ]==-");
 }
-

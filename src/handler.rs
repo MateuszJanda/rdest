@@ -1,7 +1,6 @@
-use tokio::sync::{mpsc, oneshot};
+use crate::{Connection, Error, Frame, Handshake};
 use tokio::net::TcpStream;
-use crate::{Connection, Handshake, Frame, Error};
-
+use tokio::sync::{mpsc, oneshot};
 
 #[derive(Debug)]
 pub struct Recv {
@@ -10,32 +9,35 @@ pub struct Recv {
     pub channel: oneshot::Sender<Frame>,
 }
 
-
-pub async fn fff(addr: String, info_hash: [u8; 20], peer_id: [u8; 20], tx2: mpsc::Sender<Recv>) {
-    // let addr = "127.0.0.1:8888";
-    println!("Try connect to {}", &addr);
-    let socket = TcpStream::connect(&addr).await.unwrap();
-    let connection = Connection::new(addr, socket);
-    println!("connect");
-
-    let mut handler2 = Handler {
-        connection,
-        tx: tx2,
-    };
-
-    // Process the connection. If an error is encountered, log it.
-    if let Err(err) = handler2.run(&info_hash, &peer_id).await {
-        // error!(cause = ?err, "connection error");
-        panic!("jkl");
-    }
-}
-
-struct Handler {
+pub struct Handler {
     connection: Connection,
     tx: mpsc::Sender<Recv>,
 }
 
 impl Handler {
+    pub async fn fff(
+        addr: String,
+        info_hash: [u8; 20],
+        peer_id: [u8; 20],
+        tx2: mpsc::Sender<Recv>,
+    ) {
+        println!("Try connect to {}", &addr);
+        let stream = TcpStream::connect(&addr).await.unwrap();
+        let connection = Connection::new(addr, stream);
+        println!("connect");
+
+        let mut handler2 = Handler {
+            connection,
+            tx: tx2,
+        };
+
+        // Process the connection. If an error is encountered, log it.
+        if let Err(err) = handler2.run(&info_hash, &peer_id).await {
+            // error!(cause = ?err, "connection error");
+            panic!("jkl");
+        }
+    }
+
     async fn run(&mut self, info_hash: &[u8; 20], peer_id: &[u8; 20]) -> Result<(), Error> {
         self.connection
             .write_frame(&Handshake::new(info_hash, peer_id))
