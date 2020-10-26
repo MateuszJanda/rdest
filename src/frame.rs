@@ -3,8 +3,8 @@ use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use std::io::Cursor;
 
-const PREFIX_SIZE: usize = 4;
-const ID_POS: usize = PREFIX_SIZE;
+const LEN_SIZE: usize = 4;
+const ID_POS: usize = LEN_SIZE;
 const ID_SIZE: usize = 1;
 
 #[derive(Debug)]
@@ -34,17 +34,17 @@ pub struct Handshake {
 }
 
 impl Handshake {
+    const LEN: u32 = (Handshake::PROTOCOL_ID.len()
+        + Handshake::RESERVED_SIZE
+        + Handshake::INFO_HASH_SIZE
+        + Handshake::PEER_ID_SIZE) as u32;
     const PROTOCOL_ID: &'static [u8; 19] = b"BitTorrent protocol";
     const ID_FROM_PROTOCOL: u8 = Handshake::PROTOCOL_ID[3];
-    const PREFIX_SIZE: usize = 1;
+    const LEN_SIZE: usize = 1;
     const RESERVED_SIZE: usize = 8;
     const INFO_HASH_SIZE: usize = 20;
     const PEER_ID_SIZE: usize = 20;
-    const LEN: usize = Handshake::PROTOCOL_ID.len()
-        + Handshake::RESERVED_SIZE
-        + Handshake::INFO_HASH_SIZE
-        + Handshake::PEER_ID_SIZE;
-    const FULL_LEN: usize = Handshake::PREFIX_SIZE + Handshake::LEN;
+    const FULL_SIZE: usize = Handshake::LEN_SIZE + Handshake::LEN as usize;
 
     pub fn new(info_hash: &[u8; 20], peer_id: &[u8; 20]) -> Handshake {
         Handshake {
@@ -54,12 +54,11 @@ impl Handshake {
     }
 
     fn from(crs: &Cursor<&[u8]>) -> Handshake {
-        let start =
-            Handshake::PREFIX_SIZE + Handshake::PROTOCOL_ID.len() + Handshake::RESERVED_SIZE;
+        let start = Handshake::LEN_SIZE + Handshake::PROTOCOL_ID.len() + Handshake::RESERVED_SIZE;
         let mut info_hash = [0; Handshake::INFO_HASH_SIZE];
         info_hash.clone_from_slice(&crs.get_ref()[start..start + Handshake::INFO_HASH_SIZE]);
 
-        let start = Handshake::PREFIX_SIZE
+        let start = Handshake::LEN_SIZE
             + Handshake::PROTOCOL_ID.len()
             + Handshake::RESERVED_SIZE
             + Handshake::INFO_HASH_SIZE;
@@ -75,7 +74,7 @@ impl Handshake {
         available_data: usize,
     ) -> Result<usize, Error> {
         if protocol_id_length == Handshake::PROTOCOL_ID.len() {
-            if available_data < Handshake::FULL_LEN {
+            if available_data < Handshake::FULL_SIZE {
                 return Err(Error::Incomplete);
             }
 
@@ -85,7 +84,7 @@ impl Handshake {
                 }
             }
 
-            return Ok(Handshake::FULL_LEN);
+            return Ok(Handshake::FULL_SIZE);
         }
 
         return Err(Error::InvalidProtocolId);
@@ -109,9 +108,9 @@ impl Serializer for Handshake {
 pub struct KeepAlive {}
 
 impl KeepAlive {
-    const LEN: usize = 0;
-    const PREFIX_SIZE: usize = PREFIX_SIZE;
-    const FULL_LEN: usize = KeepAlive::PREFIX_SIZE;
+    const LEN: u32 = 0;
+    const LEN_SIZE: usize = LEN_SIZE;
+    const FULL_SIZE: usize = KeepAlive::LEN_SIZE;
 
     pub fn new() -> KeepAlive {
         KeepAlive {}
@@ -120,7 +119,7 @@ impl KeepAlive {
 
 impl Serializer for KeepAlive {
     fn data(&self) -> Vec<u8> {
-        vec![KeepAlive::LEN as u8; KeepAlive::PREFIX_SIZE]
+        KeepAlive::LEN.to_be_bytes().to_vec()
     }
 }
 
@@ -128,18 +127,18 @@ impl Serializer for KeepAlive {
 pub struct Choke {}
 
 impl Choke {
+    const LEN: u32 = 1;
     const ID: u8 = 0;
-    const PREFIX_SIZE: usize = PREFIX_SIZE;
-    const LEN: usize = 1;
-    const FULL_LEN: usize = Choke::PREFIX_SIZE + Choke::LEN;
+    const LEN_SIZE: usize = LEN_SIZE;
+    const FULL_SIZE: usize = Choke::LEN_SIZE + Choke::LEN as usize;
 
     pub fn new() -> Choke {
         Choke {}
     }
 
     pub fn check(length: usize) -> Result<usize, Error> {
-        if length == Choke::LEN {
-            return Ok(Choke::FULL_LEN);
+        if length == Choke::LEN as usize {
+            return Ok(Choke::FULL_SIZE);
         }
 
         Err(Error::Incomplete)
@@ -149,7 +148,7 @@ impl Choke {
 impl Serializer for Choke {
     fn data(&self) -> Vec<u8> {
         let mut vec = vec![];
-        vec.extend_from_slice(&(Choke::LEN as u32).to_be_bytes());
+        vec.extend_from_slice(&Choke::LEN.to_be_bytes());
         vec.push(Choke::ID);
 
         vec
@@ -160,18 +159,18 @@ impl Serializer for Choke {
 pub struct Unchoke {}
 
 impl Unchoke {
+    const LEN: u32 = 1;
     const ID: u8 = 1;
-    const PREFIX_SIZE: usize = PREFIX_SIZE;
-    const LEN: usize = 1;
-    const FULL_LEN: usize = Unchoke::PREFIX_SIZE + Unchoke::LEN;
+    const LEN_SIZE: usize = LEN_SIZE;
+    const FULL_SIZE: usize = Unchoke::LEN_SIZE + Unchoke::LEN as usize;
 
     pub fn new() -> Unchoke {
         Unchoke {}
     }
 
     pub fn check(length: usize) -> Result<usize, Error> {
-        if length == Unchoke::LEN {
-            return Ok(Unchoke::FULL_LEN);
+        if length == Unchoke::LEN as usize {
+            return Ok(Unchoke::FULL_SIZE);
         }
 
         Err(Error::Incomplete)
@@ -181,7 +180,7 @@ impl Unchoke {
 impl Serializer for Unchoke {
     fn data(&self) -> Vec<u8> {
         let mut vec = vec![];
-        vec.extend_from_slice(&(Unchoke::LEN as u32).to_be_bytes());
+        vec.extend_from_slice(&Unchoke::LEN.to_be_bytes());
         vec.push(Unchoke::ID);
 
         vec
@@ -192,18 +191,18 @@ impl Serializer for Unchoke {
 pub struct Interested {}
 
 impl Interested {
+    const LEN: u32 = 1;
     const ID: u8 = 2;
-    const PREFIX_SIZE: usize = PREFIX_SIZE;
-    const LEN: usize = 1;
-    const FULL_LEN: usize = Interested::PREFIX_SIZE + Interested::LEN;
+    const LEN_SIZE: usize = LEN_SIZE;
+    const FULL_SIZE: usize = Interested::LEN_SIZE + Interested::LEN as usize;
 
     pub fn new() -> Interested {
         Interested {}
     }
 
     pub fn check(length: usize) -> Result<usize, Error> {
-        if length == Interested::LEN {
-            return Ok(Interested::FULL_LEN);
+        if length == Interested::LEN as usize {
+            return Ok(Interested::FULL_SIZE);
         }
 
         Err(Error::Incomplete)
@@ -213,7 +212,7 @@ impl Interested {
 impl Serializer for Interested {
     fn data(&self) -> Vec<u8> {
         let mut vec = vec![];
-        vec.extend_from_slice(&(Interested::LEN as u32).to_be_bytes());
+        vec.extend_from_slice(&Interested::LEN.to_be_bytes());
         vec.push(Interested::ID);
 
         vec
@@ -224,18 +223,18 @@ impl Serializer for Interested {
 pub struct NotInterested {}
 
 impl NotInterested {
+    const LEN: u32 = 1;
     const ID: u8 = 3;
-    const PREFIX_SIZE: usize = PREFIX_SIZE;
-    const LEN: usize = 1;
-    const FULL_LEN: usize = NotInterested::PREFIX_SIZE + NotInterested::LEN;
+    const LEN_SIZE: usize = LEN_SIZE;
+    const FULL_SIZE: usize = NotInterested::LEN_SIZE + NotInterested::LEN as usize;
 
     pub fn new() -> NotInterested {
         NotInterested {}
     }
 
     pub fn check(length: usize) -> Result<usize, Error> {
-        if length == NotInterested::LEN {
-            return Ok(NotInterested::FULL_LEN);
+        if length == NotInterested::LEN as usize {
+            return Ok(NotInterested::FULL_SIZE);
         }
 
         Err(Error::Incomplete)
@@ -245,7 +244,7 @@ impl NotInterested {
 impl Serializer for NotInterested {
     fn data(&self) -> Vec<u8> {
         let mut vec = vec![];
-        vec.extend_from_slice(&(NotInterested::LEN as u32).to_be_bytes());
+        vec.extend_from_slice(&NotInterested::LEN.to_be_bytes());
         vec.push(NotInterested::ID);
 
         vec
@@ -254,34 +253,34 @@ impl Serializer for NotInterested {
 
 #[derive(Debug)]
 pub struct Have {
-    piece_index: u32,
+    index: u32,
 }
 
 impl Have {
-    const LEN: usize = 5;
-    const PREFIX_SIZE: usize = PREFIX_SIZE;
+    const LEN: u32 = 5;
     const ID: u8 = 4;
+    const LEN_SIZE: usize = LEN_SIZE;
     const ID_SIZE: usize = ID_SIZE;
     const INDEX_SIZE: usize = 4;
-    const FULL_LEN: usize = Have::PREFIX_SIZE + Have::LEN;
+    const FULL_SIZE: usize = Have::LEN_SIZE + Have::LEN as usize;
 
-    pub fn new(piece_index: u32) -> Have {
-        Have { piece_index }
+    pub fn new(index: u32) -> Have {
+        Have { index }
     }
 
     fn from(crs: &Cursor<&[u8]>) -> Have {
-        let start = Have::PREFIX_SIZE + Have::ID_SIZE;
-        let mut piece_index = [0; Have::INDEX_SIZE];
-        piece_index.copy_from_slice(&crs.get_ref()[start..start + Have::INDEX_SIZE]);
+        let start = Have::LEN_SIZE + Have::ID_SIZE;
+        let mut index = [0; Have::INDEX_SIZE];
+        index.copy_from_slice(&crs.get_ref()[start..start + Have::INDEX_SIZE]);
 
         Have {
-            piece_index: u32::from_be_bytes(piece_index),
+            index: u32::from_be_bytes(index),
         }
     }
 
     fn check(available_data: usize, length: usize) -> Result<usize, Error> {
-        if length == Have::LEN && available_data >= Have::PREFIX_SIZE + length {
-            return Ok(Have::FULL_LEN);
+        if length == Have::LEN as usize && available_data >= Have::LEN_SIZE + length {
+            return Ok(Have::FULL_SIZE);
         }
 
         Err(Error::Incomplete)
@@ -291,9 +290,9 @@ impl Have {
 impl Serializer for Have {
     fn data(&self) -> Vec<u8> {
         let mut vec = vec![];
-        vec.extend_from_slice(&(Have::LEN as u32).to_be_bytes());
+        vec.extend_from_slice(&Have::LEN.to_be_bytes());
         vec.push(Have::ID);
-        vec.extend_from_slice(&self.piece_index.to_be_bytes());
+        vec.extend_from_slice(&self.index.to_be_bytes());
 
         vec
     }
@@ -306,7 +305,7 @@ pub struct Bitfield {
 
 impl Bitfield {
     const ID: u8 = 5;
-    const PREFIX_SIZE: usize = PREFIX_SIZE;
+    const LEN_SIZE: usize = LEN_SIZE;
     const ID_SIZE: usize = ID_SIZE;
 
     pub fn new(pieces: Vec<u8>) -> Bitfield {
@@ -314,7 +313,7 @@ impl Bitfield {
     }
 
     fn from(crs: &Cursor<&[u8]>) -> Bitfield {
-        let start = Bitfield::PREFIX_SIZE + Bitfield::ID_SIZE;
+        let start = Bitfield::LEN_SIZE + Bitfield::ID_SIZE;
         let end = crs.position() as usize;
         let mut pieces = vec![];
         pieces.extend_from_slice(&crs.get_ref()[start..end]);
@@ -341,8 +340,8 @@ impl Bitfield {
     }
 
     fn check(available_data: usize, length: usize) -> Result<usize, Error> {
-        if available_data >= Bitfield::PREFIX_SIZE + length {
-            return Ok(Bitfield::PREFIX_SIZE + length);
+        if available_data >= Bitfield::LEN_SIZE + length {
+            return Ok(Bitfield::LEN_SIZE + length);
         }
 
         Err(Error::Incomplete)
@@ -352,7 +351,7 @@ impl Bitfield {
 impl Serializer for Bitfield {
     fn data(&self) -> Vec<u8> {
         let mut vec = vec![];
-        vec.extend_from_slice(&((ID_SIZE + self.pieces.len()) as u32).to_be_bytes());
+        vec.extend_from_slice(&((Bitfield::ID_SIZE + self.pieces.len()) as u32).to_be_bytes());
         vec.push(Bitfield::ID);
         vec.copy_from_slice(self.pieces.as_slice());
 
@@ -368,14 +367,14 @@ pub struct Request {
 }
 
 impl Request {
-    const LEN: usize = 13;
+    const LEN: u32 = 13;
     const ID: u8 = 6;
-    const PREFIX_SIZE: usize = PREFIX_SIZE;
+    const LEN_SIZE: usize = LEN_SIZE;
     const ID_SIZE: usize = ID_SIZE;
     const INDEX_SIZE: usize = 4;
     const BEGIN_SIZE: usize = 4;
     const LENGTH_SIZE: usize = 4;
-    const FULL_LEN: usize = Request::PREFIX_SIZE + Request::LEN;
+    const FULL_SIZE: usize = Request::LEN_SIZE + Request::LEN as usize;
 
     pub fn new(index: usize, begin: usize, length: usize) -> Request {
         Request {
@@ -386,7 +385,7 @@ impl Request {
     }
 
     fn from(crs: &Cursor<&[u8]>) -> Request {
-        let start = Request::PREFIX_SIZE + Request::ID_SIZE;
+        let start = Request::LEN_SIZE + Request::ID_SIZE;
         let mut index = [0; Request::INDEX_SIZE];
         index.copy_from_slice(&crs.get_ref()[start..start + Request::INDEX_SIZE]);
 
@@ -406,8 +405,8 @@ impl Request {
     }
 
     fn check(available_data: usize, length: usize) -> Result<usize, Error> {
-        if length == Request::LEN && available_data >= Request::PREFIX_SIZE + length {
-            return Ok(Request::FULL_LEN);
+        if length == Request::LEN as usize && available_data >= Request::LEN_SIZE + length {
+            return Ok(Request::FULL_SIZE);
         }
 
         Err(Error::Incomplete)
@@ -417,7 +416,7 @@ impl Request {
 impl Serializer for Request {
     fn data(&self) -> Vec<u8> {
         let mut vec = vec![];
-        vec.extend_from_slice(&(Request::LEN as u32).to_be_bytes());
+        vec.extend_from_slice(&Request::LEN.to_be_bytes());
         vec.push(Request::ID);
         vec.extend_from_slice(&self.index.to_be_bytes());
         vec.extend_from_slice(&self.begin.to_be_bytes());
@@ -436,7 +435,7 @@ pub struct Piece {
 
 impl Piece {
     const ID: u8 = 7;
-    const PREFIX_SIZE: usize = PREFIX_SIZE;
+    const LEN_SIZE: usize = LEN_SIZE;
     const ID_SIZE: usize = 4;
     const INDEX_SIZE: usize = 4;
     const BEGIN_SIZE: usize = 4;
@@ -451,7 +450,7 @@ impl Piece {
     }
 
     fn from(crs: &Cursor<&[u8]>) -> Piece {
-        let start = Piece::PREFIX_SIZE + Piece::ID_SIZE;
+        let start = Piece::LEN_SIZE + Piece::ID_SIZE;
         let mut index = [0; Piece::INDEX_SIZE];
         index.copy_from_slice(&crs.get_ref()[start..start + Piece::INDEX_SIZE]);
 
@@ -472,8 +471,8 @@ impl Piece {
     }
 
     fn check(available_data: usize, length: usize) -> Result<usize, Error> {
-        if length >= Piece::MIN_LEN && available_data >= Piece::PREFIX_SIZE + length {
-            return Ok(Piece::PREFIX_SIZE + length);
+        if length >= Piece::MIN_LEN && available_data >= Piece::LEN_SIZE + length {
+            return Ok(Piece::LEN_SIZE + length);
         }
 
         Err(Error::Incomplete)
@@ -483,9 +482,11 @@ impl Piece {
 impl Serializer for Piece {
     fn data(&self) -> Vec<u8> {
         let mut vec = vec![];
-        vec.extend_from_slice(&(Piece::ID_SIZE + self.piece_data.len() as u32).to_be_bytes());
+        vec.extend_from_slice(&((Piece::ID_SIZE + self.block.len()) as u32).to_be_bytes());
         vec.push(Piece::ID);
-        vec.copy_from_slice(self.piece_data.as_slice());
+        vec.extend_from_slice(&self.index.to_be_bytes());
+        vec.extend_from_slice(&self.begin.to_be_bytes());
+        vec.copy_from_slice(self.block.as_slice());
 
         vec
     }
@@ -499,14 +500,14 @@ pub struct Cancel {
 }
 
 impl Cancel {
+    const LEN: u32 = 13;
     const ID: u8 = 8;
-    const PREFIX_SIZE: usize = PREFIX_SIZE;
+    const LEN_SIZE: usize = LEN_SIZE;
     const ID_SIZE: usize = ID_SIZE;
     const INDEX_SIZE: usize = 4;
     const BEGIN_SIZE: usize = 4;
     const LENGTH_SIZE: usize = 4;
-    const LEN: usize = 13;
-    const FULL_LEN: usize = Cancel::PREFIX_SIZE + Cancel::LEN;
+    const FULL_SIZE: usize = Cancel::LEN_SIZE + Cancel::LEN as usize;
 
     pub fn new(index: usize, begin: usize, length: usize) -> Cancel {
         Cancel {
@@ -517,7 +518,7 @@ impl Cancel {
     }
 
     fn from(crs: &Cursor<&[u8]>) -> Cancel {
-        let start = Cancel::PREFIX_SIZE + Cancel::ID_SIZE;
+        let start = Cancel::LEN_SIZE + Cancel::ID_SIZE;
         let mut index = [0; Cancel::INDEX_SIZE];
         index.copy_from_slice(&crs.get_ref()[start..start + Cancel::INDEX_SIZE]);
 
@@ -537,8 +538,8 @@ impl Cancel {
     }
 
     fn check(available_data: usize, length: usize) -> Result<usize, Error> {
-        if length == Cancel::LEN && available_data >= Cancel::PREFIX_SIZE + length {
-            return Ok(Cancel::FULL_LEN);
+        if length == Cancel::LEN as usize && available_data >= Cancel::LEN_SIZE + length {
+            return Ok(Cancel::FULL_SIZE);
         }
 
         Err(Error::Incomplete)
@@ -548,9 +549,11 @@ impl Cancel {
 impl Serializer for Cancel {
     fn data(&self) -> Vec<u8> {
         let mut vec = vec![];
-        vec.extend_from_slice(&(Cancel::LEN as u32).to_be_bytes());
+        vec.extend_from_slice(&Cancel::LEN.to_be_bytes());
         vec.push(Cancel::ID);
-        vec.extend_from_slice(&self.piece_index.to_be_bytes());
+        vec.extend_from_slice(&self.index.to_be_bytes());
+        vec.extend_from_slice(&self.begin.to_be_bytes());
+        vec.extend_from_slice(&self.length.to_be_bytes());
 
         vec
     }
@@ -558,34 +561,34 @@ impl Serializer for Cancel {
 
 #[derive(Debug)]
 pub struct Port {
-    listen_port: u32,
+    port: u32,
 }
 
 impl Port {
+    const LEN: u32 = 3;
     const ID: u8 = 9;
-    const PREFIX_SIZE: usize = PREFIX_SIZE;
+    const LEN_SIZE: usize = LEN_SIZE;
     const ID_SIZE: usize = ID_SIZE;
     const PORT_SIZE: usize = 4;
-    const LEN: usize = 3;
-    const FULL_LEN: usize = Port::PREFIX_SIZE + Port::LEN;
+    const FULL_SIZE: usize = Port::LEN_SIZE + Port::LEN as usize;
 
     pub fn new(port: u32) -> Port {
-        Port { listen_port }
+        Port { port }
     }
 
     fn from(crs: &Cursor<&[u8]>) -> Port {
-        let start = Port::PREFIX_SIZE + Port::ID_SIZE;
+        let start = Port::LEN_SIZE + Port::ID_SIZE;
         let mut listen_port = [0; Port::PORT_SIZE];
         listen_port.copy_from_slice(&crs.get_ref()[start..start + Port::PORT_SIZE]);
 
         Port {
-            listen_port: u32::from_be_bytes(listen_port),
+            port: u32::from_be_bytes(listen_port),
         }
     }
 
     fn check(available_data: usize, length: usize) -> Result<usize, Error> {
-        if length == Port::LEN && available_data >= Port::PREFIX_SIZE + length {
-            return Ok(Port::FULL_LEN);
+        if length == Port::LEN as usize && available_data >= Port::LEN_SIZE + length {
+            return Ok(Port::FULL_SIZE);
         }
 
         Err(Error::Incomplete)
@@ -595,7 +598,7 @@ impl Port {
 impl Serializer for Port {
     fn data(&self) -> Vec<u8> {
         let mut vec = vec![];
-        vec.extend_from_slice(&(Port::LEN as u32).to_be_bytes());
+        vec.extend_from_slice(&Port::LEN.to_be_bytes());
         vec.push(Port::ID);
         vec.extend_from_slice(&self.port.to_be_bytes());
 
@@ -622,8 +625,8 @@ enum MsgId {
 impl Frame {
     pub fn parse(crs: &mut Cursor<&[u8]>) -> Result<Frame, Error> {
         let length = Self::get_message_length(crs)?;
-        if length == KeepAlive::LEN {
-            crs.set_position(KeepAlive::FULL_LEN as u64);
+        if length == KeepAlive::LEN as usize {
+            crs.set_position(KeepAlive::FULL_SIZE as u64);
             return Ok(Frame::KeepAlive(KeepAlive {}));
         }
 
@@ -678,7 +681,7 @@ impl Frame {
             }
             None => {
                 // To skip unknown message
-                crs.set_position((PREFIX_SIZE + length) as u64);
+                crs.set_position((LEN_SIZE + length) as u64);
                 Err(Error::UnknownId(msg_id))
             }
         }
@@ -699,9 +702,9 @@ impl Frame {
         let start = crs.position() as usize;
         let end = crs.get_ref().len();
 
-        if end - start >= PREFIX_SIZE as usize {
-            let mut b = [0; PREFIX_SIZE];
-            b.copy_from_slice(&crs.get_ref()[0..PREFIX_SIZE]);
+        if end - start >= LEN_SIZE as usize {
+            let mut b = [0; LEN_SIZE];
+            b.copy_from_slice(&crs.get_ref()[0..LEN_SIZE]);
             return Ok(u32::from_be_bytes(b) as usize);
         }
 
@@ -712,7 +715,7 @@ impl Frame {
         let start = crs.position() as usize;
         let end = crs.get_ref().len();
 
-        if end - start >= (PREFIX_SIZE + ID_SIZE) as usize {
+        if end - start >= (LEN_SIZE + ID_SIZE) as usize {
             return Ok(crs.get_ref()[ID_POS]);
         }
 
