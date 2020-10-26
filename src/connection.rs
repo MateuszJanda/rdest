@@ -62,7 +62,6 @@ impl Connection {
                 let len = crs.position() as usize;
                 self.buffer.advance(len);
 
-                // Return the frame to the caller
                 Ok(Some(frame))
             }
             Err(Error::Incomplete) => {

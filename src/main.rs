@@ -4,40 +4,6 @@ use tokio;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{mpsc, oneshot};
 
-/*
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn error::Error>> {
-
-    // let r = TrackerResp::from_file("response.data".to_string()).unwrap();
-    let t = Metainfo::from_file(String::from("ubuntu-20.04.1-desktop-amd64.iso.torrent")).unwrap();
-    let r = TrackerClient::connect1(&t).await.unwrap(); // TODO
-
-    let addr = &r.peers()[3];
-    println!("Try connect to {}", addr);
-    let mut stream = TcpStream::connect(addr).await?;
-
-    // let mut stream = TcpStream::connect("127.0.0.1:8888").await?;
-
-    let mut buffer =BytesMut::with_capacity(4096);
-    println!("buf len {}", buffer.len());
-    // let mut buffer = [0; 10];
-
-    let mut connection = Connection {
-        stream,
-        buffer,
-    };
-
-    let peer_id = b"ABCDEFGHIJKLMNOPQRST";
-    connection.init_frame(&t.info_hash, peer_id).await?;
-    connection.read_frame().await?;
-
-    // let n = stream.read_buf(&mut buffer).await?;
-    // println!("{}", n);
-
-    Ok(())
-}
- */
-
 #[derive(Debug)]
 struct Recv {
     key: String,
