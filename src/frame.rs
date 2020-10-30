@@ -56,14 +56,14 @@ impl Handshake {
     fn from(crs: &Cursor<&[u8]>) -> Handshake {
         let start = Handshake::LEN_SIZE + Handshake::PROTOCOL_ID.len() + Handshake::RESERVED_SIZE;
         let mut info_hash = [0; Handshake::INFO_HASH_SIZE];
-        info_hash.clone_from_slice(&crs.get_ref()[start..start + Handshake::INFO_HASH_SIZE]);
+        info_hash.copy_from_slice(&crs.get_ref()[start..start + Handshake::INFO_HASH_SIZE]);
 
         let start = Handshake::LEN_SIZE
             + Handshake::PROTOCOL_ID.len()
             + Handshake::RESERVED_SIZE
             + Handshake::INFO_HASH_SIZE;
         let mut peer_id = [0; Handshake::PEER_ID_SIZE];
-        peer_id.clone_from_slice(&crs.get_ref()[start..start + Handshake::PEER_ID_SIZE]);
+        peer_id.copy_from_slice(&crs.get_ref()[start..start + Handshake::PEER_ID_SIZE]);
 
         Handshake { info_hash, peer_id }
     }
@@ -391,11 +391,11 @@ impl Request {
 
         let start = start + Request::INDEX_SIZE;
         let mut begin = [0; Request::BEGIN_SIZE];
-        begin.clone_from_slice(&crs.get_ref()[start..start + Request::BEGIN_SIZE]);
+        begin.copy_from_slice(&crs.get_ref()[start..start + Request::BEGIN_SIZE]);
 
         let start = start + Request::BEGIN_SIZE;
         let mut length = [0; Request::LENGTH_SIZE];
-        length.clone_from_slice(&crs.get_ref()[start..start + Request::LENGTH_SIZE]);
+        length.copy_from_slice(&crs.get_ref()[start..start + Request::LENGTH_SIZE]);
 
         Request {
             index: u32::from_be_bytes(index),
@@ -486,7 +486,7 @@ impl Serializer for Piece {
         vec.push(Piece::ID);
         vec.extend_from_slice(&self.index.to_be_bytes());
         vec.extend_from_slice(&self.begin.to_be_bytes());
-        vec.copy_from_slice(self.block.as_slice());
+        vec.extend_from_slice(self.block.as_slice());
 
         vec
     }
