@@ -32,8 +32,10 @@ async fn main() {
 
     let pieces_len = t.pieces().len();
     let piece_length = t.piece_length();
+    let mut peer_bitfield = vec![false; t.pieces().len()];
+
     let manager = tokio::spawn(async move {
-        let pieces = vec![false; pieces_len];
+        let my_pieces = vec![false; pieces_len];
         while let Some(cmd) = rx.recv().await {
             match cmd {
                 Command::RecvBitfield {
@@ -41,14 +43,20 @@ async fn main() {
                     bitfield,
                     channel,
                 } => {
-                    let available = bitfield.available_pieces();
-                    for i in 0..pieces.len() {
-                        if pieces[i] == false && available[i] == true {
-                            // channel.send(Frame::Request(Request::new(i, 0, piece_length as usize)));
-                            let my = Bitfield::new(vec![0; pieces_len]);
-                            channel.send(Command::SendBitfield {
-                                bitfield: my,
-                                interested: false,
+                    peer_bitfield = bitfield.available_pieces();
+
+                    let my = Bitfield::new(vec![0; pieces_len]);
+                    channel.send(Command::SendBitfield {
+                        bitfield: my,
+                        interested: false,
+                    });
+                }
+                Command::RecvUnchoke {key, channel} => {
+                    for i in 0..my_pieces.len() {
+                        if my_pieces[i] == false && peer_bitfield[i] == true {
+                            let my = Request::new(i, 0, piece_length as usize);
+                            channel.send(Command::SendRequest {
+                                req: my,
                             });
                             break;
                         }
