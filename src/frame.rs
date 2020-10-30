@@ -353,7 +353,7 @@ impl Serializer for Bitfield {
         let mut vec = vec![];
         vec.extend_from_slice(&((Bitfield::ID_SIZE + self.pieces.len()) as u32).to_be_bytes());
         vec.push(Bitfield::ID);
-        vec.copy_from_slice(self.pieces.as_slice());
+        vec.extend_from_slice(self.pieces.as_slice());
 
         vec
     }

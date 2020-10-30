@@ -89,11 +89,15 @@ impl Handler {
                     } = resp_rx.await.unwrap()
                     {
                         println!("Odsyłam Bitfield {:?}", bitfield);
-                        self.connection.write_frame(&bitfield).await.unwrap();
+                        if let Err(e) = self.connection.write_frame(&bitfield).await {
+                            println!("After Bitfield {:?}", e);
+                        }
 
                         if interested {
                             println!("Wysyłam Interested");
-                            self.connection.write_frame(&Interested {}).await.unwrap();
+                            if let Err(e) = self.connection.write_frame(&Interested {}).await {
+                                println!("After Interested {:?}", e);
+                            }
                         }
                     }
                 }

@@ -34,6 +34,7 @@ impl Connection {
     pub async fn read_frame(&mut self) -> Result<Option<Frame>, Error> {
         loop {
             if let Some(frame) = self.parse_frame()? {
+                println!("Now ramka {:?}", frame);
                 return Ok(Some(frame));
             }
 

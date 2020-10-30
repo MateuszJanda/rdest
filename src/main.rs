@@ -45,19 +45,22 @@ async fn main() {
                 } => {
                     peer_bitfield = bitfield.available_pieces();
 
-                    let my = Bitfield::new(vec![0; pieces_len]);
-                    channel.send(Command::SendBitfield {
-                        bitfield: my,
-                        interested: false,
-                    });
+                    for i in 0..my_pieces.len() {
+                        if my_pieces[i] == false && peer_bitfield[i] == true {
+                            let my = Bitfield::new(vec![0; pieces_len]);
+                            channel.send(Command::SendBitfield {
+                                bitfield: my,
+                                interested: true,
+                            });
+                            break;
+                        }
+                    }
                 }
-                Command::RecvUnchoke {key, channel} => {
+                Command::RecvUnchoke { key, channel } => {
                     for i in 0..my_pieces.len() {
                         if my_pieces[i] == false && peer_bitfield[i] == true {
                             let my = Request::new(i, 0, piece_length as usize);
-                            channel.send(Command::SendRequest {
-                                req: my,
-                            });
+                            channel.send(Command::SendRequest { req: my });
                             break;
                         }
                     }
