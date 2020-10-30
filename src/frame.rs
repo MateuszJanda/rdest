@@ -436,7 +436,7 @@ pub struct Piece {
 impl Piece {
     const ID: u8 = 7;
     const LEN_SIZE: usize = LEN_SIZE;
-    const ID_SIZE: usize = 4;
+    const ID_SIZE: usize = ID_SIZE;
     const INDEX_SIZE: usize = 4;
     const BEGIN_SIZE: usize = 4;
     const MIN_LEN: usize = 9;
@@ -456,7 +456,7 @@ impl Piece {
 
         let start = start + Piece::INDEX_SIZE;
         let mut begin = [0; Piece::BEGIN_SIZE];
-        begin.clone_from_slice(&crs.get_ref()[start..start + Piece::BEGIN_SIZE]);
+        begin.copy_from_slice(&crs.get_ref()[start..start + Piece::BEGIN_SIZE]);
 
         let start = start + Piece::BEGIN_SIZE;
         let end = crs.position() as usize;
