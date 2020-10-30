@@ -1,17 +1,38 @@
-use crate::{Connection, Error, Frame, Handshake};
+use crate::frame::{Bitfield, Interested};
+use crate::{Connection, Error, Frame, Handshake, Request};
 use tokio::net::TcpStream;
 use tokio::sync::{mpsc, oneshot};
 
+// #[derive(Debug)]
+// pub struct Recv {
+//     pub key: String,
+//     pub frame: Frame,
+//     pub channel: oneshot::Sender<Frame>,
+// }
+
 #[derive(Debug)]
-pub struct Recv {
-    pub key: String,
-    pub frame: Frame,
-    pub channel: oneshot::Sender<Frame>,
+pub enum Command {
+    RecvBitfield {
+        key: String,
+        bitfield: Bitfield,
+        channel: oneshot::Sender<Command>,
+    },
+    RecvUnchoke {
+        key: String,
+        channel: oneshot::Sender<Command>,
+    },
+    SendBitfield {
+        bitfield: Bitfield,
+        interested: bool,
+    },
+    SendRequest {
+        req: Request,
+    },
 }
 
 pub struct Handler {
     connection: Connection,
-    tx: mpsc::Sender<Recv>,
+    tx: mpsc::Sender<Command>,
 }
 
 impl Handler {
@@ -19,7 +40,7 @@ impl Handler {
         addr: String,
         info_hash: [u8; 20],
         peer_id: [u8; 20],
-        tx2: mpsc::Sender<Recv>,
+        tx2: mpsc::Sender<Command>,
     ) {
         println!("Try connect to {}", &addr);
         let stream = TcpStream::connect(&addr).await.unwrap();
@@ -48,22 +69,47 @@ impl Handler {
             match self.connection.read_frame().await? {
                 Some(Frame::Handshake(_)) => {
                     println!("Handshake");
+                    // TODO validate Handshake
                 }
                 Some(Frame::Bitfield(b)) => {
                     println!("Bitfield");
                     let (resp_tx, resp_rx) = oneshot::channel();
                     self.tx
-                        .send(Recv {
+                        .send(Command::RecvBitfield {
                             key: self.connection.addr.clone(),
-                            frame: Frame::Bitfield(b),
+                            bitfield: b,
                             channel: resp_tx,
                         })
                         .await
                         .unwrap();
 
-                    if let Frame::Request(res) = resp_rx.await.unwrap() {
-                        println!("Odsyłam Requst {:?}", res);
-                        self.connection.write_frame(&res).await.unwrap();
+                    if let Command::SendBitfield {
+                        bitfield,
+                        interested,
+                    } = resp_rx.await.unwrap()
+                    {
+                        println!("Odsyłam Bitfield {:?}", bitfield);
+                        self.connection.write_frame(&bitfield).await.unwrap();
+
+                        if interested {
+                            println!("Wysyłam Interested");
+                            self.connection.write_frame(&Interested {}).await.unwrap();
+                        }
+                    }
+                }
+                Some(Frame::Unchoke(u)) => {
+                    let (resp_tx, resp_rx) = oneshot::channel();
+                    self.tx
+                        .send(Command::RecvUnchoke {
+                            key: self.connection.addr.clone(),
+                            channel: resp_tx,
+                        })
+                        .await
+                        .unwrap();
+
+                    if let Command::SendRequest { req } = resp_rx.await.unwrap() {
+                        println!("Wysyłam request");
+                        self.connection.write_frame(&req).await.unwrap();
                     }
                 }
                 Some(Frame::Piece(_)) => {

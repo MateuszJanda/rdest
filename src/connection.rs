@@ -65,7 +65,7 @@ impl Connection {
                 Ok(Some(frame))
             }
             Err(Error::UnknownId(_)) => {
-                // Discard the frame from the buffer
+                // Discard the frame for unknown message from the buffer
                 let len = crs.position() as usize;
                 self.buffer.advance(len);
 

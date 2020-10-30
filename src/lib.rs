@@ -25,9 +25,11 @@ pub use crate::tracker_client::TrackerClient;
 pub use crate::tracker_resp::TrackerResp;
 
 pub use crate::connection::Connection;
+pub use crate::frame::Bitfield;
 pub use crate::frame::Frame;
 pub use crate::frame::Handshake;
 pub use crate::frame::KeepAlive;
 pub use crate::frame::Request;
+
+pub use crate::handler::Command;
 pub use crate::handler::Handler;
-pub use crate::handler::Recv;

@@ -1,4 +1,7 @@
-use rdest::{Connection, Error, Frame, Handler, Handshake, Metainfo, Recv, Request, TrackerClient};
+use rdest::{
+    Bitfield, Command, Connection, Error, Frame, Handler, Handshake, Metainfo, Request,
+    TrackerClient,
+};
 use std::net::Ipv4Addr;
 use tokio;
 use tokio::net::{TcpListener, TcpStream};
@@ -31,18 +34,22 @@ async fn main() {
     let piece_length = t.piece_length();
     let manager = tokio::spawn(async move {
         let pieces = vec![false; pieces_len];
-        while let Some(Recv {
-            key,
-            frame,
-            channel,
-        }) = rx.recv().await
-        {
-            match frame {
-                Frame::Bitfield(bitfield) => {
+        while let Some(cmd) = rx.recv().await {
+            match cmd {
+                Command::RecvBitfield {
+                    key,
+                    bitfield,
+                    channel,
+                } => {
                     let available = bitfield.available_pieces();
                     for i in 0..pieces.len() {
                         if pieces[i] == false && available[i] == true {
-                            channel.send(Frame::Request(Request::new(i, 0, piece_length as usize)));
+                            // channel.send(Frame::Request(Request::new(i, 0, piece_length as usize)));
+                            let my = Bitfield::new(vec![0; pieces_len]);
+                            channel.send(Command::SendBitfield {
+                                bitfield: my,
+                                interested: false,
+                            });
                             break;
                         }
                     }
