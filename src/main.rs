@@ -67,7 +67,7 @@ async fn main() {
                 Command::RecvUnchoke { key, channel } => {
                     for i in 0..my_pieces.len() {
                         if my_pieces[i] == false && peer_bitfield[i] == true {
-                            let my = Request::new(i, 0, piece_length as usize);
+                            let my = Request::new(i, 0, 0x4000 as usize);
                             channel.send(Command::SendRequest { req: my });
                             break;
                         }
