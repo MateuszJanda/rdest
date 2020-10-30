@@ -31,6 +31,8 @@ async fn main() {
     let (mut tx, mut rx) = mpsc::channel(32);
 
     let pieces_len = t.pieces().len();
+    println!("pieces_len {:?}", t.pieces().len());
+
     let piece_length = t.piece_length();
     let mut peer_bitfield = vec![false; t.pieces().len()];
 
@@ -47,7 +49,13 @@ async fn main() {
 
                     for i in 0..my_pieces.len() {
                         if my_pieces[i] == false && peer_bitfield[i] == true {
-                            let my = Bitfield::new(vec![0; pieces_len]);
+
+                            let mut size = pieces_len / 8;
+                            if pieces_len % 8 != 0 {
+                                size += 1;
+                            }
+
+                            let my = Bitfield::new(vec![0; size]);
                             channel.send(Command::SendBitfield {
                                 bitfield: my,
                                 interested: true,
