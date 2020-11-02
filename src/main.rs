@@ -1,4 +1,4 @@
-use rdest::{Handler, Manager, Metainfo, TrackerClient};
+use rdest::{Manager, Metainfo, TrackerClient};
 use std::net::Ipv4Addr;
 use tokio;
 use tokio::net::TcpListener;
@@ -24,12 +24,12 @@ async fn main() {
 
     // println!("{:?}", ResponseParser::from_file("response.data".to_string()));
 
-
     let mut m = Manager::new(t, r);
 
-    let manager = tokio::spawn(async move { m.run().await; });
+    let manager = tokio::spawn(async move {
+        m.run().await;
+    });
     manager.await.unwrap();
-
 
     // loop {
     //     println!("Listening");

@@ -3,7 +3,6 @@ use crate::{Connection, Error, Frame, Handshake, Request};
 use tokio::net::TcpStream;
 use tokio::sync::{mpsc, oneshot};
 
-
 #[derive(Debug)]
 pub enum Command {
     RecvBitfield {
@@ -69,13 +68,15 @@ impl Handler {
                     println!("Bitfield");
                     let (resp_tx, resp_rx) = oneshot::channel();
 
-                    if let Err(e) = self.tx
+                    if let Err(e) = self
+                        .tx
                         .send(Command::RecvBitfield {
                             key: self.connection.addr.clone(),
                             bitfield: b,
                             channel: resp_tx,
                         })
-                        .await {
+                        .await
+                    {
                         println!("Coś nie tak {:?}", e);
                     }
 

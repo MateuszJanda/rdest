@@ -1,5 +1,4 @@
-use crate::{Bitfield, Command, Request, Handler, Metainfo, TrackerResp};
-use tokio::sync::mpsc::{Receiver, Sender};
+use crate::{Bitfield, Command, Handler, Metainfo, Request, TrackerResp};
 use tokio::sync::mpsc;
 
 pub struct Manager {
@@ -12,7 +11,7 @@ pub struct Manager {
 
 impl Manager {
     pub fn new(t: Metainfo, r: TrackerResp) -> Manager {
-        let (tx, mut rx) = mpsc::channel(32);
+        let (tx, rx) = mpsc::channel(32);
 
         let pieces_len = t.pieces().len();
         Manager {
@@ -32,8 +31,7 @@ impl Manager {
         let peer_id = b"ABCDEFGHIJKLMNOPQRST";
         let tx2 = self.tx.clone();
 
-
-        let job = tokio::spawn(async move { Handler::fff(addr, info_hash, *peer_id, tx2).await } );
+        let job = tokio::spawn(async move { Handler::fff(addr, info_hash, *peer_id, tx2).await });
 
         // job.await.unwrap();
     }
