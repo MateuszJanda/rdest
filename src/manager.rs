@@ -100,6 +100,6 @@ impl Manager {
         let own_id = self.own_id.clone();
         let cmd_tx = self.cmd_tx.clone();
 
-        let job = tokio::spawn(async move { Handler::fff(addr, info_hash, own_id, cmd_tx).await });
+        let job = tokio::spawn(async move { Handler::run(addr, own_id, info_hash, cmd_tx).await });
     }
 }
