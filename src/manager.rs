@@ -2,12 +2,13 @@ use crate::handler::{RecvBitfield, RecvUnchoke};
 use crate::{Bitfield, Command, Handler, Metainfo, TrackerResp};
 use std::collections::HashMap;
 use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 
 pub struct Manager {
     own_id: [u8; 20],
     bitfield_size: usize,
     pieces_status: Vec<Status>,
-    peers: HashMap<String, Vec<bool>>,
+    peers: HashMap<String, Peer>,
 
     metainfo: Metainfo,
     tracker: TrackerResp,
@@ -20,6 +21,12 @@ enum Status {
     Missing,
     Reserved,
     Have,
+}
+
+#[derive(Debug)]
+struct Peer {
+    pieces: Vec<bool>,
+    job: JoinHandle<()>,
 }
 
 impl Manager {
@@ -57,14 +64,19 @@ impl Manager {
 
     fn recv_bitfield(&mut self, msg: RecvBitfield) {
         self.peers
-            .insert(msg.key.clone(), msg.bitfield.available_pieces());
+            .get_mut(&msg.key)
+            .unwrap()
+            .pieces
+            .copy_from_slice(&msg.bitfield.available_pieces());
 
-        let pieces = &self.peers[&msg.key];
+        // self.peers.index(&msg.key).pieces.copy_from_slice(&msg.bitfield.available_pieces());
+
+        let pieces = &self.peers[&msg.key].pieces;
 
         for idx in 0..self.pieces_status.len() {
             if self.pieces_status[idx] == Status::Missing && pieces[idx] == true {
                 let bitfield = Bitfield::new(vec![0; self.bitfield_size]);
-                msg.channel.send(Command::SendBitfield {
+                let _ = msg.channel.send(Command::SendBitfield {
                     bitfield,
                     interested: true,
                 });
@@ -75,12 +87,12 @@ impl Manager {
     }
 
     fn recv_unchoke(&mut self, msg: RecvUnchoke) {
-        let pieces = &self.peers[&msg.key];
+        let pieces = &self.peers[&msg.key].pieces;
 
         for idx in 0..self.pieces_status.len() {
             if self.pieces_status[idx] == Status::Missing && pieces[idx] == true {
                 self.pieces_status[idx] = Status::Reserved;
-                msg.channel.send(Command::SendRequest {
+                let _ = msg.channel.send(Command::SendRequest {
                     index: idx,
                     piece_size: self.piece_size(idx),
                 });
@@ -106,12 +118,19 @@ impl Manager {
         size
     }
 
-    fn spawn_jobs(&self) {
+    fn spawn_jobs(&mut self) {
         let addr = self.tracker.peers()[2].clone();
         let info_hash = self.metainfo.info_hash();
         let own_id = self.own_id.clone();
         let cmd_tx = self.cmd_tx.clone();
 
         let job = tokio::spawn(async move { Handler::run(addr, own_id, info_hash, cmd_tx).await });
+
+        let p = Peer {
+            pieces: vec![],
+            job,
+        };
+
+        self.peers.insert(self.tracker.peers()[2].clone(), p);
     }
 }
