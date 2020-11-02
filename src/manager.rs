@@ -79,10 +79,18 @@ impl Manager {
 
         for idx in 0..self.pieces_status.len() {
             if self.pieces_status[idx] == Status::Missing && pieces[idx] == true {
-                msg.channel.send(Command::SendRequest { index: idx });
+                msg.channel.send(Command::SendRequest { index: idx, piece_size: self.piece_size(idx) });
                 break;
             }
         }
+    }
+
+    fn piece_size(&self, index: usize) -> usize {
+        if index < self.metainfo.pieces().len() - 1 {
+            return self.metainfo.piece_length();
+        }
+
+        self.metainfo.total_length() as usize % self.metainfo.piece_length()
     }
 
     fn bitfield_size(metainfo: &Metainfo) -> usize {

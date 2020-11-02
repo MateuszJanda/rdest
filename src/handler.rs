@@ -14,6 +14,7 @@ pub enum Command {
     },
     SendRequest {
         index: usize,
+        piece_size: usize,
     },
 }
 
@@ -115,7 +116,7 @@ impl Handler {
                     };
                     self.cmd_tx.send(Command::RecvUnchoke(cmd)).await.unwrap();
 
-                    if let Command::SendRequest { index } = resp_rx.await.unwrap() {
+                    if let Command::SendRequest { index, piece_size } = resp_rx.await.unwrap() {
                         let msg = Request::new(index, 0, 0x4000 as usize);
                         println!("Wysyłam request");
                         self.connection.write_msg(&msg).await.unwrap();
