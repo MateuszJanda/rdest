@@ -1,6 +1,6 @@
 use crate::frame::Frame::Unchoke;
 use crate::frame::{Bitfield, Interested};
-use crate::{Connection, Error, Frame, Handshake, Request};
+use crate::{frame, Connection, Error, Frame, Handshake, Request};
 use tokio::net::TcpStream;
 use tokio::sync::{mpsc, oneshot};
 
@@ -108,19 +108,7 @@ impl Handler {
                     }
                 }
                 Some(Frame::Unchoke(u)) => {
-                    let (resp_tx, resp_rx) = oneshot::channel();
-
-                    let cmd = RecvUnchoke {
-                        key: self.connection.addr.clone(),
-                        channel: resp_tx,
-                    };
-                    self.cmd_tx.send(Command::RecvUnchoke(cmd)).await.unwrap();
-
-                    if let Command::SendRequest { index, piece_size } = resp_rx.await.unwrap() {
-                        let msg = Request::new(index, 0, 0x4000 as usize);
-                        println!("Wysyłam request");
-                        self.connection.write_msg(&msg).await.unwrap();
-                    }
+                    self.handle_unchoke(&u).await;
                 }
                 Some(Frame::Piece(_)) => {
                     println!("Piece");
@@ -132,5 +120,22 @@ impl Handler {
             }
         }
         Ok(())
+    }
+
+    async fn handle_unchoke(&mut self, u: &frame::Unchoke) {
+        let (resp_tx, resp_rx) = oneshot::channel();
+
+        let cmd = RecvUnchoke {
+            key: self.connection.addr.clone(),
+            channel: resp_tx,
+        };
+
+        self.cmd_tx.send(Command::RecvUnchoke(cmd)).await.unwrap();
+
+        if let Command::SendRequest { index, piece_size } = resp_rx.await.unwrap() {
+            let msg = Request::new(index, 0, 0x4000 as usize);
+            println!("Wysyłam request");
+            self.connection.write_msg(&msg).await.unwrap();
+        }
     }
 }
