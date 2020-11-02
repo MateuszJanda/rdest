@@ -22,7 +22,7 @@ impl Connection {
         }
     }
 
-    pub async fn write_frame<T: Serializer>(
+    pub async fn write_msg<T: Serializer>(
         &mut self,
         msg: &T,
     ) -> Result<(), Box<dyn std::error::Error>> {

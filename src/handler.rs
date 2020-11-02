@@ -13,7 +13,7 @@ pub enum Command {
         interested: bool,
     },
     SendRequest {
-        req: Request,
+        index: usize,
     },
 }
 
@@ -61,7 +61,7 @@ impl Handler {
 
     async fn run(&mut self, info_hash: &[u8; 20], peer_id: &[u8; 20]) -> Result<(), Error> {
         self.connection
-            .write_frame(&Handshake::new(info_hash, peer_id))
+            .write_msg(&Handshake::new(info_hash, peer_id))
             .await
             .unwrap();
 
@@ -90,13 +90,13 @@ impl Handler {
                     } = resp_rx.await.unwrap()
                     {
                         println!("Odsyłam Bitfield {:?}", bitfield);
-                        if let Err(e) = self.connection.write_frame(&bitfield).await {
+                        if let Err(e) = self.connection.write_msg(&bitfield).await {
                             println!("After Bitfield {:?}", e);
                         }
 
                         if interested {
                             println!("Wysyłam Interested");
-                            if let Err(e) = self.connection.write_frame(&Interested {}).await {
+                            if let Err(e) = self.connection.write_msg(&Interested {}).await {
                                 println!("After Interested {:?}", e);
                             }
                         }
@@ -111,9 +111,10 @@ impl Handler {
                     };
                     self.tx.send(Command::RecvUnchoke(cmd)).await.unwrap();
 
-                    if let Command::SendRequest { req } = resp_rx.await.unwrap() {
+                    if let Command::SendRequest { index } = resp_rx.await.unwrap() {
+                        let msg = Request::new(index, 0, 0x4000 as usize);
                         println!("Wysyłam request");
-                        self.connection.write_frame(&req).await.unwrap();
+                        self.connection.write_msg(&msg).await.unwrap();
                     }
                 }
                 Some(Frame::Piece(_)) => {
