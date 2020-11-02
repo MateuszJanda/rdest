@@ -74,14 +74,16 @@ impl Handler {
                 Some(Frame::Bitfield(b)) => {
                     println!("Bitfield");
                     let (resp_tx, resp_rx) = oneshot::channel();
-                    self.tx
+
+                    if let Err(e) = self.tx
                         .send(Command::RecvBitfield {
                             key: self.connection.addr.clone(),
                             bitfield: b,
                             channel: resp_tx,
                         })
-                        .await
-                        .unwrap();
+                        .await {
+                        println!("Coś nie tak {:?}", e);
+                    }
 
                     if let Command::SendBitfield {
                         bitfield,

@@ -4,6 +4,7 @@ mod deep_finder;
 mod error;
 mod frame;
 mod handler;
+mod manager;
 mod metainfo;
 mod raw_finder;
 mod tracker_client;
@@ -30,6 +31,8 @@ pub use crate::frame::Frame;
 pub use crate::frame::Handshake;
 pub use crate::frame::KeepAlive;
 pub use crate::frame::Request;
+
+pub use crate::manager::Manager;
 
 pub use crate::handler::Command;
 pub use crate::handler::Handler;
