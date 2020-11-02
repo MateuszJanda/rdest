@@ -2,47 +2,33 @@ use crate::{Bitfield, Command, Handler, Metainfo, Request, TrackerResp};
 use tokio::sync::mpsc;
 
 pub struct Manager {
-    tx: mpsc::Sender<Command>,
-    rx: mpsc::Receiver<Command>,
-    t: Metainfo,
-    r: TrackerResp,
-    pieces_len: usize,
+    own_id: [u8; 20],
+    metainfo: Metainfo,
+    tracker: TrackerResp,
+    cmd_tx: mpsc::Sender<Command>,
+    cmd_rx: mpsc::Receiver<Command>,
 }
 
 impl Manager {
-    pub fn new(t: Metainfo, r: TrackerResp) -> Manager {
-        let (tx, rx) = mpsc::channel(32);
+    pub fn new(metainfo: Metainfo, tracker: TrackerResp, own_id: [u8; 20]) -> Manager {
+        let (cmd_tx, cmd_rx) = mpsc::channel(32);
 
-        let pieces_len = t.pieces().len();
         Manager {
-            tx,
-            rx,
-            t,
-            r,
-            pieces_len,
+            own_id,
+            metainfo,
+            tracker,
+            cmd_tx,
+            cmd_rx,
         }
     }
 
-    pub fn rrr(&self) {
-        println!("Spawning new job");
-
-        let addr = self.r.peers()[2].clone();
-        let info_hash = self.t.info_hash();
-        let peer_id = b"ABCDEFGHIJKLMNOPQRST";
-        let tx2 = self.tx.clone();
-
-        let job = tokio::spawn(async move { Handler::fff(addr, info_hash, *peer_id, tx2).await });
-
-        // job.await.unwrap();
-    }
-
     pub async fn run(&mut self) {
-        self.rrr();
+        self.spawn_jobs();
 
-        let mut peer_bitfield = vec![false; self.pieces_len];
+        let mut peer_bitfield = vec![false; self.metainfo.pieces().len()];
 
-        let my_pieces = vec![false; self.pieces_len];
-        while let Some(cmd) = self.rx.recv().await {
+        let my_pieces = vec![false; self.metainfo.pieces().len()];
+        while let Some(cmd) = self.cmd_rx.recv().await {
             match cmd {
                 Command::RecvBitfield {
                     key,
@@ -53,10 +39,7 @@ impl Manager {
 
                     for i in 0..my_pieces.len() {
                         if my_pieces[i] == false && peer_bitfield[i] == true {
-                            let mut size = self.pieces_len / 8;
-                            if self.pieces_len % 8 != 0 {
-                                size += 1;
-                            }
+                            let size = self.bitfield_size();
 
                             let my = Bitfield::new(vec![0; size]);
                             channel.send(Command::SendBitfield {
@@ -79,5 +62,23 @@ impl Manager {
                 _ => (),
             }
         }
+    }
+
+    fn bitfield_size(&self) -> usize {
+        let mut size = self.metainfo.pieces().len() / 8;
+        if self.metainfo.pieces().len() % 8 != 0 {
+            size += 1;
+        }
+
+        size
+    }
+
+    fn spawn_jobs(&self) {
+        let addr = self.tracker.peers()[2].clone();
+        let info_hash = self.metainfo.info_hash();
+        let own_id = self.own_id.clone();
+        let cmd_tx = self.cmd_tx.clone();
+
+        let job = tokio::spawn(async move { Handler::fff(addr, info_hash, own_id, cmd_tx).await });
     }
 }
