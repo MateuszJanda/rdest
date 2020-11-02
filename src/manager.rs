@@ -74,11 +74,12 @@ impl Manager {
         }
     }
 
-    fn recv_unchoke(&self, msg: RecvUnchoke) {
+    fn recv_unchoke(&mut self, msg: RecvUnchoke) {
         let pieces = &self.peers[&msg.key];
 
         for idx in 0..self.pieces_status.len() {
             if self.pieces_status[idx] == Status::Missing && pieces[idx] == true {
+                self.pieces_status[idx] = Status::Reserved;
                 msg.channel.send(Command::SendRequest {
                     index: idx,
                     piece_size: self.piece_size(idx),

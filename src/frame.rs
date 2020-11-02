@@ -428,9 +428,9 @@ impl Serializer for Request {
 
 #[derive(Debug)]
 pub struct Piece {
-    index: u32,
-    begin: u32,
-    block: Vec<u8>,
+    pub index: u32,
+    pub begin: u32,
+    pub block: Vec<u8>,
 }
 
 impl Piece {
