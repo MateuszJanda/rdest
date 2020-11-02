@@ -1,5 +1,5 @@
 use crate::frame::{Bitfield, Interested, Piece};
-use crate::{Connection, Error, Frame, Handshake, Request};
+use crate::{Connection, Frame, Handshake, Request};
 use tokio::net::TcpStream;
 use tokio::sync::{mpsc, oneshot};
 
@@ -68,13 +68,13 @@ impl Handler {
         };
 
         // Process the connection. If an error is encountered, log it.
-        if let Err(err) = handler.msg_loop().await {
+        if let Err(_) = handler.msg_loop().await {
             // error!(cause = ?err, "connection error");
             panic!("jkl");
         }
     }
 
-    async fn msg_loop(&mut self) -> Result<(), Error> {
+    async fn msg_loop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.connection
             .write_msg(&Handshake::new(&self.info_hash, &self.own_id))
             .await
@@ -121,7 +121,9 @@ impl Handler {
                     self.handle_unchoke().await;
                 }
                 Some(Frame::Piece(p)) => {
-                    self.handle_piece(&p).await;
+                    if false == self.handle_piece(&p).await? {
+                        break;
+                    }
                 }
                 Some(f) => {
                     println!("Frame: {:?}", f);
@@ -153,7 +155,7 @@ impl Handler {
         }
     }
 
-    async fn handle_piece(&mut self, piece: &Piece) {
+    async fn handle_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
         println!("Piece");
 
         self.piece[self.position..self.position + piece.block.len()].copy_from_slice(&piece.block);
@@ -167,11 +169,9 @@ impl Handler {
                 channel: resp_tx,
             };
 
-            if let Err(e) = self.cmd_tx.send(cmd).await {
-                println!("Coś nie tak {:?}", e);
-            }
+            self.cmd_tx.send(cmd).await?;
 
-            match resp_rx.await.unwrap() {
+            match resp_rx.await? {
                 Command::SendRequest { index, piece_size } => {
                     self.index = Some(index);
                     self.position = 0;
@@ -191,6 +191,8 @@ impl Handler {
             println!("Wysyłam kolejny request");
             self.connection.write_msg(&msg).await.unwrap();
         }
+
+        Ok(true)
     }
 
     fn chunk_length(&self) -> usize {
