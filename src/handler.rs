@@ -1,6 +1,5 @@
-use crate::frame::Frame::Unchoke;
 use crate::frame::{Bitfield, Interested};
-use crate::{frame, Connection, Error, Frame, Handshake, Request};
+use crate::{Connection, Error, Frame, Handshake, Request};
 use tokio::net::TcpStream;
 use tokio::sync::{mpsc, oneshot};
 
@@ -107,8 +106,8 @@ impl Handler {
                         }
                     }
                 }
-                Some(Frame::Unchoke(u)) => {
-                    self.handle_unchoke(&u).await;
+                Some(Frame::Unchoke(_)) => {
+                    self.handle_unchoke().await;
                 }
                 Some(Frame::Piece(_)) => {
                     println!("Piece");
@@ -122,7 +121,7 @@ impl Handler {
         Ok(())
     }
 
-    async fn handle_unchoke(&mut self, u: &frame::Unchoke) {
+    async fn handle_unchoke(&mut self) {
         let (resp_tx, resp_rx) = oneshot::channel();
 
         let cmd = RecvUnchoke {

@@ -1,5 +1,5 @@
 use crate::handler::{RecvBitfield, RecvUnchoke};
-use crate::{Bitfield, Command, Handler, Metainfo, Request, TrackerResp};
+use crate::{Bitfield, Command, Handler, Metainfo, TrackerResp};
 use std::collections::HashMap;
 use tokio::sync::mpsc;
 
