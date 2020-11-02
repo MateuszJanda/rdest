@@ -1,3 +1,4 @@
+use crate::frame::Frame::Unchoke;
 use crate::frame::{Bitfield, Interested};
 use crate::{Connection, Error, Frame, Handshake, Request};
 use tokio::net::TcpStream;
@@ -5,15 +6,8 @@ use tokio::sync::{mpsc, oneshot};
 
 #[derive(Debug)]
 pub enum Command {
-    RecvBitfield {
-        key: String,
-        bitfield: Bitfield,
-        channel: oneshot::Sender<Command>,
-    },
-    RecvUnchoke {
-        key: String,
-        channel: oneshot::Sender<Command>,
-    },
+    RecvBitfield(RecvBitfield),
+    RecvUnchoke(RecvUnchoke),
     SendBitfield {
         bitfield: Bitfield,
         interested: bool,
@@ -21,6 +15,19 @@ pub enum Command {
     SendRequest {
         req: Request,
     },
+}
+
+#[derive(Debug)]
+pub struct RecvBitfield {
+    pub(crate) key: String,
+    pub(crate) bitfield: Bitfield,
+    pub(crate) channel: oneshot::Sender<Command>,
+}
+
+#[derive(Debug)]
+pub struct RecvUnchoke {
+    pub(crate) key: String,
+    pub(crate) channel: oneshot::Sender<Command>,
 }
 
 pub struct Handler {
@@ -68,15 +75,12 @@ impl Handler {
                     println!("Bitfield");
                     let (resp_tx, resp_rx) = oneshot::channel();
 
-                    if let Err(e) = self
-                        .tx
-                        .send(Command::RecvBitfield {
-                            key: self.connection.addr.clone(),
-                            bitfield: b,
-                            channel: resp_tx,
-                        })
-                        .await
-                    {
+                    let cmd = RecvBitfield {
+                        key: self.connection.addr.clone(),
+                        bitfield: b,
+                        channel: resp_tx,
+                    };
+                    if let Err(e) = self.tx.send(Command::RecvBitfield(cmd)).await {
                         println!("Coś nie tak {:?}", e);
                     }
 
@@ -100,13 +104,12 @@ impl Handler {
                 }
                 Some(Frame::Unchoke(u)) => {
                     let (resp_tx, resp_rx) = oneshot::channel();
-                    self.tx
-                        .send(Command::RecvUnchoke {
-                            key: self.connection.addr.clone(),
-                            channel: resp_tx,
-                        })
-                        .await
-                        .unwrap();
+
+                    let cmd = RecvUnchoke {
+                        key: self.connection.addr.clone(),
+                        channel: resp_tx,
+                    };
+                    self.tx.send(Command::RecvUnchoke(cmd)).await.unwrap();
 
                     if let Command::SendRequest { req } = resp_rx.await.unwrap() {
                         println!("Wysyłam request");
