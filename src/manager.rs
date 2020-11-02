@@ -24,30 +24,6 @@ impl Manager {
         }
     }
 
-    // pub async fn fff(t: Metainfo, r: TrackerResp) {
-    //     let (tx, mut rx) = mpsc::channel(32);
-    //
-    //
-    //     let mut m = Manager {
-    //         tx,
-    //         rx,
-    //         t,
-    //         r,
-    //     };
-    //
-    //     // let pieces_len = t.pieces().len();
-    //     // println!("pieces_len {:?}", t.pieces().len());
-    //     //
-    //     // let piece_length = t.piece_length();
-    //
-    //     // let manager = tokio::spawn(m.run(pieces_len, &mut rx));
-    //     // let manager = tokio::spawn(async move { m.run(pieces_len); });
-    //     let manager = tokio::spawn(async move { m.rrr(); });
-    //
-    //
-    //     manager.await.unwrap();
-    // }
-
     pub fn rrr(&self) {
         println!("Spawning new job");
 
@@ -63,7 +39,6 @@ impl Manager {
     }
 
     pub async fn run(&mut self) {
-        println!("BUKA 2");
         self.rrr();
 
         let mut peer_bitfield = vec![false; self.pieces_len];

@@ -3,12 +3,6 @@ use crate::{Connection, Error, Frame, Handshake, Request};
 use tokio::net::TcpStream;
 use tokio::sync::{mpsc, oneshot};
 
-// #[derive(Debug)]
-// pub struct Recv {
-//     pub key: String,
-//     pub frame: Frame,
-//     pub channel: oneshot::Sender<Frame>,
-// }
 
 #[derive(Debug)]
 pub enum Command {
