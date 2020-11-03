@@ -1,8 +1,8 @@
 use crate::frame::{Bitfield, Interested, Piece};
 use crate::{Connection, Frame, Handshake, Request};
+use std::fs;
 use tokio::net::TcpStream;
 use tokio::sync::{mpsc, oneshot};
-use std::fs;
 
 #[derive(Debug)]
 pub enum Command {
@@ -20,7 +20,9 @@ pub enum Command {
     Done(Done),
     VerifyFail(VerifyFail),
     End,
-    KillReq { key: String,},
+    KillReq {
+        key: String,
+    },
 }
 
 #[derive(Debug)]
@@ -87,8 +89,6 @@ impl Handler {
             // error!(cause = ?err, "connection error");
             panic!("jkl {:?}", e);
         }
-
-
     }
 
     async fn msg_loop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -170,7 +170,12 @@ impl Handler {
 
         self.cmd_tx.send(Command::RecvUnchoke(cmd)).await.unwrap();
 
-        if let Command::SendRequest { index, piece_size, piece_hash} = resp_rx.await.unwrap() {
+        if let Command::SendRequest {
+            index,
+            piece_size,
+            piece_hash,
+        } = resp_rx.await.unwrap()
+        {
             self.piece = vec![0; piece_size];
             self.piece_hash = piece_hash;
             self.index = Some(index);
@@ -200,13 +205,11 @@ impl Handler {
                 self.cmd_tx.send(cmd).await?;
 
                 match resp_rx.await? {
-                    Command::End => {
-                        return Ok(false)
-                    }
+                    Command::End => return Ok(false),
                     _ => (),
                 }
 
-                return Ok(true)
+                return Ok(true);
             }
 
             self.write_piece();
@@ -220,7 +223,11 @@ impl Handler {
             self.cmd_tx.send(cmd).await?;
 
             match resp_rx.await? {
-                Command::SendRequest { index, piece_size , piece_hash} => {
+                Command::SendRequest {
+                    index,
+                    piece_size,
+                    piece_hash,
+                } => {
                     self.index = Some(index);
                     self.position = 0;
                     self.piece = vec![0; piece_size];
@@ -231,9 +238,7 @@ impl Handler {
                     println!("Wysyłam nowy request");
                     self.connection.write_msg(&msg).await.unwrap();
                 }
-                Command::End => {
-                    return Ok(false)
-                }
+                Command::End => return Ok(false),
                 _ => (),
             }
         } else {
@@ -264,7 +269,9 @@ impl Handler {
     }
 
     fn write_piece(&self) {
-        let name: String = self.piece_hash.iter()
+        let name: String = self
+            .piece_hash
+            .iter()
             .map(|b| format!("{:02X}", b))
             .collect();
 

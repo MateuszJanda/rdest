@@ -64,7 +64,7 @@ impl Manager {
                 Command::VerifyFail(cmd) => {
                     self.recv_verify_fail(cmd);
                 }
-                Command::KillReq {key } => {
+                Command::KillReq { key } => {
                     self.kill_job(&key).await;
 
                     if self.peers.is_empty() {
@@ -112,11 +112,7 @@ impl Manager {
             if self.pieces_status[idx] == Status::Missing && pieces[idx] == true {
                 self.pieces_status[idx] = Status::Reserved;
 
-                self.peers
-                    .get_mut(&msg.key)
-                    .unwrap()
-                    .index = idx;
-
+                self.peers.get_mut(&msg.key).unwrap().index = idx;
 
                 let _ = msg.channel.send(Command::SendRequest {
                     index: idx,
@@ -178,11 +174,7 @@ impl Manager {
     }
 
     async fn kill_job(&mut self, key: &String) {
-        let j = self.peers
-            .get_mut(key)
-            .unwrap()
-            .job
-            .take();
+        let j = self.peers.get_mut(key).unwrap().job.take();
         j.unwrap().await.unwrap();
 
         self.peers.remove(key);
