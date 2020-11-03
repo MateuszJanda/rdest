@@ -15,10 +15,7 @@ pub enum Command {
         index: usize,
         piece_size: usize,
     },
-    Done {
-        key: String,
-        channel: oneshot::Sender<Command>,
-    },
+    Done(Done),
     Kill,
 }
 
@@ -33,6 +30,12 @@ pub struct RecvBitfield {
 pub struct RecvUnchoke {
     pub(crate) key: String,
     pub(crate) channel: oneshot::Sender<Command>,
+}
+
+#[derive(Debug)]
+pub struct Done {
+    pub key: String,
+    pub channel: oneshot::Sender<Command>,
 }
 
 pub struct Handler {
@@ -68,9 +71,9 @@ impl Handler {
         };
 
         // Process the connection. If an error is encountered, log it.
-        if let Err(_) = handler.msg_loop().await {
+        if let Err(e) = handler.msg_loop().await {
             // error!(cause = ?err, "connection error");
-            panic!("jkl");
+            panic!("jkl {:?}", e);
         }
     }
 
@@ -164,10 +167,10 @@ impl Handler {
         if self.position == piece.block.len() {
             let (resp_tx, resp_rx) = oneshot::channel();
 
-            let cmd = Command::Done {
+            let cmd = Command::Done(Done {
                 key: self.connection.addr.clone(),
                 channel: resp_tx,
-            };
+            });
 
             self.cmd_tx.send(cmd).await?;
 

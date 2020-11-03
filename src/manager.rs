@@ -1,4 +1,4 @@
-use crate::handler::{RecvBitfield, RecvUnchoke};
+use crate::handler::{Done, RecvBitfield, RecvUnchoke};
 use crate::{Bitfield, Command, Handler, Metainfo, TrackerResp};
 use std::collections::HashMap;
 use tokio::sync::mpsc;
@@ -57,19 +57,27 @@ impl Manager {
                 Command::RecvUnchoke(cmd) => {
                     self.recv_unchoke(cmd);
                 }
+                Command::Done(cmd) => {
+                    self.recv_done(cmd);
+                }
                 _ => (),
             }
         }
     }
 
     fn recv_bitfield(&mut self, msg: RecvBitfield) {
+        let p = msg.bitfield.available_pieces();
         self.peers
             .get_mut(&msg.key)
             .unwrap()
             .pieces
-            .copy_from_slice(&msg.bitfield.available_pieces());
+            .resize(p.len(), false);
 
-        // self.peers.index(&msg.key).pieces.copy_from_slice(&msg.bitfield.available_pieces());
+        self.peers
+            .get_mut(&msg.key)
+            .unwrap()
+            .pieces
+            .copy_from_slice(&p);
 
         let pieces = &self.peers[&msg.key].pieces;
 
@@ -99,6 +107,10 @@ impl Manager {
                 break;
             }
         }
+    }
+
+    fn recv_done(&mut self, msg: Done) {
+        let _ = msg.channel.send(Command::Kill);
     }
 
     fn piece_size(&self, index: usize) -> usize {
