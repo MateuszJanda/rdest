@@ -2,6 +2,7 @@ use crate::frame::{Bitfield, Interested, Piece};
 use crate::{Connection, Frame, Handshake, Request};
 use tokio::net::TcpStream;
 use tokio::sync::{mpsc, oneshot};
+use std::fs;
 
 #[derive(Debug)]
 pub enum Command {
@@ -176,9 +177,8 @@ impl Handler {
         self.position += piece.block.len();
 
         if self.position == self.piece.len() {
-            let (resp_tx, resp_rx) = oneshot::channel();
-
             if !self.verify() {
+                let (resp_tx, resp_rx) = oneshot::channel();
                 println!("Verify fail");
                 let cmd = Command::VerifyFail(VerifyFail {
                     key: self.connection.addr.clone(),
@@ -197,6 +197,9 @@ impl Handler {
                 return Ok(true)
             }
 
+            self.write_piece();
+
+            let (resp_tx, resp_rx) = oneshot::channel();
             let cmd = Command::Done(Done {
                 key: self.connection.addr.clone(),
                 channel: resp_tx,
@@ -246,5 +249,13 @@ impl Handler {
         println!("Checksum: {:?} {:?}", m.digest().bytes(), self.piece_hash);
 
         return m.digest().bytes() == self.piece_hash;
+    }
+
+    fn write_piece(&self) {
+        let name: String = self.piece_hash.iter()
+            .map(|b| format!("{:02X}", b))
+            .collect();
+
+        fs::write(name, &self.piece).unwrap(); // TODO: remove
     }
 }
