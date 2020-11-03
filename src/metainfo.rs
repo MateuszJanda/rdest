@@ -197,6 +197,7 @@ impl Metainfo {
     }
 
     pub fn pieces(&self) -> Vec<[u8; HASH_SIZE]> {
+        // TODO: maybe &Vec<>
         self.pieces.clone()
     }
 

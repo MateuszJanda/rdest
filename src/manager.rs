@@ -1,4 +1,4 @@
-use crate::handler::{Done, RecvBitfield, RecvUnchoke};
+use crate::handler::{Done, RecvBitfield, RecvUnchoke, VerifyFail};
 use crate::{Bitfield, Command, Handler, Metainfo, TrackerResp};
 use std::collections::HashMap;
 use tokio::sync::mpsc;
@@ -60,6 +60,9 @@ impl Manager {
                 Command::Done(cmd) => {
                     self.recv_done(cmd);
                 }
+                Command::VerifyFail(cmd) => {
+                    self.recv_verify_fail(cmd);
+                }
                 _ => (),
             }
         }
@@ -103,6 +106,7 @@ impl Manager {
                 let _ = msg.channel.send(Command::SendRequest {
                     index: idx,
                     piece_size: self.piece_size(idx),
+                    piece_hash: self.metainfo.pieces()[idx],
                 });
                 break;
             }
@@ -110,6 +114,10 @@ impl Manager {
     }
 
     fn recv_done(&mut self, msg: Done) {
+        let _ = msg.channel.send(Command::Kill);
+    }
+
+    fn recv_verify_fail(&mut self, msg: VerifyFail) {
         let _ = msg.channel.send(Command::Kill);
     }
 
