@@ -26,7 +26,8 @@ enum Status {
 #[derive(Debug)]
 struct Peer {
     pieces: Vec<bool>,
-    job: JoinHandle<()>,
+    job: Option<JoinHandle<()>>,
+    index: usize,
 }
 
 impl Manager {
@@ -62,6 +63,13 @@ impl Manager {
                 }
                 Command::VerifyFail(cmd) => {
                     self.recv_verify_fail(cmd);
+                }
+                Command::KillReq {key } => {
+                    self.kill_job(&key).await;
+
+                    if self.peers.is_empty() {
+                        break;
+                    }
                 }
                 _ => (),
             }
@@ -103,6 +111,13 @@ impl Manager {
         for idx in 0..self.pieces_status.len() {
             if self.pieces_status[idx] == Status::Missing && pieces[idx] == true {
                 self.pieces_status[idx] = Status::Reserved;
+
+                self.peers
+                    .get_mut(&msg.key)
+                    .unwrap()
+                    .index = idx;
+
+
                 let _ = msg.channel.send(Command::SendRequest {
                     index: idx,
                     piece_size: self.piece_size(idx),
@@ -114,11 +129,18 @@ impl Manager {
     }
 
     fn recv_done(&mut self, msg: Done) {
-        let _ = msg.channel.send(Command::Kill);
+        for (key, peer) in self.peers.iter() {
+            if key == &msg.key {
+                self.pieces_status[peer.index] = Status::Have;
+                break;
+            }
+        }
+
+        let _ = msg.channel.send(Command::End);
     }
 
     fn recv_verify_fail(&mut self, msg: VerifyFail) {
-        let _ = msg.channel.send(Command::Kill);
+        let _ = msg.channel.send(Command::End);
     }
 
     fn piece_size(&self, index: usize) -> usize {
@@ -148,9 +170,23 @@ impl Manager {
 
         let p = Peer {
             pieces: vec![],
-            job,
+            job: Some(job),
+            index: 0,
         };
 
         self.peers.insert(self.tracker.peers()[2].clone(), p);
+    }
+
+    async fn kill_job(&mut self, key: &String) {
+        let j = self.peers
+            .get_mut(key)
+            .unwrap()
+            .job
+            .take();
+        j.unwrap().await.unwrap();
+
+        self.peers.remove(key);
+
+        println!("Job killed");
     }
 }

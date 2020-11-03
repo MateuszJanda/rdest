@@ -19,7 +19,8 @@ pub enum Command {
     },
     Done(Done),
     VerifyFail(VerifyFail),
-    Kill,
+    End,
+    KillReq { key: String,},
 }
 
 #[derive(Debug)]
@@ -86,6 +87,8 @@ impl Handler {
             // error!(cause = ?err, "connection error");
             panic!("jkl {:?}", e);
         }
+
+
     }
 
     async fn msg_loop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -145,6 +148,15 @@ impl Handler {
                 _ => {}
             }
         }
+
+        {
+            let cmd = Command::KillReq {
+                key: self.connection.addr.clone(),
+            };
+
+            self.cmd_tx.send(cmd).await?;
+        }
+
         Ok(())
     }
 
@@ -188,7 +200,7 @@ impl Handler {
                 self.cmd_tx.send(cmd).await?;
 
                 match resp_rx.await? {
-                    Command::Kill => {
+                    Command::End => {
                         return Ok(false)
                     }
                     _ => (),
@@ -219,7 +231,7 @@ impl Handler {
                     println!("Wysyłam nowy request");
                     self.connection.write_msg(&msg).await.unwrap();
                 }
-                Command::Kill => {
+                Command::End => {
                     return Ok(false)
                 }
                 _ => (),
