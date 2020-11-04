@@ -11,7 +11,7 @@ pub struct Connection {
     pub buffer: BytesMut,
 }
 
-const BUFFER_SIZE: usize = 65536 + 2;
+const BUFFER_SIZE: usize = 65536;
 
 impl Connection {
     pub fn new(addr: String, stream: TcpStream) -> Connection {
