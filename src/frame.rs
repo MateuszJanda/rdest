@@ -606,7 +606,7 @@ impl Serializer for Port {
     }
 }
 
-#[derive(FromPrimitive)]
+#[derive(PartialEq, FromPrimitive)]
 #[repr(u8)]
 enum MsgId {
     HandshakeId = Handshake::ID_FROM_PROTOCOL,
@@ -630,12 +630,14 @@ impl Frame {
             return Ok(Frame::KeepAlive(KeepAlive {}));
         }
 
-        // TODO: check and change buffer to 2**17 or 2**18
-        if length > 65536 {
-            Err(Error::MsgToLarge)
+        let msg_id = Self::get_message_id(crs)?;
+
+        // TODO: check buffer auto expand and change size to 2**17 or 2**18
+        if FromPrimitive::from_u8(msg_id) != Some(MsgId::HandshakeId) && length > 65536 {
+            println!("len {}", length);
+            return Err(Error::MsgToLarge);
         }
 
-        let msg_id = Self::get_message_id(crs)?;
         let protocol_id_length = Self::get_protocol_id_length(crs)?;
         let available_data = Self::available_data(crs);
 

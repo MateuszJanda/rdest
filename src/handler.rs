@@ -1,8 +1,9 @@
 use crate::frame::{Bitfield, Interested, Piece};
-use crate::{Connection, Frame, Handshake, Request};
+use crate::{Connection, Error, Frame, Handshake, Request};
 use std::fs;
 use tokio::net::TcpStream;
 use tokio::sync::{mpsc, oneshot};
+use tokio::time::{interval_at, Duration, Instant};
 
 #[derive(Debug)]
 pub enum Command {
@@ -97,55 +98,19 @@ impl Handler {
             .await
             .unwrap();
 
+        let start = Instant::now() + Duration::from_millis(0);
+        let mut interval = interval_at(start, Duration::from_millis(2000));
+
         loop {
-            match self.connection.read_frame().await? {
-                Some(Frame::Handshake(_)) => {
-                    println!("Handshake");
-                    // TODO validate Handshake
-                }
-                Some(Frame::Bitfield(b)) => {
-                    println!("Bitfield");
-                    let (resp_tx, resp_rx) = oneshot::channel();
-
-                    let cmd = RecvBitfield {
-                        key: self.connection.addr.clone(),
-                        bitfield: b,
-                        channel: resp_tx,
-                    };
-                    if let Err(e) = self.cmd_tx.send(Command::RecvBitfield(cmd)).await {
-                        println!("Coś nie tak {:?}", e);
-                    }
-
-                    if let Command::SendBitfield {
-                        bitfield,
-                        interested,
-                    } = resp_rx.await.unwrap()
-                    {
-                        println!("Odsyłam Bitfield {:?}", bitfield);
-                        if let Err(e) = self.connection.write_msg(&bitfield).await {
-                            println!("After Bitfield {:?}", e);
-                        }
-
-                        if interested {
-                            println!("Wysyłam Interested");
-                            if let Err(e) = self.connection.write_msg(&Interested {}).await {
-                                println!("After Interested {:?}", e);
-                            }
-                        }
-                    }
-                }
-                Some(Frame::Unchoke(_)) => {
-                    self.handle_unchoke().await;
-                }
-                Some(Frame::Piece(p)) => {
-                    if false == self.handle_piece(&p).await? {
+            tokio::select! {
+                _ = interval.tick() => {
+                    // TODO: keep alive
+                },
+                frame = self.connection.read_frame() => {
+                    if false == self.handle_frame(frame?).await? {
                         break;
                     }
                 }
-                Some(f) => {
-                    println!("Frame: {:?}", f);
-                }
-                _ => {}
             }
         }
 
@@ -158,6 +123,63 @@ impl Handler {
         }
 
         Ok(())
+    }
+
+    async fn handle_frame(
+        &mut self,
+        frame: Option<Frame>,
+    ) -> Result<bool, Box<dyn std::error::Error>> {
+        match frame {
+            Some(Frame::Handshake(_)) => {
+                println!("Handshake");
+                // TODO validate Handshake
+            }
+            Some(Frame::Bitfield(b)) => {
+                println!("Bitfield");
+                let (resp_tx, resp_rx) = oneshot::channel();
+
+                let cmd = RecvBitfield {
+                    key: self.connection.addr.clone(),
+                    bitfield: b,
+                    channel: resp_tx,
+                };
+                if let Err(e) = self.cmd_tx.send(Command::RecvBitfield(cmd)).await {
+                    println!("Coś nie tak {:?}", e);
+                }
+
+                if let Command::SendBitfield {
+                    bitfield,
+                    interested,
+                } = resp_rx.await.unwrap()
+                {
+                    println!("Odsyłam Bitfield {:?}", bitfield);
+                    if let Err(e) = self.connection.write_msg(&bitfield).await {
+                        println!("After Bitfield {:?}", e);
+                    }
+
+                    if interested {
+                        println!("Wysyłam Interested");
+                        if let Err(e) = self.connection.write_msg(&Interested {}).await {
+                            println!("After Interested {:?}", e);
+                        }
+                    }
+                }
+            }
+            Some(Frame::Unchoke(_)) => {
+                self.handle_unchoke().await;
+            }
+            Some(Frame::Piece(p)) => {
+                if false == self.handle_piece(&p).await? {
+                    return Ok(false);
+                }
+            }
+            Some(f) => {
+                println!("Frame: {:?}", f);
+            }
+            _ => {}
+        }
+
+        return Ok(true);
     }
 
     async fn handle_unchoke(&mut self) {
