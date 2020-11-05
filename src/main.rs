@@ -1,9 +1,9 @@
 use rdest::{Manager, Metainfo, TrackerClient};
+use std::io;
+use std::io::Write;
 use std::net::Ipv4Addr;
 use tokio;
 use tokio::net::TcpListener;
-use std::io;
-use std::io::Write;
 
 #[tokio::main]
 async fn main() {

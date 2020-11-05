@@ -264,8 +264,10 @@ impl Have {
     const INDEX_SIZE: usize = 4;
     const FULL_SIZE: usize = Have::LEN_SIZE + Have::LEN as usize;
 
-    pub fn new(index: u32) -> Have {
-        Have { index }
+    pub fn new(index: usize) -> Have {
+        Have {
+            index: index as u32,
+        }
     }
 
     fn from(crs: &Cursor<&[u8]>) -> Have {

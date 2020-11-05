@@ -1,10 +1,14 @@
 use crate::frame::{Bitfield, Interested, Piece};
-use crate::{Connection, Error, Frame, Handshake, Request};
+use crate::{Connection, Frame, Handshake, Have, Request};
 use std::fs;
 use tokio::net::TcpStream;
-use tokio::sync::{mpsc, oneshot};
+use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time::{interval_at, Duration, Instant};
 
+#[derive(Debug, Clone)]
+pub enum BroadcastCommand {
+    SendHave { key: String, index: usize },
+}
 #[derive(Debug)]
 pub enum Command {
     RecvBitfield(RecvBitfield),
@@ -20,6 +24,7 @@ pub enum Command {
         piece_size: usize,
         piece_hash: [u8; 20],
     },
+
     Done(Done),
     VerifyFail(VerifyFail),
     End,
@@ -68,6 +73,7 @@ pub struct Handler {
     piece_hash: [u8; 20],
     connection: Connection,
     cmd_tx: mpsc::Sender<Command>,
+    b_rx: broadcast::Receiver<BroadcastCommand>,
 }
 
 impl Handler {
@@ -76,6 +82,7 @@ impl Handler {
         own_id: [u8; 20],
         info_hash: [u8; 20],
         cmd_tx: mpsc::Sender<Command>,
+        b_rx: broadcast::Receiver<BroadcastCommand>,
     ) {
         println!("Try connect to {}", &addr);
         let stream = TcpStream::connect(&addr).await.unwrap();
@@ -91,6 +98,7 @@ impl Handler {
             piece_hash: [0; 20],
             connection,
             cmd_tx,
+            b_rx,
         };
 
         // Process the connection. If an error is encountered, log it.
@@ -113,7 +121,12 @@ impl Handler {
             tokio::select! {
                 _ = interval.tick() => {
                     // TODO: keep alive
-                },
+                }
+                c = self.b_rx.recv() => {
+                    if false == self.send_have(c?).await? {
+                        break;
+                    }
+                }
                 frame = self.connection.read_frame() => {
                     if false == self.handle_frame(frame?).await? {
                         break;
@@ -131,6 +144,22 @@ impl Handler {
         }
 
         Ok(())
+    }
+
+    async fn send_have(
+        &mut self,
+        cmd: BroadcastCommand,
+    ) -> Result<bool, Box<dyn std::error::Error>> {
+        match cmd {
+            BroadcastCommand::SendHave { key, index } => {
+                if key != self.connection.addr {
+                    self.connection.write_msg(&Have::new(index)).await?;
+                }
+
+                return Ok(true);
+            }
+            _ => Ok(false),
+        }
     }
 
     async fn handle_frame(

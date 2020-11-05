@@ -1,7 +1,7 @@
-use crate::handler::{Done, RecvBitfield, RecvUnchoke, VerifyFail, RecvHave};
+use crate::handler::{BroadcastCommand, Done, RecvBitfield, RecvHave, RecvUnchoke, VerifyFail};
 use crate::{Bitfield, Command, Handler, Metainfo, TrackerResp};
 use std::collections::HashMap;
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
 
 pub struct Manager {
@@ -14,6 +14,8 @@ pub struct Manager {
     tracker: TrackerResp,
     cmd_tx: mpsc::Sender<Command>,
     cmd_rx: mpsc::Receiver<Command>,
+
+    b_tx: broadcast::Sender<BroadcastCommand>,
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -34,6 +36,8 @@ impl Manager {
     pub fn new(metainfo: Metainfo, tracker: TrackerResp, own_id: [u8; 20]) -> Manager {
         let (cmd_tx, cmd_rx) = mpsc::channel(32);
 
+        let (b_tx, _) = broadcast::channel(16);
+
         Manager {
             own_id,
             bitfield_size: Self::bitfield_size(&metainfo),
@@ -44,6 +48,8 @@ impl Manager {
             tracker,
             cmd_tx,
             cmd_rx,
+
+            b_tx,
         }
     }
 
@@ -54,19 +60,19 @@ impl Manager {
             match cmd {
                 Command::RecvBitfield(r) => {
                     self.recv_bitfield(r);
-                },
+                }
                 Command::RecvUnchoke(cmd) => {
                     self.recv_unchoke(cmd);
-                },
+                }
                 Command::RecvHave(cmd) => {
                     self.recv_have(cmd);
-                },
+                }
                 Command::Done(cmd) => {
                     self.recv_done(cmd);
-                },
+                }
                 Command::VerifyFail(cmd) => {
                     self.recv_verify_fail(cmd);
-                },
+                }
                 Command::KillReq { key } => {
                     self.kill_job(&key).await;
 
@@ -128,10 +134,7 @@ impl Manager {
     }
 
     fn recv_have(&mut self, msg: RecvHave) {
-        self.peers
-            .get_mut(&msg.key)
-            .unwrap()
-            .pieces[msg.index] = true;
+        self.peers.get_mut(&msg.key).unwrap().pieces[msg.index] = true;
     }
 
     fn recv_done(&mut self, msg: Done) {
@@ -172,7 +175,10 @@ impl Manager {
         let own_id = self.own_id.clone();
         let cmd_tx = self.cmd_tx.clone();
 
-        let job = tokio::spawn(async move { Handler::run(addr, own_id, info_hash, cmd_tx).await });
+        let b_rx = self.b_tx.subscribe();
+
+        let job =
+            tokio::spawn(async move { Handler::run(addr, own_id, info_hash, cmd_tx, b_rx).await });
 
         let p = Peer {
             pieces: vec![],
