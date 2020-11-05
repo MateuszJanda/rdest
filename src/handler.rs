@@ -9,6 +9,8 @@ use tokio::time::{interval_at, Duration, Instant};
 pub enum Command {
     RecvBitfield(RecvBitfield),
     RecvUnchoke(RecvUnchoke),
+    RecvHave(RecvHave),
+
     SendBitfield {
         bitfield: Bitfield,
         interested: bool,
@@ -37,6 +39,12 @@ pub struct RecvBitfield {
 pub struct RecvUnchoke {
     pub(crate) key: String,
     pub(crate) channel: oneshot::Sender<Command>,
+}
+
+#[derive(Debug)]
+pub struct RecvHave {
+    pub(crate) key: String,
+    pub(crate) index: usize,
 }
 
 #[derive(Debug)]
@@ -164,6 +172,14 @@ impl Handler {
                         }
                     }
                 }
+            }
+            Some(Frame::Have(h)) => {
+                let cmd = RecvHave {
+                    key: self.connection.addr.clone(),
+                    index: h.index(),
+                };
+
+                self.cmd_tx.send(Command::RecvHave(cmd)).await?;
             }
             Some(Frame::Unchoke(_)) => {
                 self.handle_unchoke().await;

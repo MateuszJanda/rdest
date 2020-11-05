@@ -285,6 +285,10 @@ impl Have {
 
         Err(Error::Incomplete)
     }
+
+    pub(crate) fn index(&self) -> usize {
+        self.index as usize
+    }
 }
 
 impl Serializer for Have {

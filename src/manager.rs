@@ -1,4 +1,4 @@
-use crate::handler::{Done, RecvBitfield, RecvUnchoke, VerifyFail};
+use crate::handler::{Done, RecvBitfield, RecvUnchoke, VerifyFail, RecvHave};
 use crate::{Bitfield, Command, Handler, Metainfo, TrackerResp};
 use std::collections::HashMap;
 use tokio::sync::mpsc;
@@ -54,16 +54,19 @@ impl Manager {
             match cmd {
                 Command::RecvBitfield(r) => {
                     self.recv_bitfield(r);
-                }
+                },
                 Command::RecvUnchoke(cmd) => {
                     self.recv_unchoke(cmd);
-                }
+                },
+                Command::RecvHave(cmd) => {
+                    self.recv_have(cmd);
+                },
                 Command::Done(cmd) => {
                     self.recv_done(cmd);
-                }
+                },
                 Command::VerifyFail(cmd) => {
                     self.recv_verify_fail(cmd);
-                }
+                },
                 Command::KillReq { key } => {
                     self.kill_job(&key).await;
 
@@ -122,6 +125,13 @@ impl Manager {
                 break;
             }
         }
+    }
+
+    fn recv_have(&mut self, msg: RecvHave) {
+        self.peers
+            .get_mut(&msg.key)
+            .unwrap()
+            .pieces[msg.index] = true;
     }
 
     fn recv_done(&mut self, msg: Done) {
