@@ -126,8 +126,8 @@ impl Handler {
             .await
             .unwrap();
 
-        let start = Instant::now() + Duration::from_millis(0);
-        let mut interval = interval_at(start, Duration::from_millis(2000));
+        let start = Instant::now() + Duration::from_secs(2 * 60);
+        let mut interval = interval_at(start, Duration::from_secs(2 * 60));
 
         loop {
             tokio::select! {

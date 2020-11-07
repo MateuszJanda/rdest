@@ -1,5 +1,5 @@
 use crate::manager::Status;
-use crate::{manager, Error};
+use crate::Error;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use std::io::Cursor;
@@ -392,7 +392,7 @@ impl Bitfield {
     }
 
     pub fn validate(&self, pieces_count: &usize) -> Result<(), Error> {
-        if self.pieces.len() != *pieces_count {
+        if self.available_pieces().len() != *pieces_count {
             return Err(Error::InvalidSize);
         }
 
