@@ -109,6 +109,8 @@ impl Handler {
             // error!(cause = ?err, "connection error");
             panic!("jkl {:?}", e);
         }
+
+        handler.kill_req().await;
     }
 
     async fn msg_loop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -143,16 +145,17 @@ impl Handler {
             }
         }
 
-        {
-            let cmd = Command::KillReq {
-                key: self.connection.addr.clone(),
-                index: self.index,
-            };
-
-            self.cmd_tx.send(cmd).await?;
-        }
-
         Ok(())
+    }
+
+    async fn kill_req(&mut self) {
+        let cmd = Command::KillReq {
+            key: self.connection.addr.clone(),
+            index: self.index,
+        };
+
+        // Should panic if can't inform manager
+        self.cmd_tx.send(cmd).await.unwrap();
     }
 
     async fn send_keep_alive(
