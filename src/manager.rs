@@ -73,7 +73,7 @@ impl Manager {
                 Command::VerifyFail(cmd) => {
                     self.recv_verify_fail(cmd);
                 }
-                Command::KillReq { key , index} => {
+                Command::KillReq { key, index } => {
                     self.kill_job(&key, &index).await;
 
                     if self.peers.is_empty() {

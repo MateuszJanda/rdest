@@ -1,5 +1,5 @@
 use crate::frame::{Bitfield, Interested, Piece};
-use crate::{Connection, Frame, Handshake, Have, Request, KeepAlive};
+use crate::{Connection, Frame, Handshake, Have, KeepAlive, Request};
 use std::fs;
 use tokio::net::TcpStream;
 use tokio::sync::{broadcast, mpsc, oneshot};
@@ -158,9 +158,7 @@ impl Handler {
         self.cmd_tx.send(cmd).await.unwrap();
     }
 
-    async fn send_keep_alive(
-        &mut self
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    async fn send_keep_alive(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.connection.write_msg(&KeepAlive::new()).await?;
 
         Ok(())
