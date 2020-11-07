@@ -192,6 +192,9 @@ impl Handler {
                 println!("Handshake");
                 // TODO validate Handshake
             }
+            Some(Frame::KeepAlive(_)) => {
+                self.keep_alive = true;
+            }
             Some(Frame::Bitfield(b)) => {
                 self.keep_alive = true;
                 println!("Bitfield");
