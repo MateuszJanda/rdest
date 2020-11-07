@@ -1,5 +1,5 @@
 use crate::handler::{BroadcastCommand, Done, RecvBitfield, RecvHave, RecvUnchoke, VerifyFail};
-use crate::{Bitfield, Command, Handler, Metainfo, TrackerResp};
+use crate::{Bitfield, Command, Error, Handler, Metainfo, TrackerResp};
 use std::collections::HashMap;
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
@@ -101,36 +101,66 @@ impl Manager {
 
         let pieces = &self.peers[&msg.key].pieces;
 
-        for idx in 0..self.pieces_status.len() {
-            if self.pieces_status[idx] == Status::Missing && pieces[idx] == true {
-                let bitfield = Bitfield::new(vec![0; self.bitfield_size]);
-                let _ = msg.channel.send(Command::SendBitfield {
-                    bitfield,
-                    interested: true,
-                });
+        let interested = match self.choose_piece(pieces) {
+            Err(_) => false,
+            Ok(_) => true,
+        };
 
-                break;
-            }
-        }
+        let bitfield = Bitfield::new(vec![0; self.bitfield_size]);
+        let _ = msg.channel.send(Command::SendBitfield {
+            bitfield,
+            interested,
+        });
     }
 
     fn recv_unchoke(&mut self, msg: RecvUnchoke) {
         let pieces = &self.peers[&msg.key].pieces;
 
-        for idx in 0..self.pieces_status.len() {
-            if self.pieces_status[idx] == Status::Missing && pieces[idx] == true {
+        let cmd = match self.choose_piece(pieces) {
+            Err(_) => Command::SendNotInterested,
+            Ok(idx) => {
                 self.pieces_status[idx] = Status::Reserved;
-
                 self.peers.get_mut(&msg.key).unwrap().index = idx;
 
-                let _ = msg.channel.send(Command::SendRequest {
+                Command::SendRequest {
                     index: idx,
                     piece_size: self.piece_size(idx),
                     piece_hash: self.metainfo.pieces()[idx],
-                });
-                break;
+                }
+            }
+        };
+
+        let _ = msg.channel.send(cmd);
+    }
+
+    fn choose_piece(&self, pieces: &Vec<bool>) -> Result<usize, Error> {
+        let mut v: Vec<u32> = vec![0; self.metainfo.pieces().len()];
+
+        for (key, p) in self.peers.iter() {
+            for (idx, have) in p.pieces.iter().enumerate() {
+                if *have {
+                    v[idx] += 1;
+                }
             }
         }
+
+        let mut x: Vec<(usize, u32)> = v
+            .iter()
+            .enumerate()
+            .filter(|val| self.pieces_status[val.0] == Status::Missing)
+            .map(|y| (y.0, *y.1))
+            .collect();
+
+        // Sort by rarest
+        x.sort_by(|a, b| a.1.cmp(&b.1));
+
+        for (idx, count) in x.iter() {
+            if count > &0 && pieces[*idx] == true {
+                return Ok(*idx);
+            }
+        }
+
+        Err(Error::NotFound)
     }
 
     fn recv_have(&mut self, msg: RecvHave) {

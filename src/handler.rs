@@ -25,6 +25,8 @@ pub enum Command {
         piece_hash: [u8; 20],
     },
 
+    SendNotInterested,
+
     Done(Done),
     VerifyFail(VerifyFail),
     End,
