@@ -141,6 +141,12 @@ impl Manager {
         for (key, peer) in self.peers.iter() {
             if key == &msg.key {
                 self.pieces_status[peer.index] = Status::Have;
+
+                let _ = self.b_tx.send(BroadcastCommand::SendHave {
+                    key: msg.key.clone(),
+                    index: peer.index,
+                });
+
                 break;
             }
         }
