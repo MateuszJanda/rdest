@@ -73,8 +73,8 @@ impl Manager {
                 Command::VerifyFail(cmd) => {
                     self.recv_verify_fail(cmd);
                 }
-                Command::KillReq { key } => {
-                    self.kill_job(&key).await;
+                Command::KillReq { key , index} => {
+                    self.kill_job(&key, &index).await;
 
                     if self.peers.is_empty() {
                         break;
@@ -195,7 +195,11 @@ impl Manager {
         self.peers.insert(self.tracker.peers()[2].clone(), p);
     }
 
-    async fn kill_job(&mut self, key: &String) {
+    async fn kill_job(&mut self, key: &String, index: &Option<usize>) {
+        if index.is_some() && self.pieces_status[index.unwrap()] != Status::Have {
+            self.pieces_status[index.unwrap()] = Status::Missing;
+        }
+
         let j = self.peers.get_mut(key).unwrap().job.take();
         j.unwrap().await.unwrap();
 

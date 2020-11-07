@@ -30,6 +30,7 @@ pub enum Command {
     End,
     KillReq {
         key: String,
+        index: Option<usize>,
     },
 }
 
@@ -138,6 +139,7 @@ impl Handler {
         {
             let cmd = Command::KillReq {
                 key: self.connection.addr.clone(),
+                index: self.index,
             };
 
             self.cmd_tx.send(cmd).await?;
