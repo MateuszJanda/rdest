@@ -4,6 +4,7 @@ use std::fmt;
 pub enum Error {
     Incomplete,
     InvalidProtocolId,
+    InvalidInfoHash,
     HashCalculation,
     SocketWrite,
     ConnectionReset,
@@ -19,6 +20,7 @@ impl fmt::Display for Error {
         match self {
             Error::Incomplete => write!(f, "Incomplete"),
             Error::InvalidProtocolId => write!(f, "Invalid protocol Id"),
+            Error::InvalidInfoHash => write!(f, "Invalid info hash"),
             Error::HashCalculation => write!(f, "Can't calculate SHA1 hash"),
             Error::SocketWrite => write!(f, "Can't write to socket"),
             Error::MsgToLarge => write!(f, "Message to large"),

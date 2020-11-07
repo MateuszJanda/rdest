@@ -69,10 +69,13 @@ pub struct Handler {
     info_hash: [u8; 20],
     own_id: [u8; 20],
     index: Option<usize>,
+    pieces_count: usize,
     piece: Vec<u8>,
     position: usize,
     piece_hash: [u8; 20],
+
     keep_alive: bool,
+
     connection: Connection,
     cmd_tx: mpsc::Sender<Command>,
     b_rx: broadcast::Receiver<BroadcastCommand>,
@@ -83,6 +86,7 @@ impl Handler {
         addr: String,
         own_id: [u8; 20],
         info_hash: [u8; 20],
+        pieces_count: usize,
         cmd_tx: mpsc::Sender<Command>,
         b_rx: broadcast::Receiver<BroadcastCommand>,
     ) {
@@ -95,6 +99,7 @@ impl Handler {
             own_id,
             info_hash,
             index: None,
+            pieces_count,
             piece: vec![],
             position: 0,
             piece_hash: [0; 20],
@@ -185,10 +190,10 @@ impl Handler {
         frame: Option<Frame>,
     ) -> Result<bool, Box<dyn std::error::Error>> {
         match frame {
-            Some(Frame::Handshake(_)) => {
-                self.keep_alive = true;
+            Some(Frame::Handshake(h)) => {
                 println!("Handshake");
-                // TODO validate Handshake
+                self.keep_alive = true;
+                h.validate(&self.info_hash)?;
             }
             Some(Frame::KeepAlive(_)) => {
                 self.keep_alive = true;

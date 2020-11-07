@@ -89,6 +89,16 @@ impl Handshake {
 
         return Err(Error::InvalidProtocolId);
     }
+
+    pub fn validate(&self, info_hash: &[u8; 20]) -> Result<(), Error> {
+        for i in 0..self.info_hash.len() {
+            if info_hash[i] != self.info_hash[i] {
+                return Err(Error::InvalidInfoHash);
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl Serializer for Handshake {

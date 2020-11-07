@@ -179,12 +179,14 @@ impl Manager {
         let addr = self.tracker.peers()[2].clone();
         let info_hash = self.metainfo.info_hash();
         let own_id = self.own_id.clone();
+        let pieces_count = self.metainfo.pieces().len();
         let cmd_tx = self.cmd_tx.clone();
 
         let b_rx = self.b_tx.subscribe();
 
-        let job =
-            tokio::spawn(async move { Handler::run(addr, own_id, info_hash, cmd_tx, b_rx).await });
+        let job = tokio::spawn(async move {
+            Handler::run(addr, own_id, info_hash, pieces_count, cmd_tx, b_rx).await
+        });
 
         let p = Peer {
             pieces: vec![],
