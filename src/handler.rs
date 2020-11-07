@@ -199,6 +199,8 @@ impl Handler {
                 self.keep_alive = true;
             }
             Some(Frame::Bitfield(b)) => {
+                b.validate(&self.pieces_count)?;
+
                 self.keep_alive = true;
                 println!("Bitfield");
                 let (resp_tx, resp_rx) = oneshot::channel();
@@ -231,6 +233,8 @@ impl Handler {
                 }
             }
             Some(Frame::Have(h)) => {
+                h.validate(self.pieces_count)?;
+
                 self.keep_alive = true;
                 let cmd = RecvHave {
                     key: self.connection.addr.clone(),
@@ -244,6 +248,8 @@ impl Handler {
                 self.handle_unchoke().await;
             }
             Some(Frame::Piece(p)) => {
+                p.validate(self.pieces_count, self.piece.len())?;
+
                 self.keep_alive = true;
                 if false == self.handle_piece(&p).await? {
                     return Ok(false);

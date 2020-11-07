@@ -68,7 +68,7 @@ impl Handshake {
         Handshake { info_hash, peer_id }
     }
 
-    pub fn check(
+    fn check(
         crs: &Cursor<&[u8]>,
         protocol_id_length: usize,
         available_data: usize,
@@ -301,6 +301,14 @@ impl Have {
     pub(crate) fn index(&self) -> usize {
         self.index as usize
     }
+
+    pub fn validate(&self, pieces_count: usize) -> Result<(), Error> {
+        if self.index as usize >= pieces_count {
+            return Err(Error::InvalidIndex);
+        }
+
+        Ok(())
+    }
 }
 
 impl Serializer for Have {
@@ -361,6 +369,14 @@ impl Bitfield {
         }
 
         Err(Error::Incomplete)
+    }
+
+    pub fn validate(&self, pieces_count: &usize) -> Result<(), Error> {
+        if self.pieces.len() != *pieces_count {
+            return Err(Error::InvalidSize);
+        }
+
+        Ok(())
     }
 }
 
@@ -492,6 +508,18 @@ impl Piece {
         }
 
         Err(Error::Incomplete)
+    }
+
+    pub fn validate(&self, pieces_count: usize, piece_size: usize) -> Result<(), Error> {
+        if self.index as usize >= pieces_count {
+            return Err(Error::InvalidIndex);
+        }
+
+        if self.begin as usize + self.block.len() > piece_size {
+            return Err(Error::InvalidSize);
+        }
+
+        Ok(())
     }
 }
 
