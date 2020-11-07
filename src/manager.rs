@@ -19,7 +19,7 @@ pub struct Manager {
 }
 
 #[derive(PartialEq, Clone, Debug)]
-enum Status {
+pub enum Status {
     Missing,
     Reserved,
     Have,
@@ -106,7 +106,7 @@ impl Manager {
             Ok(_) => true,
         };
 
-        let bitfield = Bitfield::new(vec![0; self.bitfield_size]);
+        let bitfield = Bitfield::from_vec(&self.pieces_status);
         let _ = msg.channel.send(Command::SendBitfield {
             bitfield,
             interested,
