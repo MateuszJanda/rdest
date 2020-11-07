@@ -1,5 +1,5 @@
 use crate::frame::{Bitfield, Interested, Piece};
-use crate::{Connection, Frame, Handshake, Have, Request};
+use crate::{Connection, Frame, Handshake, Have, Request, KeepAlive};
 use std::fs;
 use tokio::net::TcpStream;
 use tokio::sync::{broadcast, mpsc, oneshot};
@@ -72,6 +72,7 @@ pub struct Handler {
     piece: Vec<u8>,
     position: usize,
     piece_hash: [u8; 20],
+    keep_alive: bool,
     connection: Connection,
     cmd_tx: mpsc::Sender<Command>,
     b_rx: broadcast::Receiver<BroadcastCommand>,
@@ -97,6 +98,7 @@ impl Handler {
             piece: vec![],
             position: 0,
             piece_hash: [0; 20],
+            keep_alive: false,
             connection,
             cmd_tx,
             b_rx,
@@ -121,7 +123,12 @@ impl Handler {
         loop {
             tokio::select! {
                 _ = interval.tick() => {
-                    // TODO: keep alive
+                    if !self.keep_alive {
+                        println!("Close connection, no messages from peer");
+                        break;
+                    }
+                    self.send_keep_alive().await?;
+                    self.keep_alive = false;
                 }
                 c = self.b_rx.recv() => {
                     if false == self.send_have(c?).await? {
@@ -148,6 +155,14 @@ impl Handler {
         Ok(())
     }
 
+    async fn send_keep_alive(
+        &mut self
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.connection.write_msg(&KeepAlive::new()).await?;
+
+        Ok(())
+    }
+
     async fn send_have(
         &mut self,
         cmd: BroadcastCommand,
@@ -170,10 +185,12 @@ impl Handler {
     ) -> Result<bool, Box<dyn std::error::Error>> {
         match frame {
             Some(Frame::Handshake(_)) => {
+                self.keep_alive = true;
                 println!("Handshake");
                 // TODO validate Handshake
             }
             Some(Frame::Bitfield(b)) => {
+                self.keep_alive = true;
                 println!("Bitfield");
                 let (resp_tx, resp_rx) = oneshot::channel();
 
@@ -205,6 +222,7 @@ impl Handler {
                 }
             }
             Some(Frame::Have(h)) => {
+                self.keep_alive = true;
                 let cmd = RecvHave {
                     key: self.connection.addr.clone(),
                     index: h.index(),
@@ -213,9 +231,11 @@ impl Handler {
                 self.cmd_tx.send(Command::RecvHave(cmd)).await?;
             }
             Some(Frame::Unchoke(_)) => {
+                self.keep_alive = true;
                 self.handle_unchoke().await;
             }
             Some(Frame::Piece(p)) => {
+                self.keep_alive = true;
                 if false == self.handle_piece(&p).await? {
                     return Ok(false);
                 }
