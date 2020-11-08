@@ -142,7 +142,7 @@ impl Manager {
     fn choose_piece(&self, pieces: &Vec<bool>) -> Result<usize, Error> {
         let mut v: Vec<u32> = vec![0; self.metainfo.pieces().len()];
 
-        for (key, p) in self.peers.iter() {
+        for (_, p) in self.peers.iter() {
             for (idx, have) in p.pieces.iter().enumerate() {
                 if *have {
                     v[idx] += 1;

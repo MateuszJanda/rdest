@@ -183,7 +183,6 @@ impl Handler {
 
                 return Ok(true);
             }
-            _ => Ok(false),
         }
     }
 
@@ -375,11 +374,11 @@ impl Handler {
     }
 
     fn write_piece(&self) {
-        let name: String = self
+        let name = self
             .piece_hash
             .iter()
             .map(|b| format!("{:02X}", b))
-            .collect();
+            .collect::<String>() + ".piece";
 
         fs::write(name, &self.piece).unwrap(); // TODO: remove
     }

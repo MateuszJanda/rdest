@@ -1,4 +1,3 @@
-use crate::manager::Status;
 use crate::Error;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
