@@ -10,6 +10,7 @@ mod raw_finder;
 mod tracker_client;
 mod tracker_resp;
 mod utils;
+mod progress;
 
 pub use crate::error::Error;
 
