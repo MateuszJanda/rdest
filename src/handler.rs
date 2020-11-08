@@ -378,7 +378,8 @@ impl Handler {
             .piece_hash
             .iter()
             .map(|b| format!("{:02X}", b))
-            .collect::<String>() + ".piece";
+            .collect::<String>()
+            + ".piece";
 
         fs::write(name, &self.piece).unwrap(); // TODO: remove
     }

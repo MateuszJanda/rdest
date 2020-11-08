@@ -1,5 +1,5 @@
 use crate::handler::{BroadcastCommand, Done, RecvBitfield, RecvHave, RecvUnchoke, VerifyFail};
-use crate::progress::Progress;
+use crate::progress::{ProCmd, Progress};
 use crate::{Bitfield, Command, Error, Handler, Metainfo, TrackerResp};
 use std::collections::HashMap;
 use tokio::sync::{broadcast, mpsc};
@@ -16,6 +16,9 @@ pub struct Manager {
     cmd_rx: mpsc::Receiver<Command>,
 
     b_tx: broadcast::Sender<BroadcastCommand>,
+
+    pro_cmd: Option<mpsc::Sender<ProCmd>>,
+    progress_job: Option<JoinHandle<()>>,
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -35,7 +38,6 @@ struct Peer {
 impl Manager {
     pub fn new(metainfo: Metainfo, tracker: TrackerResp, own_id: [u8; 20]) -> Manager {
         let (cmd_tx, cmd_rx) = mpsc::channel(32);
-
         let (b_tx, _) = broadcast::channel(16);
 
         Manager {
@@ -49,11 +51,13 @@ impl Manager {
             cmd_rx,
 
             b_tx,
+            pro_cmd: None,
+            progress_job: None,
         }
     }
 
     pub async fn run(&mut self) {
-        // self.spawn_progress().await;
+        self.spawn_progress();
 
         self.spawn_jobs();
 
@@ -78,6 +82,7 @@ impl Manager {
                     self.kill_job(&key, &index).await;
 
                     if self.peers.is_empty() {
+                        self.kill_progress().await;
                         break;
                     }
                 }
@@ -203,17 +208,12 @@ impl Manager {
         self.metainfo.total_length() as usize % self.metainfo.piece_length()
     }
 
-    async fn spawn_progress(&mut self) {
-        let mut p = Progress {
-            pos: 1,
-            dir: 1,
-        };
+    fn spawn_progress(&mut self) {
+        let (mut p, r) = Progress::new();
 
-        let progress_job = tokio::spawn(async move {
-            p.run().await
-        });
+        self.progress_job = Some(tokio::spawn(async move { p.run().await }));
 
-        progress_job.await.unwrap();
+        self.pro_cmd = Some(r);
     }
 
     fn spawn_jobs(&mut self) {
@@ -249,5 +249,21 @@ impl Manager {
         self.peers.remove(key);
 
         println!("Job killed");
+    }
+
+    async fn kill_progress(&mut self) {
+        match &mut self.pro_cmd {
+            Some(r) => {
+                let _ = r.send(ProCmd::Kill {}).await;
+            }
+            _ => (),
+        }
+
+        match &mut self.progress_job {
+            Some(j) => {
+                j.await.unwrap();
+            }
+            _ => (),
+        }
     }
 }

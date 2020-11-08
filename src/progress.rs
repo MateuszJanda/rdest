@@ -1,13 +1,31 @@
-use tokio::time::{interval_at, Duration, Instant};
 use std::io;
 use std::io::Write;
+use tokio::sync::mpsc;
+use tokio::time::{interval_at, Duration, Instant};
 
-pub(crate) struct Progress {
-    pub(crate) pos: usize,
-    pub(crate) dir: i32,
+pub enum ProCmd {
+    Kill,
+}
+
+pub struct Progress {
+    pos: usize,
+    dir: i32,
+    cmd_rx: mpsc::Receiver<ProCmd>,
 }
 
 impl Progress {
+    pub fn new() -> (Progress, mpsc::Sender<ProCmd>) {
+        let (cmd_tx, cmd_rx) = mpsc::channel(32);
+
+        let p = Progress {
+            pos: 1,
+            dir: 1,
+            cmd_rx,
+        };
+
+        (p, cmd_tx)
+    }
+
     pub async fn run(&mut self) {
         let start = Instant::now() + Duration::from_millis(0);
         let mut interval = interval_at(start, Duration::from_millis(100));
@@ -15,8 +33,13 @@ impl Progress {
         loop {
             tokio::select! {
                  _ = interval.tick() => self.animation().await,
+                 cmd = self.cmd_rx.recv() => {
+                     match cmd {
+                        Some(ProCmd::Kill) => break,
+                        _ => (),
+                    }
+                }
             }
-
         }
     }
 
