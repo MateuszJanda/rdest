@@ -333,19 +333,13 @@ impl Bitfield {
     const LEN_SIZE: usize = LEN_SIZE;
     const ID_SIZE: usize = ID_SIZE;
 
-    pub fn new(size: usize) -> Bitfield {
-        Bitfield {
-            pieces: vec![0; size],
-        }
-    }
-
-    pub fn from_vec(pieces: &Vec<Status>) -> Bitfield {
+    pub fn from_vec(pieces: &Vec<bool>) -> Bitfield {
         let mut v = vec![];
 
         for p in pieces.chunks(8) {
             let mut byte: u8 = 0;
             for (idx, vv) in p.iter().enumerate() {
-                if vv == &Status::Have {
+                if *vv {
                     byte |= 0b1000_0000 >> idx;
                 }
             }

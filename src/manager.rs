@@ -106,7 +106,13 @@ impl Manager {
             Ok(_) => true,
         };
 
-        let bitfield = Bitfield::from_vec(&self.pieces_status);
+        let bitfield = Bitfield::from_vec(
+            &self
+                .pieces_status
+                .iter()
+                .map(|x| *x == Status::Have)
+                .collect(),
+        );
         let _ = msg.channel.send(Command::SendBitfield {
             bitfield,
             interested,
