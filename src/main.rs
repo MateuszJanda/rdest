@@ -1,6 +1,4 @@
 use rdest::{Manager, Metainfo, TrackerClient};
-use std::io;
-use std::io::Write;
 use std::net::Ipv4Addr;
 use tokio;
 use tokio::net::TcpListener;
@@ -8,9 +6,6 @@ use tokio::net::TcpListener;
 #[tokio::main]
 async fn main() {
     println!("Hello, world!");
-
-    // ttt().await;
-    // panic!("asdf");
 
     // let mut listener = TcpListener::bind("127.0.0.1:6881").await.unwrap();
     let mut _listener = TcpListener::bind((Ipv4Addr::new(0, 0, 0, 0), 6881))
@@ -58,25 +53,4 @@ async fn main() {
     println!("-==[ koniec ]==-");
 }
 
-async fn ttt() {
-    use tokio::sync::oneshot;
-    use tokio::time::{interval_at, Duration, Instant};
 
-    let start = Instant::now() + Duration::from_millis(0);
-    let mut interval = interval_at(start, Duration::from_millis(1000));
-
-    let mut i = 0;
-    loop {
-        interval.tick().await;
-        println!("\rtick {}", i);
-        print!("{}", i);
-
-        io::stdout().flush().unwrap();
-
-        i += 1;
-
-        if i > 5 {
-            break;
-        }
-    }
-}

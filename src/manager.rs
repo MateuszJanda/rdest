@@ -1,4 +1,5 @@
 use crate::handler::{BroadcastCommand, Done, RecvBitfield, RecvHave, RecvUnchoke, VerifyFail};
+use crate::progress::Progress;
 use crate::{Bitfield, Command, Error, Handler, Metainfo, TrackerResp};
 use std::collections::HashMap;
 use tokio::sync::{broadcast, mpsc};
@@ -6,7 +7,6 @@ use tokio::task::JoinHandle;
 
 pub struct Manager {
     own_id: [u8; 20],
-    bitfield_size: usize,
     pieces_status: Vec<Status>,
     peers: HashMap<String, Peer>,
 
@@ -40,7 +40,6 @@ impl Manager {
 
         Manager {
             own_id,
-            bitfield_size: Self::bitfield_size(&metainfo),
             pieces_status: vec![Status::Missing; metainfo.pieces().len()],
             peers: HashMap::new(),
 
@@ -54,6 +53,8 @@ impl Manager {
     }
 
     pub async fn run(&mut self) {
+        // self.spawn_progress().await;
+
         self.spawn_jobs();
 
         while let Some(cmd) = self.cmd_rx.recv().await {
@@ -202,13 +203,17 @@ impl Manager {
         self.metainfo.total_length() as usize % self.metainfo.piece_length()
     }
 
-    fn bitfield_size(metainfo: &Metainfo) -> usize {
-        let mut size = metainfo.pieces().len() / 8;
-        if metainfo.pieces().len() % 8 != 0 {
-            size += 1;
-        }
+    async fn spawn_progress(&mut self) {
+        let mut p = Progress {
+            pos: 1,
+            dir: 1,
+        };
 
-        size
+        let progress_job = tokio::spawn(async move {
+            p.run().await
+        });
+
+        progress_job.await.unwrap();
     }
 
     fn spawn_jobs(&mut self) {

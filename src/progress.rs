@@ -1,21 +1,20 @@
-use tokio::sync::oneshot;
 use tokio::time::{interval_at, Duration, Instant};
 use std::io;
 use std::io::Write;
 
-struct Progress {
-    pos: usize,
-    dir: i32,
+pub(crate) struct Progress {
+    pub(crate) pos: usize,
+    pub(crate) dir: i32,
 }
 
 impl Progress {
     pub async fn run(&mut self) {
         let start = Instant::now() + Duration::from_millis(0);
-        let mut interval = interval_at(start, Duration::from_millis(500));
+        let mut interval = interval_at(start, Duration::from_millis(100));
 
         loop {
             tokio::select! {
-                 _ = interval.tick() => self.animation().await?;
+                 _ = interval.tick() => self.animation().await,
             }
 
         }
@@ -23,7 +22,7 @@ impl Progress {
 
     async fn animation(&mut self) {
         let text = " ".repeat(self.pos) + "a";
-        print!("{}", text);
+        print!("\r{}", text);
 
         io::stdout().flush().unwrap();
 
