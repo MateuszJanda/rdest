@@ -57,7 +57,7 @@ impl Manager {
     }
 
     pub async fn run(&mut self) {
-        self.spawn_progress();
+        // self.spawn_progress();
 
         self.spawn_jobs();
 
