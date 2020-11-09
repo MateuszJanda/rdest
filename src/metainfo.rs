@@ -24,6 +24,11 @@ pub struct File {
     pub path: String,
 }
 
+pub struct PiecePos {
+    pub file_index: usize,
+    pub bit_index: usize,
+}
+
 impl Metainfo {
     pub fn from_file(path: String) -> Result<Metainfo, Error> {
         match &fs::read(path) {
@@ -211,5 +216,49 @@ impl Metainfo {
 
     pub fn info_hash(&self) -> [u8; HASH_SIZE] {
         self.info_hash.clone()
+    }
+
+    pub fn file_piece_ranges(&self) -> Vec<(String, PiecePos, PiecePos)> {
+        let mut dir = if self.files.len() > 1 {
+            self.name.clone()
+        } else {
+            "".to_string()
+        };
+
+        let mut r: Vec<(String, PiecePos, PiecePos)> = vec![];
+        let mut pos: usize = 0;
+
+        for File { length, path } in self.files.iter() {
+            let file_start_index = if pos % self.piece_length as usize != 0 {
+                (pos / self.piece_length as usize + 1) as usize
+            } else {
+                (pos / self.piece_length as usize) as usize
+            };
+
+            let file_end_index = if (pos + *length as usize) % self.piece_length as usize != 0 {
+                ((pos + *length as usize) / self.piece_length as usize + 1) as usize
+            } else {
+                ((pos + *length as usize) / self.piece_length as usize) as usize
+            };
+
+            let bit_start_index = pos % self.piece_length as usize;
+            let bit_end_index = (pos + *length as usize) % self.piece_length as usize;
+
+            r.push((
+                dir.clone() + path,
+                PiecePos {
+                    file_index: file_start_index,
+                    bit_index: bit_start_index,
+                },
+                PiecePos {
+                    file_index: file_end_index,
+                    bit_index: bit_end_index,
+                },
+            ));
+
+            pos += *length as usize;
+        }
+
+        r
     }
 }
