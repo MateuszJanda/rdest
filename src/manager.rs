@@ -2,6 +2,8 @@ use crate::handler::{BroadcastCommand, Done, RecvBitfield, RecvHave, RecvUnchoke
 use crate::progress::{ProCmd, Progress};
 use crate::{Bitfield, Command, Error, Handler, Metainfo, TrackerResp};
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::{BufRead, BufReader, BufWriter, Read, Seek, Write};
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
 
@@ -83,6 +85,7 @@ impl Manager {
 
                     if self.peers.is_empty() {
                         self.kill_progress().await;
+                        self.extract_files();
                         break;
                     }
                 }
@@ -264,6 +267,53 @@ impl Manager {
                 j.await.unwrap();
             }
             _ => (),
+        }
+    }
+
+    fn extract_files(&self) {
+        for (path, start, end) in self.metainfo.file_piece_ranges().iter() {
+            let f = File::create(path).unwrap();
+            let mut writer = BufWriter::new(f);
+
+            for idx in start.file_index..end.file_index {
+                let name = self.metainfo.pieces()[idx]
+                    .iter()
+                    .map(|b| format!("{:02X}", b))
+                    .collect::<String>()
+                    + ".piece";
+
+                let f2 = File::open(name).unwrap();
+
+                let mut reader = BufReader::new(f2);
+
+                if idx == start.file_index {
+                    reader
+                        .by_ref()
+                        .seek(std::io::SeekFrom::Start(start.bit_index as u64))
+                        .unwrap();
+                }
+
+                // TODO: or read_all()
+                writer
+                    .write_all(reader.by_ref().fill_buf().unwrap())
+                    .unwrap();
+            }
+
+            // Write last chunk
+            let idx = end.file_index;
+            let name = self.metainfo.pieces()[idx]
+                .iter()
+                .map(|b| format!("{:02X}", b))
+                .collect::<String>()
+                + ".piece";
+            let f2 = File::open(name).unwrap();
+            let mut reader = BufReader::new(f2);
+            // TODO: or read_exact()
+            reader.by_ref().take(end.bit_index as u64);
+
+            writer
+                .write_all(reader.by_ref().fill_buf().unwrap())
+                .unwrap();
         }
     }
 }
