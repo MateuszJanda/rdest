@@ -285,8 +285,7 @@ impl Manager {
             // Write pieces/chunks
             for idx in start.file_index..end.file_index {
                 let name = utils::hash_to_string(&self.metainfo.pieces()[idx]) + ".piece";
-                let piece_file = File::open(name)?;
-                let reader = &mut BufReader::new(piece_file);
+                let reader = &mut BufReader::new(File::open(name)?);
 
                 if idx == start.file_index {
                     reader.seek(std::io::SeekFrom::Start(start.byte_index as u64))?;
