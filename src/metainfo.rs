@@ -220,7 +220,7 @@ impl Metainfo {
 
     pub fn file_piece_ranges(&self) -> Vec<(String, PiecePos, PiecePos)> {
         let dir = if self.files.len() > 1 {
-            self.name.clone()
+            self.name.clone() + "/"
         } else {
             "".to_string()
         };
