@@ -284,19 +284,17 @@ impl Manager {
 
                 let f2 = File::open(name).unwrap();
 
-                let mut reader = BufReader::new(f2);
+                let reader = &mut BufReader::new(f2);
 
                 if idx == start.file_index {
                     reader
-                        .by_ref()
                         .seek(std::io::SeekFrom::Start(start.bit_index as u64))
                         .unwrap();
                 }
 
-                // TODO: or read_all()
-                writer
-                    .write_all(reader.by_ref().fill_buf().unwrap())
-                    .unwrap();
+                let mut d = vec![];
+                reader.read_to_end(&mut d);
+                writer.write_all(d.as_slice()).unwrap();
             }
 
             // Write last chunk
@@ -307,13 +305,12 @@ impl Manager {
                 .collect::<String>()
                 + ".piece";
             let f2 = File::open(name).unwrap();
-            let mut reader = BufReader::new(f2);
-            // TODO: or read_exact()
-            reader.by_ref().take(end.bit_index as u64);
+            let reader = &mut BufReader::new(f2);
 
-            writer
-                .write_all(reader.by_ref().fill_buf().unwrap())
-                .unwrap();
+            let mut d = vec![0; end.bit_index];
+            reader.read_exact(d.as_mut_slice());
+
+            writer.write_all(d.as_slice()).unwrap();
         }
     }
 }
