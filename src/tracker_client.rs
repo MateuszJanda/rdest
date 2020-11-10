@@ -39,9 +39,7 @@ impl TrackerClient {
     }
 
     fn get_url(metafile: &Metainfo) -> String {
-        let info_hash: String = form_urlencoded::byte_serialize(&metafile.info_hash()).collect();
-        let url = metafile.tracker_url() + "?info_hash=" + info_hash.as_str();
-
-        return url;
+        let info_hash: String = form_urlencoded::byte_serialize(metafile.info_hash()).collect();
+        metafile.tracker_url().clone() + "?info_hash=" + info_hash.as_str()
     }
 }

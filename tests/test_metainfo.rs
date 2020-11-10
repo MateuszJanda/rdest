@@ -299,13 +299,13 @@ fn torrent_with_both_length_and_files() {
 #[test]
 fn torrent_with_one_file() {
     let m = Metainfo::from_bencode(b"d8:announce3:URL4:infod4:name4:NAME12:piece lengthi999e6:pieces20:AAAAABBBBBCCCCCDDDDD6:lengthi111eee").unwrap();
-    assert_eq!(m.tracker_url(), "URL".to_string());
+    assert_eq!(m.tracker_url(), &"URL".to_string());
     assert_eq!(m.total_length(), 111);
     assert_eq!(m.piece_length(), 999);
-    assert_eq!(m.pieces(), vec![*b"AAAAABBBBBCCCCCDDDDD"]);
+    assert_eq!(m.pieces(), &vec![*b"AAAAABBBBBCCCCCDDDDD"]);
     assert_eq!(
         m.info_hash(),
-        [
+        &[
             0xaf, 0xee, 0xde, 0xee, 0x6c, 0x1a, 0xb8, 0x35, 0x6b, 0x8e, 0x2a, 0xf, 0x7d, 0xa7,
             0x4d, 0x8c, 0x33, 0xe3, 0x68, 0x6a
         ],
@@ -316,13 +316,13 @@ fn torrent_with_one_file() {
 #[test]
 fn torrent_with_multi_files() {
     let m = Metainfo::from_bencode(b"d8:announce3:URL4:infod4:name4:NAME12:piece lengthi999e6:pieces20:AAAAABBBBBCCCCCDDDDD5:filesld6:lengthi777e4:path4:PATHeeee").unwrap();
-    assert_eq!(m.tracker_url(), "URL".to_string());
+    assert_eq!(m.tracker_url(), &"URL".to_string());
     assert_eq!(m.total_length(), 777);
     assert_eq!(m.piece_length(), 999);
-    assert_eq!(m.pieces(), vec![*b"AAAAABBBBBCCCCCDDDDD"]);
+    assert_eq!(m.pieces(), &vec![*b"AAAAABBBBBCCCCCDDDDD"]);
     assert_eq!(
         m.info_hash(),
-        [
+        &[
             0x69, 0xc7, 0xa3, 0x43, 0xb4, 0x22, 0x68, 0xaa, 0x00, 0x94, 0xcf, 0x3e, 0x95, 0xa6,
             0xfd, 0x48, 0xc4, 0x1f, 0x08, 0xa7
         ],

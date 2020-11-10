@@ -197,13 +197,12 @@ impl Metainfo {
         Err(Error::HashCalculation)
     }
 
-    pub fn tracker_url(&self) -> String {
-        self.announce.clone()
+    pub fn tracker_url(&self) -> &String {
+        &self.announce
     }
 
-    pub fn pieces(&self) -> Vec<[u8; HASH_SIZE]> {
-        // TODO: maybe &Vec<>
-        self.pieces.clone()
+    pub fn pieces(&self) -> &Vec<[u8; HASH_SIZE]> {
+        &self.pieces
     }
 
     pub fn piece_length(&self) -> usize {
@@ -214,8 +213,8 @@ impl Metainfo {
         self.files.iter().map(|f| f.length).sum()
     }
 
-    pub fn info_hash(&self) -> [u8; HASH_SIZE] {
-        self.info_hash.clone()
+    pub fn info_hash(&self) -> &[u8; HASH_SIZE] {
+        &self.info_hash
     }
 
     pub fn file_piece_ranges(&self) -> Vec<(String, PiecePos, PiecePos)> {

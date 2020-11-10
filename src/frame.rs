@@ -358,7 +358,7 @@ impl Bitfield {
         Bitfield { pieces }
     }
 
-    pub fn available_pieces(&self) -> Vec<bool> {
+    pub fn to_vec(&self) -> Vec<bool> {
         let mut pieces = vec![];
         for b in self.pieces.iter() {
             let mut byte = *b;
@@ -385,7 +385,7 @@ impl Bitfield {
     }
 
     pub fn validate(&self, pieces_count: &usize) -> Result<(), Error> {
-        if self.available_pieces().len() != *pieces_count {
+        if self.to_vec().len() != *pieces_count {
             return Err(Error::InvalidSize);
         }
 
@@ -523,12 +523,21 @@ impl Piece {
         Err(Error::Incomplete)
     }
 
-    pub fn validate(&self, pieces_count: usize, piece_size: usize) -> Result<(), Error> {
-        if self.index as usize >= pieces_count {
+    pub fn validate(
+        &self,
+        index: usize,
+        chunk_index: usize,
+        chunk_length: usize,
+    ) -> Result<(), Error> {
+        if self.index as usize != index {
             return Err(Error::InvalidIndex);
         }
 
-        if self.begin as usize + self.block.len() > piece_size {
+        if self.begin as usize != chunk_index {
+            return Err(Error::InvalidIndex);
+        }
+
+        if self.block.len() as usize != chunk_length {
             return Err(Error::InvalidSize);
         }
 

@@ -1,6 +1,7 @@
 use crate::handler::{BroadcastCommand, Done, RecvBitfield, RecvHave, RecvUnchoke, VerifyFail};
 use crate::progress::{ProCmd, Progress};
 use crate::{utils, Bitfield, Command, Error, Handler, Metainfo, TrackerResp};
+use rand::seq::SliceRandom;
 use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
@@ -8,7 +9,6 @@ use std::io::{BufReader, BufWriter, Read, Seek, Write};
 use std::path::Path;
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
-use rand::seq::SliceRandom;
 
 pub struct Manager {
     own_id: [u8; 20],
@@ -100,7 +100,7 @@ impl Manager {
     }
 
     fn recv_bitfield(&mut self, msg: RecvBitfield) {
-        let p = msg.bitfield.available_pieces();
+        let p = msg.bitfield.to_vec();
         self.peers
             .get_mut(&msg.key)
             .unwrap()
@@ -228,7 +228,7 @@ impl Manager {
 
     fn spawn_jobs(&mut self) {
         let addr = self.tracker.peers()[2].clone();
-        let info_hash = self.metainfo.info_hash();
+        let info_hash = *self.metainfo.info_hash();
         let own_id = self.own_id.clone();
         let pieces_count = self.metainfo.pieces().len();
         let cmd_tx = self.cmd_tx.clone();

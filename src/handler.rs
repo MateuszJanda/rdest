@@ -249,7 +249,7 @@ impl Handler {
                 self.handle_unchoke().await;
             }
             Some(Frame::Piece(p)) => {
-                p.validate(self.pieces_count, self.piece.len())?;
+                p.validate(self.index.unwrap(), self.position, self.chunk_length())?;
 
                 self.keep_alive = true;
                 if false == self.handle_piece(&p).await? {
