@@ -1,5 +1,5 @@
-use crate::frame::Serializer;
-use crate::{Error, Frame};
+use crate::frame::{Frame, Serializer};
+use crate::Error;
 use bytes::{Buf, BytesMut};
 use std::io::Cursor;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};

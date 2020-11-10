@@ -1,6 +1,6 @@
-use crate::bdecoder::BValue;
+use crate::bdecoder::{BValue, Delimiter};
 use crate::raw_finder::RawFinder;
-use crate::{Delimiter, Error};
+use crate::Error;
 use std::iter::Enumerate;
 use std::slice::Iter;
 

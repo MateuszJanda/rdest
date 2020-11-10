@@ -1,6 +1,9 @@
-use crate::handler::{BroadcastCommand, Done, RecvBitfield, RecvHave, RecvUnchoke, VerifyFail};
+use crate::frame::Bitfield;
+use crate::handler::{
+    BroadcastCommand, Command, Done, Handler, RecvBitfield, RecvHave, RecvUnchoke, VerifyFail,
+};
 use crate::progress::{ProCmd, Progress};
-use crate::{utils, Bitfield, Command, Error, Handler, Metainfo, TrackerResp};
+use crate::{utils, Error, Metainfo, TrackerResp};
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
 use std::fs;

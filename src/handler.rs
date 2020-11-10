@@ -1,5 +1,6 @@
-use crate::frame::{Bitfield, Interested, Piece};
-use crate::{utils, Connection, Frame, Handshake, Have, KeepAlive, Request};
+use crate::connection::Connection;
+use crate::frame::{Bitfield, Frame, Handshake, Have, Interested, KeepAlive, Piece, Request};
+use crate::utils;
 use std::fs;
 use tokio::net::TcpStream;
 use tokio::sync::{broadcast, mpsc, oneshot};
