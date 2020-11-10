@@ -1,6 +1,6 @@
 use crate::handler::{BroadcastCommand, Done, RecvBitfield, RecvHave, RecvUnchoke, VerifyFail};
 use crate::progress::{ProCmd, Progress};
-use crate::{Bitfield, Command, Error, Handler, Metainfo, TrackerResp};
+use crate::{utils, Bitfield, Command, Error, Handler, Metainfo, TrackerResp};
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, BufWriter, Read, Seek, Write};
@@ -85,7 +85,9 @@ impl Manager {
 
                     if self.peers.is_empty() {
                         self.kill_progress().await;
-                        self.extract_files();
+                        if let Err(_) = self.extract_files() {
+                            ()
+                        }
                         break;
                     }
                 }
@@ -270,47 +272,35 @@ impl Manager {
         }
     }
 
-    fn extract_files(&self) {
+    fn extract_files(&self) -> Result<(), Box<dyn std::error::Error>> {
         for (path, start, end) in self.metainfo.file_piece_ranges().iter() {
-            let f = File::create(path).unwrap();
-            let mut writer = BufWriter::new(f);
+            let out_file = File::create(path)?;
+            let mut writer = BufWriter::new(out_file);
 
             for idx in start.file_index..end.file_index {
-                let name = self.metainfo.pieces()[idx]
-                    .iter()
-                    .map(|b| format!("{:02X}", b))
-                    .collect::<String>()
-                    + ".piece";
-
-                let f2 = File::open(name).unwrap();
-
-                let reader = &mut BufReader::new(f2);
+                let name = utils::hash_to_string(&self.metainfo.pieces()[idx]) + ".piece";
+                let piece_file = File::open(name)?;
+                let reader = &mut BufReader::new(piece_file);
 
                 if idx == start.file_index {
-                    reader
-                        .seek(std::io::SeekFrom::Start(start.bit_index as u64))
-                        .unwrap();
+                    reader.seek(std::io::SeekFrom::Start(start.byte_index as u64))?;
                 }
 
-                let mut d = vec![];
-                reader.read_to_end(&mut d);
-                writer.write_all(d.as_slice()).unwrap();
+                let mut buffer = vec![];
+                reader.read_to_end(&mut buffer)?;
+                writer.write_all(buffer.as_slice())?;
             }
 
             // Write last chunk
-            let idx = end.file_index;
-            let name = self.metainfo.pieces()[idx]
-                .iter()
-                .map(|b| format!("{:02X}", b))
-                .collect::<String>()
-                + ".piece";
-            let f2 = File::open(name).unwrap();
-            let reader = &mut BufReader::new(f2);
+            let name = utils::hash_to_string(&self.metainfo.pieces()[end.file_index]) + ".piece";
+            let piece_file = File::open(name)?;
+            let reader = &mut BufReader::new(piece_file);
 
-            let mut d = vec![0; end.bit_index];
-            reader.read_exact(d.as_mut_slice());
-
-            writer.write_all(d.as_slice()).unwrap();
+            let mut buffer = vec![0; end.byte_index];
+            reader.read_exact(buffer.as_mut_slice())?;
+            writer.write_all(buffer.as_slice())?;
         }
+
+        Ok(())
     }
 }

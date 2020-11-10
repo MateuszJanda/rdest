@@ -7,3 +7,9 @@ macro_rules! hashmap {
          map
     }}
 }
+
+pub fn hash_to_string(hash: &[u8; 20]) -> String {
+    hash.iter()
+        .map(|b| format!("{:02X}", b))
+        .collect::<String>()
+}

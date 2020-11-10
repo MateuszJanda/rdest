@@ -26,7 +26,7 @@ pub struct File {
 
 pub struct PiecePos {
     pub file_index: usize,
-    pub bit_index: usize,
+    pub byte_index: usize,
 }
 
 impl Metainfo {
@@ -248,11 +248,11 @@ impl Metainfo {
             pos / self.piece_length as usize
         };
 
-        let bit_index = pos % self.piece_length as usize;
+        let byte_index = pos % self.piece_length as usize;
 
         PiecePos {
             file_index,
-            bit_index,
+            byte_index,
         }
     }
 }
