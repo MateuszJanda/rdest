@@ -1,5 +1,5 @@
 use crate::frame::{Bitfield, Interested, Piece};
-use crate::{Connection, Frame, Handshake, Have, KeepAlive, Request};
+use crate::{utils, Connection, Frame, Handshake, Have, KeepAlive, Request};
 use std::fs;
 use tokio::net::TcpStream;
 use tokio::sync::{broadcast, mpsc, oneshot};
@@ -374,13 +374,7 @@ impl Handler {
     }
 
     fn write_piece(&self) {
-        let name = self
-            .piece_hash
-            .iter()
-            .map(|b| format!("{:02X}", b))
-            .collect::<String>()
-            + ".piece";
-
+        let name = utils::hash_to_string(&self.piece_hash) + ".piece";
         fs::write(name, &self.piece).unwrap(); // TODO: remove
     }
 }

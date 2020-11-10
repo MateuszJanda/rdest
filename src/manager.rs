@@ -26,18 +26,18 @@ pub struct Manager {
     progress_job: Option<JoinHandle<()>>,
 }
 
-#[derive(PartialEq, Clone, Debug)]
-pub enum Status {
-    Missing,
-    Reserved,
-    Have,
-}
-
 #[derive(Debug)]
 struct Peer {
     pieces: Vec<bool>,
     job: Option<JoinHandle<()>>,
     index: usize,
+}
+
+#[derive(PartialEq, Clone, Debug)]
+pub enum Status {
+    Missing,
+    Reserved,
+    Have,
 }
 
 impl Manager {

@@ -25,11 +25,7 @@ async fn main() {
     // println!("{:?}", ResponseParser::from_file("response.data".to_string()));
 
     let mut m = Manager::new(t, r, *b"ABCDEFGHIJKLMNOPQRST");
-
-    let manager = tokio::spawn(async move {
-        m.run().await;
-    });
-    manager.await.unwrap();
+    m.run().await;
 
     // loop {
     //     println!("Listening");
