@@ -8,6 +8,7 @@ use std::io::{BufReader, BufWriter, Read, Seek, Write};
 use std::path::Path;
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
+use rand::seq::SliceRandom;
 
 pub struct Manager {
     own_id: [u8; 20],
@@ -162,6 +163,8 @@ impl Manager {
                 }
             }
         }
+
+        v.shuffle(&mut rand::thread_rng());
 
         let mut x: Vec<(usize, u32)> = v
             .iter()
