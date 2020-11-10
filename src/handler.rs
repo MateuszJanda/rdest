@@ -12,7 +12,11 @@ pub enum BroadcastCommand {
 }
 #[derive(Debug)]
 pub enum Command {
-    RecvBitfield(RecvBitfield),
+    RecvBitfield {
+        addr: String,
+        bitfield: Bitfield,
+        channel: oneshot::Sender<Command>,
+    },
     RecvUnchoke(RecvUnchoke),
     RecvHave(RecvHave),
 
@@ -35,13 +39,6 @@ pub enum Command {
         key: String,
         index: Option<usize>,
     },
-}
-
-#[derive(Debug)]
-pub struct RecvBitfield {
-    pub(crate) key: String,
-    pub(crate) bitfield: Bitfield,
-    pub(crate) channel: oneshot::Sender<Command>,
 }
 
 #[derive(Debug)]
@@ -207,12 +204,12 @@ impl Handler {
                 println!("Bitfield");
                 let (resp_tx, resp_rx) = oneshot::channel();
 
-                let cmd = RecvBitfield {
-                    key: self.connection.addr.clone(),
+                let cmd = Command::RecvBitfield {
+                    addr: self.connection.addr.clone(),
                     bitfield: b,
                     channel: resp_tx,
                 };
-                if let Err(e) = self.cmd_tx.send(Command::RecvBitfield(cmd)).await {
+                if let Err(e) = self.cmd_tx.send(cmd).await {
                     println!("Coś nie tak {:?}", e);
                 }
 

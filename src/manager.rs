@@ -1,7 +1,5 @@
 use crate::frame::Bitfield;
-use crate::handler::{
-    BroadcastCommand, Command, Done, Handler, RecvBitfield, RecvHave, RecvUnchoke, VerifyFail,
-};
+use crate::handler::{BroadcastCommand, Command, Done, Handler, RecvHave, RecvUnchoke, VerifyFail};
 use crate::progress::{ProCmd, Progress};
 use crate::{utils, Error, Metainfo, TrackerResp};
 use rand::seq::SliceRandom;
@@ -10,7 +8,7 @@ use std::fs;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Seek, Write};
 use std::path::Path;
-use tokio::sync::{broadcast, mpsc};
+use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::task::JoinHandle;
 
 pub struct Manager {
@@ -45,8 +43,8 @@ pub enum Status {
 
 impl Manager {
     pub fn new(metainfo: Metainfo, tracker: TrackerResp, own_id: [u8; 20]) -> Manager {
-        let (cmd_tx, cmd_rx) = mpsc::channel(32);
-        let (b_tx, _) = broadcast::channel(16);
+        let (cmd_tx, cmd_rx) = mpsc::channel(64);
+        let (b_tx, _) = broadcast::channel(32);
 
         Manager {
             own_id,
@@ -71,9 +69,11 @@ impl Manager {
 
         while let Some(cmd) = self.cmd_rx.recv().await {
             match cmd {
-                Command::RecvBitfield(r) => {
-                    self.recv_bitfield(r);
-                }
+                Command::RecvBitfield {
+                    addr,
+                    bitfield,
+                    channel,
+                } => self.recv_bitfield(addr, bitfield, channel),
                 Command::RecvUnchoke(cmd) => {
                     self.recv_unchoke(cmd);
                 }
@@ -102,21 +102,26 @@ impl Manager {
         }
     }
 
-    fn recv_bitfield(&mut self, msg: RecvBitfield) {
-        let p = msg.bitfield.to_vec();
+    fn recv_bitfield(
+        &mut self,
+        addr: String,
+        bitfield: Bitfield,
+        channel: oneshot::Sender<Command>,
+    ) {
+        let p = bitfield.to_vec();
         self.peers
-            .get_mut(&msg.key)
+            .get_mut(&addr)
             .unwrap()
             .pieces
             .resize(p.len(), false);
 
         self.peers
-            .get_mut(&msg.key)
+            .get_mut(&addr)
             .unwrap()
             .pieces
             .copy_from_slice(&p);
 
-        let pieces = &self.peers[&msg.key].pieces;
+        let pieces = &self.peers[&addr].pieces;
 
         let interested = match self.choose_piece(pieces) {
             Err(_) => false,
@@ -130,7 +135,7 @@ impl Manager {
                 .map(|x| *x == Status::Have)
                 .collect(),
         );
-        let _ = msg.channel.send(Command::SendBitfield {
+        let _ = channel.send(Command::SendBitfield {
             bitfield,
             interested,
         });
