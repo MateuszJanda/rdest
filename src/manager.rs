@@ -2,8 +2,10 @@ use crate::handler::{BroadcastCommand, Done, RecvBitfield, RecvHave, RecvUnchoke
 use crate::progress::{ProCmd, Progress};
 use crate::{utils, Bitfield, Command, Error, Handler, Metainfo, TrackerResp};
 use std::collections::HashMap;
+use std::fs;
 use std::fs::File;
-use std::io::{BufRead, BufReader, BufWriter, Read, Seek, Write};
+use std::io::{BufReader, BufWriter, Read, Seek, Write};
+use std::path::Path;
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
 
@@ -274,9 +276,13 @@ impl Manager {
 
     fn extract_files(&self) -> Result<(), Box<dyn std::error::Error>> {
         for (path, start, end) in self.metainfo.file_piece_ranges().iter() {
-            let out_file = File::create(path)?;
-            let mut writer = BufWriter::new(out_file);
+            // Create directories if needed
+            fs::create_dir_all(Path::new(path).parent().unwrap())?;
 
+            // Create output file
+            let mut writer = BufWriter::new(File::create(path)?);
+
+            // Write pieces/chunks
             for idx in start.file_index..end.file_index {
                 let name = utils::hash_to_string(&self.metainfo.pieces()[idx]) + ".piece";
                 let piece_file = File::open(name)?;
@@ -293,8 +299,7 @@ impl Manager {
 
             // Write last chunk
             let name = utils::hash_to_string(&self.metainfo.pieces()[end.file_index]) + ".piece";
-            let piece_file = File::open(name)?;
-            let reader = &mut BufReader::new(piece_file);
+            let reader = &mut BufReader::new(File::open(name)?);
 
             let mut buffer = vec![0; end.byte_index];
             reader.read_exact(buffer.as_mut_slice())?;
