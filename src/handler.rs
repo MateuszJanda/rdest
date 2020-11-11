@@ -7,7 +7,7 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time::{interval_at, Duration, Instant};
 
 #[derive(Debug, Clone)]
-pub enum BroadcastCommand {
+pub enum BroadCmd {
     SendHave { key: String, index: usize },
 }
 #[derive(Debug)]
@@ -15,13 +15,22 @@ pub enum Command {
     RecvBitfield {
         addr: String,
         bitfield: Bitfield,
-        channel: oneshot::Sender<Command>,
+        resp_ch: oneshot::Sender<Command>,
+    },
+    RecvChoke {
+        addr: String,
+        resp_ch: oneshot::Sender<Command>,
     },
     RecvUnchoke {
         addr: String,
-        channel: oneshot::Sender<Command>,
+        resp_ch: oneshot::Sender<Command>,
     },
-    RecvHave(RecvHave),
+    // RecvInterested,
+    // RecvNotInterested,
+    RecvHave {
+        addr: String,
+        index: usize,
+    },
 
     SendBitfield {
         bitfield: Bitfield,
@@ -45,21 +54,15 @@ pub enum Command {
 }
 
 #[derive(Debug)]
-pub struct RecvHave {
-    pub(crate) key: String,
-    pub(crate) index: usize,
-}
-
-#[derive(Debug)]
 pub struct Done {
     pub key: String,
-    pub channel: oneshot::Sender<Command>,
+    pub resp_ch: oneshot::Sender<Command>,
 }
 
 #[derive(Debug)]
 pub struct VerifyFail {
     pub key: String,
-    pub channel: oneshot::Sender<Command>,
+    pub resp_ch: oneshot::Sender<Command>,
 }
 
 pub struct Handler {
@@ -75,7 +78,7 @@ pub struct Handler {
 
     connection: Connection,
     cmd_tx: mpsc::Sender<Command>,
-    b_rx: broadcast::Receiver<BroadcastCommand>,
+    b_rx: broadcast::Receiver<BroadCmd>,
 }
 
 impl Handler {
@@ -85,7 +88,7 @@ impl Handler {
         info_hash: [u8; 20],
         pieces_count: usize,
         cmd_tx: mpsc::Sender<Command>,
-        b_rx: broadcast::Receiver<BroadcastCommand>,
+        b_rx: broadcast::Receiver<BroadCmd>,
     ) {
         println!("Try connect to {}", &addr);
         let stream = TcpStream::connect(&addr).await.unwrap();
@@ -166,12 +169,9 @@ impl Handler {
         Ok(())
     }
 
-    async fn send_have(
-        &mut self,
-        cmd: BroadcastCommand,
-    ) -> Result<bool, Box<dyn std::error::Error>> {
+    async fn send_have(&mut self, cmd: BroadCmd) -> Result<bool, Box<dyn std::error::Error>> {
         match cmd {
-            BroadcastCommand::SendHave { key, index } => {
+            BroadCmd::SendHave { key, index } => {
                 if key != self.connection.addr {
                     self.connection.write_msg(&Have::new(index)).await?;
                 }
@@ -204,7 +204,7 @@ impl Handler {
                 let cmd = Command::RecvBitfield {
                     addr: self.connection.addr.clone(),
                     bitfield: b,
-                    channel: resp_tx,
+                    resp_ch: resp_tx,
                 };
                 if let Err(e) = self.cmd_tx.send(cmd).await {
                     println!("Coś nie tak {:?}", e);
@@ -232,12 +232,12 @@ impl Handler {
                 h.validate(self.pieces_count)?;
 
                 self.keep_alive = true;
-                let cmd = RecvHave {
-                    key: self.connection.addr.clone(),
+                let cmd = Command::RecvHave {
+                    addr: self.connection.addr.clone(),
                     index: h.index(),
                 };
 
-                self.cmd_tx.send(Command::RecvHave(cmd)).await?;
+                self.cmd_tx.send(cmd).await?;
             }
             Some(Frame::Unchoke(_)) => {
                 self.keep_alive = true;
@@ -265,7 +265,7 @@ impl Handler {
 
         let cmd = Command::RecvUnchoke {
             addr: self.connection.addr.clone(),
-            channel: resp_tx,
+            resp_ch: resp_tx,
         };
 
         self.cmd_tx.send(cmd).await.unwrap();
@@ -299,7 +299,7 @@ impl Handler {
                 println!("Verify fail");
                 let cmd = Command::VerifyFail(VerifyFail {
                     key: self.connection.addr.clone(),
-                    channel: resp_tx,
+                    resp_ch: resp_tx,
                 });
 
                 self.cmd_tx.send(cmd).await?;
@@ -317,7 +317,7 @@ impl Handler {
             let (resp_tx, resp_rx) = oneshot::channel();
             let cmd = Command::Done(Done {
                 key: self.connection.addr.clone(),
-                channel: resp_tx,
+                resp_ch: resp_tx,
             });
 
             self.cmd_tx.send(cmd).await?;

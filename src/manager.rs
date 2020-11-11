@@ -1,5 +1,5 @@
 use crate::frame::Bitfield;
-use crate::handler::{BroadcastCommand, Command, Done, Handler, RecvHave, VerifyFail};
+use crate::handler::{BroadCmd, Command, Done, Handler, VerifyFail};
 use crate::progress::{ProCmd, Progress};
 use crate::{utils, Error, Metainfo, TrackerResp};
 use rand::seq::SliceRandom;
@@ -21,7 +21,7 @@ pub struct Manager {
     cmd_tx: mpsc::Sender<Command>,
     cmd_rx: mpsc::Receiver<Command>,
 
-    b_tx: broadcast::Sender<BroadcastCommand>,
+    b_tx: broadcast::Sender<BroadCmd>,
 
     pro_cmd: Option<mpsc::Sender<ProCmd>>,
     progress_job: Option<JoinHandle<()>>,
@@ -72,12 +72,10 @@ impl Manager {
                 Command::RecvBitfield {
                     addr,
                     bitfield,
-                    channel,
-                } => self.recv_bitfield(addr, bitfield, channel),
-                Command::RecvUnchoke { addr, channel } => self.recv_unchoke(addr, channel),
-                Command::RecvHave(cmd) => {
-                    self.recv_have(cmd);
-                }
+                    resp_ch,
+                } => self.recv_bitfield(addr, bitfield, resp_ch),
+                Command::RecvUnchoke { addr, resp_ch } => self.recv_unchoke(addr, resp_ch),
+                Command::RecvHave { addr, index } => self.recv_have(addr, index),
                 Command::Done(cmd) => {
                     self.recv_done(cmd);
                 }
@@ -104,7 +102,7 @@ impl Manager {
         &mut self,
         addr: String,
         bitfield: Bitfield,
-        channel: oneshot::Sender<Command>,
+        resp_ch: oneshot::Sender<Command>,
     ) {
         let p = bitfield.to_vec();
         self.peers
@@ -133,13 +131,13 @@ impl Manager {
                 .map(|x| *x == Status::Have)
                 .collect(),
         );
-        let _ = channel.send(Command::SendBitfield {
+        let _ = resp_ch.send(Command::SendBitfield {
             bitfield,
             interested,
         });
     }
 
-    fn recv_unchoke(&mut self, addr: String, channel: oneshot::Sender<Command>) {
+    fn recv_unchoke(&mut self, addr: String, resp_ch: oneshot::Sender<Command>) {
         let pieces = &self.peers[&addr].pieces;
 
         let cmd = match self.choose_piece(pieces) {
@@ -156,7 +154,7 @@ impl Manager {
             }
         };
 
-        let _ = channel.send(cmd);
+        let _ = resp_ch.send(cmd);
     }
 
     fn choose_piece(&self, pieces: &Vec<bool>) -> Result<usize, Error> {
@@ -191,8 +189,8 @@ impl Manager {
         Err(Error::NotFound)
     }
 
-    fn recv_have(&mut self, msg: RecvHave) {
-        self.peers.get_mut(&msg.key).unwrap().pieces[msg.index] = true;
+    fn recv_have(&mut self, addr: String, index: usize) {
+        self.peers.get_mut(&addr).unwrap().pieces[index] = true;
     }
 
     fn recv_done(&mut self, msg: Done) {
@@ -200,7 +198,7 @@ impl Manager {
             if key == &msg.key {
                 self.pieces_status[peer.index] = Status::Have;
 
-                let _ = self.b_tx.send(BroadcastCommand::SendHave {
+                let _ = self.b_tx.send(BroadCmd::SendHave {
                     key: msg.key.clone(),
                     index: peer.index,
                 });
@@ -209,11 +207,11 @@ impl Manager {
             }
         }
 
-        let _ = msg.channel.send(Command::End);
+        let _ = msg.resp_ch.send(Command::End);
     }
 
     fn recv_verify_fail(&mut self, msg: VerifyFail) {
-        let _ = msg.channel.send(Command::End);
+        let _ = msg.resp_ch.send(Command::End);
     }
 
     fn piece_size(&self, index: usize) -> usize {
