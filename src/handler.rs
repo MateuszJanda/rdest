@@ -72,11 +72,15 @@ pub struct Handler {
     piece_hash: [u8; 20],
     buff_piece: Vec<u8>,
     buff_pos: usize,
-
-    keep_alive: bool,
-
+    peer_status: Status,
     job_ch: mpsc::Sender<JobCmd>,
     broad_ch: broadcast::Receiver<BroadCmd>,
+}
+
+pub struct Status {
+    choked: bool,
+    interested: bool,
+    keep_alive: bool,
 }
 
 impl Handler {
@@ -101,7 +105,11 @@ impl Handler {
                 piece_hash: [0; 20],
                 buff_piece: vec![],
                 buff_pos: 0,
-                keep_alive: false,
+                peer_status: Status {
+                    choked: true,
+                    interested: false,
+                    keep_alive: false,
+                },
                 job_ch,
                 broad_ch,
             };
@@ -145,12 +153,12 @@ impl Handler {
         loop {
             tokio::select! {
                 _ = interval.tick() => {
-                    if !self.keep_alive {
+                    if !self.peer_status.keep_alive {
                         println!("Close connection, no messages from peer");
                         break;
                     }
                     self.send_keep_alive().await?;
-                    self.keep_alive = false;
+                    self.peer_status.keep_alive = false;
                 }
                 cmd = self.broad_ch.recv() => {
                     if self.send_have(cmd?).await? == false {
@@ -190,23 +198,26 @@ impl Handler {
         opt_frame: Option<Frame>,
     ) -> Result<bool, Box<dyn std::error::Error>> {
         match opt_frame {
-            Some(frame) => match frame {
-                Frame::Handshake(handshake) => self.handle_handshake(&handshake)?,
-                Frame::KeepAlive(_) => self.handle_keep_alive(),
-                Frame::Choke(_) => (),
-                Frame::Unchoke(_) => self.handle_unchoke().await,
-                Frame::Interested(_) => (),
-                Frame::NotInterested(_) => (),
-                Frame::Have(have) => self.handle_have(&have).await?,
-                Frame::Bitfield(bitfield) => self.handle_bitfield(bitfield).await?,
-                Frame::Request(_) => (),
-                Frame::Piece(piece) => {
-                    if self.handle_piece(&piece).await? == false {
-                        return Ok(false);
+            Some(frame) => {
+                self.peer_status.keep_alive = true;
+                match frame {
+                    Frame::Handshake(handshake) => self.handle_handshake(&handshake)?,
+                    Frame::KeepAlive(_) => (),
+                    Frame::Choke(_) => self.handle_choke(),
+                    Frame::Unchoke(_) => self.handle_unchoke().await,
+                    Frame::Interested(_) => self.handle_interested(),
+                    Frame::NotInterested(_) => self.handle_not_interested(),
+                    Frame::Have(have) => self.handle_have(&have).await?,
+                    Frame::Bitfield(bitfield) => self.handle_bitfield(bitfield).await?,
+                    Frame::Request(_) => (),
+                    Frame::Piece(piece) => {
+                        if self.handle_piece(&piece).await? == false {
+                            return Ok(false);
+                        }
                     }
+                    Frame::Cancel(_) => (),
                 }
-                Frame::Cancel(_) => (),
-            },
+            }
             None => return Ok(false),
         }
 
@@ -217,17 +228,16 @@ impl Handler {
         &mut self,
         handshake: &Handshake,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        self.keep_alive = true;
         handshake.validate(&self.info_hash)?;
         Ok(())
     }
 
-    fn handle_keep_alive(&mut self) {
-        self.keep_alive = true;
+    fn handle_choke(&mut self) {
+        self.peer_status.choked = true;
     }
 
     async fn handle_unchoke(&mut self) {
-        self.keep_alive = true;
+        self.peer_status.choked = false;
         let (resp_tx, resp_rx) = oneshot::channel();
 
         let cmd = JobCmd::RecvUnchoke {
@@ -253,8 +263,16 @@ impl Handler {
             self.connection.write_msg(&msg).await.unwrap();
         }
     }
+
+    fn handle_interested(&mut self) {
+        self.peer_status.interested = true;
+    }
+
+    fn handle_not_interested(&mut self) {
+        self.peer_status.interested = false;
+    }
+
     async fn handle_have(&mut self, have: &Have) -> Result<(), Box<dyn std::error::Error>> {
-        self.keep_alive = true;
         have.validate(self.pieces_count)?;
 
         let cmd = JobCmd::RecvHave {
@@ -270,7 +288,6 @@ impl Handler {
         &mut self,
         bitfield: Bitfield,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        self.keep_alive = true;
         bitfield.validate(&self.pieces_count)?;
 
         let (resp_tx, resp_rx) = oneshot::channel();
@@ -304,7 +321,6 @@ impl Handler {
     }
 
     async fn handle_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
-        self.keep_alive = true;
         piece.validate(
             self.piece_index.unwrap(),
             self.buff_pos,
