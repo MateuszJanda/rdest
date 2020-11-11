@@ -187,23 +187,27 @@ impl Handler {
 
     async fn handle_frame(
         &mut self,
-        frame: Option<Frame>,
+        opt_frame: Option<Frame>,
     ) -> Result<bool, Box<dyn std::error::Error>> {
-        match frame {
-            Some(Frame::Handshake(handshake)) => self.handle_handshake(&handshake)?,
-            Some(Frame::KeepAlive(_)) => self.handle_keep_alive(),
-            Some(Frame::Unchoke(_)) => self.handle_unchoke().await,
-            Some(Frame::Have(have)) => self.handle_have(&have).await?,
-            Some(Frame::Bitfield(bitfield)) => self.handle_bitfield(bitfield).await?,
-            Some(Frame::Piece(piece)) => {
-                if self.handle_piece(&piece).await? == false {
-                    return Ok(false);
+        match opt_frame {
+            Some(frame) => match frame {
+                Frame::Handshake(handshake) => self.handle_handshake(&handshake)?,
+                Frame::KeepAlive(_) => self.handle_keep_alive(),
+                Frame::Choke(_) => (),
+                Frame::Unchoke(_) => self.handle_unchoke().await,
+                Frame::Interested(_) => (),
+                Frame::NotInterested(_) => (),
+                Frame::Have(have) => self.handle_have(&have).await?,
+                Frame::Bitfield(bitfield) => self.handle_bitfield(bitfield).await?,
+                Frame::Request(_) => (),
+                Frame::Piece(piece) => {
+                    if self.handle_piece(&piece).await? == false {
+                        return Ok(false);
+                    }
                 }
-            }
-            Some(f) => {
-                println!("Frame: {:?}", f);
-            }
-            _ => {}
+                Frame::Cancel(_) => (),
+            },
+            None => return Ok(false),
         }
 
         return Ok(true);

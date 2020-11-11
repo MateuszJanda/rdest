@@ -20,7 +20,6 @@ pub enum Frame {
     Request(Request),
     Piece(Piece),
     Cancel(Cancel),
-    Port(Port),
 }
 
 pub trait Serializer {
@@ -685,7 +684,6 @@ enum MsgId {
     RequestId = Request::ID,
     PieceId = Piece::ID,
     CancelId = Cancel::ID,
-    PortId = Port::ID,
 }
 
 impl Frame {
@@ -747,10 +745,6 @@ impl Frame {
             Some(MsgId::CancelId) => {
                 crs.set_position(Cancel::check(available_data, length)? as u64);
                 Ok(Frame::Cancel(Cancel::from(crs)))
-            }
-            Some(MsgId::PortId) => {
-                crs.set_position(Port::check(available_data, length)? as u64);
-                Ok(Frame::Port(Port::from(crs)))
             }
             None => {
                 // To skip unknown message
