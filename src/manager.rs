@@ -161,7 +161,6 @@ impl Manager {
 
     fn handle_unchoke(&mut self, addr: &String, resp_ch: oneshot::Sender<JobCmd>) -> bool {
         let pieces = &self.peers[addr].pieces;
-
         let cmd = match self.choose_piece(pieces) {
             Err(_) => JobCmd::SendNotInterested,
             Ok(idx) => {

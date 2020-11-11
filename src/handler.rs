@@ -73,6 +73,7 @@ pub struct Handler {
     buff_piece: Vec<u8>,
     buff_pos: usize,
     peer_status: Status,
+    msg_buff: Vec<Have>,
     job_ch: mpsc::Sender<JobCmd>,
     broad_ch: broadcast::Receiver<BroadCmd>,
 }
@@ -110,6 +111,7 @@ impl Handler {
                     interested: false,
                     keep_alive: false,
                 },
+                msg_buff: vec![],
                 job_ch,
                 broad_ch,
             };
@@ -160,11 +162,7 @@ impl Handler {
                     self.send_keep_alive().await?;
                     self.peer_status.keep_alive = false;
                 }
-                cmd = self.broad_ch.recv() => {
-                    if self.send_have(cmd?).await? == false {
-                        break;
-                    }
-                }
+                cmd = self.broad_ch.recv() => self.send_have(cmd?).await?,
                 frame = self.connection.read_frame() => {
                     if self.handle_frame(frame?).await? == false {
                         break;
@@ -181,16 +179,22 @@ impl Handler {
         Ok(())
     }
 
-    async fn send_have(&mut self, cmd: BroadCmd) -> Result<bool, Box<dyn std::error::Error>> {
+    async fn send_have(&mut self, cmd: BroadCmd) -> Result<(), Box<dyn std::error::Error>> {
         match cmd {
             BroadCmd::SendHave { key, index } => {
-                if key != self.connection.addr {
-                    self.connection.write_msg(&Have::new(index)).await?;
+                if key == self.connection.addr {
+                    ()
                 }
 
-                return Ok(true);
+                if self.peer_status.choked {
+                    self.msg_buff.push(Have::new(index));
+                } else {
+                    self.connection.write_msg(&Have::new(index)).await?;
+                }
             }
         }
+
+        Ok(())
     }
 
     async fn handle_frame(
@@ -204,7 +208,7 @@ impl Handler {
                     Frame::Handshake(handshake) => self.handle_handshake(&handshake)?,
                     Frame::KeepAlive(_) => (),
                     Frame::Choke(_) => self.handle_choke(),
-                    Frame::Unchoke(_) => self.handle_unchoke().await,
+                    Frame::Unchoke(_) => self.handle_unchoke().await?,
                     Frame::Interested(_) => self.handle_interested(),
                     Frame::NotInterested(_) => self.handle_not_interested(),
                     Frame::Have(have) => self.handle_have(&have).await?,
@@ -236,8 +240,16 @@ impl Handler {
         self.peer_status.choked = true;
     }
 
-    async fn handle_unchoke(&mut self) {
+    async fn handle_unchoke(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.peer_status.choked = false;
+
+        if !self.msg_buff.is_empty() {
+            for have in self.msg_buff.iter() {
+                self.connection.write_msg(have).await?;
+            }
+            self.msg_buff.clear();
+        }
+
         let (resp_tx, resp_rx) = oneshot::channel();
 
         let cmd = JobCmd::RecvUnchoke {
@@ -251,17 +263,19 @@ impl Handler {
             index,
             piece_size,
             piece_hash,
-        } = resp_rx.await.unwrap()
+        } = resp_rx.await?
         {
             self.buff_piece = vec![0; piece_size];
             self.piece_hash = piece_hash;
             self.piece_index = Some(index);
 
-            let length = self.chunk_length();
+            let length = self.block_length();
             let msg = Request::new(index, self.buff_pos, length);
             println!("Wysyłam request");
-            self.connection.write_msg(&msg).await.unwrap();
+            self.connection.write_msg(&msg).await?;
         }
+
+        Ok(())
     }
 
     fn handle_interested(&mut self) {
@@ -324,7 +338,7 @@ impl Handler {
         piece.validate(
             self.piece_index.unwrap(),
             self.buff_pos,
-            self.chunk_length(),
+            self.block_length(),
         )?;
 
         if self.save_piece(piece).await? == false {
@@ -381,7 +395,7 @@ impl Handler {
                     self.buff_piece = vec![0; piece_size];
                     self.piece_hash = piece_hash;
 
-                    let length = self.chunk_length();
+                    let length = self.block_length();
                     let msg = Request::new(index, self.buff_pos, length);
                     println!("Wysyłam nowy request");
                     self.connection.write_msg(&msg).await.unwrap();
@@ -390,7 +404,7 @@ impl Handler {
                 _ => (),
             }
         } else {
-            let length = self.chunk_length();
+            let length = self.block_length();
             let msg = Request::new(self.piece_index.unwrap(), self.buff_pos, length);
             println!("Wysyłam kolejny request");
             self.connection.write_msg(&msg).await.unwrap();
@@ -399,7 +413,7 @@ impl Handler {
         Ok(true)
     }
 
-    fn chunk_length(&self) -> usize {
+    fn block_length(&self) -> usize {
         if self.buff_pos + 0x4000 > self.buff_piece.len() {
             return self.buff_piece.len() % 0x4000;
         }
