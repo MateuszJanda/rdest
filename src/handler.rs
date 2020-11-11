@@ -64,17 +64,17 @@ pub enum BitfieldCmd {
 }
 
 pub struct Handler {
-    info_hash: [u8; 20],
+    connection: Connection,
     own_id: [u8; 20],
-    piece_index: Option<usize>,
+    info_hash: [u8; 20],
     pieces_count: usize,
+    piece_index: Option<usize>,
+    piece_hash: [u8; 20],
     buff_piece: Vec<u8>,
     buff_pos: usize,
-    piece_hash: [u8; 20],
 
     keep_alive: bool,
 
-    connection: Connection,
     job_ch: mpsc::Sender<JobCmd>,
     broad_ch: broadcast::Receiver<BroadCmd>,
 }
@@ -93,15 +93,15 @@ impl Handler {
             println!("connected");
 
             let mut handler = Handler {
+                connection: Connection::new(addr, stream),
                 own_id,
                 info_hash,
-                piece_index: None,
                 pieces_count,
+                piece_index: None,
+                piece_hash: [0; 20],
                 buff_piece: vec![],
                 buff_pos: 0,
-                piece_hash: [0; 20],
                 keep_alive: false,
-                connection: Connection::new(addr, stream),
                 job_ch,
                 broad_ch,
             };
