@@ -207,7 +207,7 @@ impl Manager {
         self.kill_job(&addr, &index).await;
 
         if self.peers.is_empty() {
-            self.kill_progress().await;
+            self.kill_progress_view().await;
             if let Err(_) = self.extract_files() {
                 ()
             }
@@ -220,27 +220,28 @@ impl Manager {
     fn choose_piece(&self, pieces: &Vec<bool>) -> Result<usize, Error> {
         let mut v: Vec<u32> = vec![0; self.metainfo.pieces().len()];
 
-        for (_, p) in self.peers.iter() {
-            for (idx, have) in p.pieces.iter().enumerate() {
+        for (_, peer) in self.peers.iter() {
+            for (idx, have) in peer.pieces.iter().enumerate() {
                 if *have {
                     v[idx] += 1;
                 }
             }
         }
 
+        // Shuffle to get better distribution of pieces from peers
         v.shuffle(&mut rand::thread_rng());
 
-        let mut x: Vec<(usize, u32)> = v
+        let mut rarest: Vec<(usize, u32)> = v
             .iter()
             .enumerate()
-            .filter(|val| self.pieces_status[val.0] == Status::Missing)
-            .map(|y| (y.0, *y.1))
+            .filter(|(idx, _)| self.pieces_status[*idx] == Status::Missing)
+            .map(|(idx, count)| (idx, *count))
             .collect();
 
         // Sort by rarest
-        x.sort_by(|a, b| a.1.cmp(&b.1));
+        rarest.sort_by(|(_, a_count), (_, b_count)| a_count.cmp(&b_count));
 
-        for (idx, count) in x.iter() {
+        for (idx, count) in rarest.iter() {
             if count > &0 && pieces[*idx] == true {
                 return Ok(*idx);
             }
@@ -270,7 +271,7 @@ impl Manager {
         println!("Job killed");
     }
 
-    async fn kill_progress(&mut self) {
+    async fn kill_progress_view(&mut self) {
         match &mut self.pro_cmd {
             Some(r) => {
                 let _ = r.send(ProCmd::Kill {}).await;
