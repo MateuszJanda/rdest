@@ -22,7 +22,7 @@ pub struct Manager {
     cmd_rx: mpsc::Receiver<Command>,
 
     b_tx: broadcast::Sender<BroadCmd>,
-    view: View,
+    view: Option<View>,
 }
 
 #[derive(Debug)]
@@ -34,8 +34,8 @@ struct Peer {
 
 #[derive(Debug)]
 struct View {
-    channel: Option<mpsc::Sender<ViewCmd>>,
-    job: Option<JoinHandle<()>>,
+    channel: mpsc::Sender<ViewCmd>,
+    job: JoinHandle<()>,
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -61,10 +61,7 @@ impl Manager {
             cmd_rx,
 
             b_tx,
-            view: View {
-                channel: None,
-                job: None,
-            },
+            view: None,
         }
     }
 
@@ -81,8 +78,10 @@ impl Manager {
 
     fn spawn_progress_view(&mut self) {
         let (mut view, channel) = Progress::new();
-        self.view.job = Some(tokio::spawn(async move { view.run().await }));
-        self.view.channel = Some(channel);
+        self.view = Some(View {
+            channel,
+            job: tokio::spawn(async move { view.run().await }),
+        });
     }
 
     fn spawn_jobs(&mut self) {
@@ -278,16 +277,11 @@ impl Manager {
     }
 
     async fn kill_progress_view(&mut self) {
-        match &mut self.view.channel {
-            Some(r) => {
-                let _ = r.send(ViewCmd::Kill {}).await;
-            }
-            _ => (),
-        }
-
-        match &mut self.view.job {
-            Some(j) => {
-                j.await.unwrap();
+        match &mut self.view.take() {
+            Some(view) => {
+                let _ = view.channel.send(ViewCmd::Kill {}).await;
+                let job = &mut view.job;
+                job.await.unwrap();
             }
             _ => (),
         }
