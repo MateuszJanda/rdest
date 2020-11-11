@@ -195,11 +195,8 @@ impl Handler {
             Some(Frame::Unchoke(_)) => self.handle_unchoke().await,
             Some(Frame::Have(have)) => self.handle_have(&have).await?,
             Some(Frame::Bitfield(bitfield)) => self.handle_bitfield(bitfield).await?,
-            Some(Frame::Piece(p)) => {
-                p.validate(self.index.unwrap(), self.buff_pos, self.chunk_length())?;
-
-                self.keep_alive = true;
-                if false == self.handle_piece(&p).await? {
+            Some(Frame::Piece(piece)) => {
+                if self.handle_piece(&piece).await? == false {
                     return Ok(false);
                 }
             }
@@ -302,15 +299,23 @@ impl Handler {
         Ok(())
     }
 
-    async fn handle_piece(
-        &mut self,
-        buff_piece: &Piece,
-    ) -> Result<bool, Box<dyn std::error::Error>> {
+    async fn handle_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
+        self.keep_alive = true;
+        piece.validate(self.index.unwrap(), self.buff_pos, self.chunk_length())?;
+
+        if self.save_piece(piece).await? == false {
+            return Ok(false);
+        }
+
+        Ok(true)
+    }
+
+    async fn save_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
         println!("Piece");
 
-        self.buff_piece[self.buff_pos..self.buff_pos + buff_piece.block.len()]
-            .copy_from_slice(&buff_piece.block);
-        self.buff_pos += buff_piece.block.len();
+        self.buff_piece[self.buff_pos..self.buff_pos + piece.block.len()]
+            .copy_from_slice(&piece.block);
+        self.buff_pos += piece.block.len();
 
         if self.buff_pos == self.buff_piece.len() {
             if !self.verify() {
