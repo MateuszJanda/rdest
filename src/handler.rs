@@ -89,6 +89,16 @@ struct PieceData {
     buff_pos: usize,
 }
 
+impl PieceData {
+    fn block_length(&self) -> usize {
+        if self.buff_pos + 0x4000 > self.buff.len() {
+            return self.buff.len() % 0x4000;
+        }
+
+        return 0x4000;
+    }
+}
+
 impl Handler {
     pub async fn run(
         addr: String,
@@ -319,7 +329,11 @@ impl Handler {
 
     async fn handle_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
         if let Some(piece_data) = self.piece.as_ref() {
-            piece.validate(piece_data.index, piece_data.buff_pos, self.block_length())?;
+            piece.validate(
+                piece_data.index,
+                piece_data.buff_pos,
+                piece_data.block_length(),
+            )?;
         } else {
             return Err(Box::new(Error::NotFound));
         }
@@ -420,7 +434,7 @@ impl Handler {
 
     async fn write_request(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(piece) = self.piece.as_ref() {
-            let msg = Request::new(piece.index, piece.buff_pos, self.block_length());
+            let msg = Request::new(piece.index, piece.buff_pos, piece.block_length());
             if self.peer_status.choked {
                 self.msg_buff.push(Frame::Request(msg));
             } else {
@@ -430,16 +444,6 @@ impl Handler {
         }
 
         Ok(())
-    }
-
-    fn block_length(&self) -> usize {
-        if let Some(piece_data) = self.piece.as_ref() {
-            if piece_data.buff_pos + 0x4000 > piece_data.buff.len() {
-                return piece_data.buff.len() % 0x4000;
-            }
-        }
-
-        return 0x4000;
     }
 
     fn verify(&self) -> bool {
