@@ -1,6 +1,6 @@
 use crate::connection::Connection;
 use crate::frame::{Bitfield, Frame, Handshake, Have, Interested, KeepAlive, Piece, Request};
-use crate::utils;
+use crate::{utils, Error};
 use std::fs;
 use tokio::net::TcpStream;
 use tokio::sync::oneshot::Receiver;
@@ -69,20 +69,24 @@ pub struct Handler {
     own_id: [u8; 20],
     info_hash: [u8; 20],
     pieces_count: usize,
-    piece_index: Option<usize>,
-    piece_hash: [u8; 20],
-    buff_piece: Vec<u8>,
-    buff_pos: usize,
+    piece: Option<PieceData>,
     peer_status: Status,
     msg_buff: Vec<Frame>,
     job_ch: mpsc::Sender<JobCmd>,
     broad_ch: broadcast::Receiver<BroadCmd>,
 }
 
-pub struct Status {
+struct Status {
     choked: bool,
     interested: bool,
     keep_alive: bool,
+}
+
+struct PieceData {
+    index: usize,
+    hash: [u8; 20],
+    buff: Vec<u8>,
+    buff_pos: usize,
 }
 
 impl Handler {
@@ -103,10 +107,7 @@ impl Handler {
                 own_id,
                 info_hash,
                 pieces_count,
-                piece_index: None,
-                piece_hash: [0; 20],
-                buff_piece: vec![],
-                buff_pos: 0,
+                piece: None,
                 peer_status: Status {
                     choked: true,
                     interested: false,
@@ -122,12 +123,9 @@ impl Handler {
                 println!("jkl {:?}", e);
             }
 
-            Self::kill_req(
-                &handler.connection.addr,
-                &handler.piece_index,
-                &mut handler.job_ch,
-            )
-            .await;
+            let index = handler.piece.map_or(None, |p| Some(p.index));
+
+            Self::kill_req(&handler.connection.addr, &index, &mut handler.job_ch).await;
         } else {
             Self::kill_req(&addr, &None, &mut job_ch).await;
         }
@@ -269,10 +267,12 @@ impl Handler {
         piece_size: usize,
         piece_hash: &[u8; 20],
     ) {
-        self.piece_index = Some(piece_index);
-        self.buff_piece = vec![0; piece_size];
-        self.buff_pos = 0;
-        self.piece_hash = *piece_hash;
+        self.piece = Some(PieceData {
+            index: piece_index,
+            hash: *piece_hash,
+            buff: vec![0; piece_size],
+            buff_pos: 0,
+        });
     }
 
     fn handle_interested(&mut self) {
@@ -319,11 +319,11 @@ impl Handler {
     }
 
     async fn handle_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
-        piece.validate(
-            self.piece_index.unwrap(),
-            self.buff_pos,
-            self.block_length(),
-        )?;
+        if let Some(piece_data) = self.piece.as_ref() {
+            piece.validate(piece_data.index, piece_data.buff_pos, self.block_length())?;
+        } else {
+            return Err(Box::new(Error::NotFound));
+        }
 
         if self.save_piece(piece).await? == false {
             return Ok(false);
@@ -335,11 +335,13 @@ impl Handler {
     async fn save_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
         println!("Piece");
 
-        self.buff_piece[self.buff_pos..self.buff_pos + piece.block.len()]
-            .copy_from_slice(&piece.block);
-        self.buff_pos += piece.block.len();
+        let piece_data = self.piece.as_mut().ok_or(Box::new(Error::NotFound))?;
 
-        if self.buff_pos == self.buff_piece.len() {
+        piece_data.buff[piece_data.buff_pos..piece_data.buff_pos + piece.block.len()]
+            .copy_from_slice(&piece.block);
+        piece_data.buff_pos += piece.block.len();
+
+        if piece_data.buff_pos == piece_data.buff.len() {
             if !self.verify() {
                 let (resp_tx, resp_rx) = oneshot::channel();
                 println!("Verify fail");
@@ -359,7 +361,7 @@ impl Handler {
             }
 
             self.write_piece();
-            self.piece_index = None;
+            // self.piece_index = None; // TODO
 
             let (resp_tx, resp_rx) = oneshot::channel();
             let cmd = JobCmd::PieceDone {
@@ -415,40 +417,45 @@ impl Handler {
     }
 
     async fn write_request(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let msg = Request::new(
-            self.piece_index.unwrap(),
-            self.buff_pos,
-            self.block_length(),
-        );
-        if self.peer_status.choked {
-            self.msg_buff.push(Frame::Request(msg));
-        } else {
-            println!("Wysyłam kolejny request");
-            self.connection.write_msg(&msg).await?;
+        if let Some(piece) = self.piece.as_ref() {
+            let msg = Request::new(piece.index, piece.buff_pos, self.block_length());
+            if self.peer_status.choked {
+                self.msg_buff.push(Frame::Request(msg));
+            } else {
+                println!("Wysyłam kolejny request");
+                self.connection.write_msg(&msg).await?;
+            }
         }
 
         Ok(())
     }
 
     fn block_length(&self) -> usize {
-        if self.buff_pos + 0x4000 > self.buff_piece.len() {
-            return self.buff_piece.len() % 0x4000;
+        if let Some(piece_data) = self.piece.as_ref() {
+            if piece_data.buff_pos + 0x4000 > piece_data.buff.len() {
+                return piece_data.buff.len() % 0x4000;
+            }
         }
 
         return 0x4000;
     }
 
     fn verify(&self) -> bool {
-        let mut m = sha1::Sha1::new();
-        m.update(self.buff_piece.as_ref());
+        if let Some(piece_data) = self.piece.as_ref() {
+            let mut m = sha1::Sha1::new();
+            m.update(piece_data.buff.as_ref());
+            println!("Checksum: {:?} {:?}", m.digest().bytes(), piece_data.hash);
 
-        println!("Checksum: {:?} {:?}", m.digest().bytes(), self.piece_hash);
+            return m.digest().bytes() == piece_data.hash;
+        }
 
-        return m.digest().bytes() == self.piece_hash;
+        return false;
     }
 
     fn write_piece(&self) {
-        let name = utils::hash_to_string(&self.piece_hash) + ".piece";
-        fs::write(name, &self.buff_piece).unwrap();
+        if let Some(piece_data) = self.piece.as_ref() {
+            let name = utils::hash_to_string(&piece_data.hash) + ".piece";
+            fs::write(name, &piece_data.buff).unwrap();
+        }
     }
 }
