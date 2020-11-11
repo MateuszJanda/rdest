@@ -31,10 +31,17 @@ pub enum Command {
         addr: String,
         index: usize,
     },
-
     PieceDone {
         addr: String,
         resp_ch: oneshot::Sender<Command>,
+    },
+    VerifyFail {
+        addr: String,
+        resp_ch: oneshot::Sender<Command>,
+    },
+    KillReq {
+        addr: String,
+        index: Option<usize>,
     },
 
     SendBitfield {
@@ -49,21 +56,7 @@ pub enum Command {
 
     SendNotInterested,
 
-    VerifyFail(VerifyFail),
     End,
-    KillReq {
-        key: String,
-        index: Option<usize>,
-    },
-}
-
-#[derive(Debug)]
-pub struct Done {}
-
-#[derive(Debug)]
-pub struct VerifyFail {
-    pub key: String,
-    pub resp_ch: oneshot::Sender<Command>,
 }
 
 pub struct Handler {
@@ -156,7 +149,7 @@ impl Handler {
 
     async fn kill_req(&mut self) {
         let cmd = Command::KillReq {
-            key: self.connection.addr.clone(),
+            addr: self.connection.addr.clone(),
             index: self.index,
         };
 
@@ -298,10 +291,10 @@ impl Handler {
             if !self.verify() {
                 let (resp_tx, resp_rx) = oneshot::channel();
                 println!("Verify fail");
-                let cmd = Command::VerifyFail(VerifyFail {
-                    key: self.connection.addr.clone(),
+                let cmd = Command::VerifyFail {
+                    addr: self.connection.addr.clone(),
                     resp_ch: resp_tx,
-                });
+                };
 
                 self.cmd_tx.send(cmd).await?;
 

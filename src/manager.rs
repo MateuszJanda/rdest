@@ -1,5 +1,5 @@
 use crate::frame::Bitfield;
-use crate::handler::{BroadCmd, Command, Handler, VerifyFail};
+use crate::handler::{BroadCmd, Command, Handler};
 use crate::progress::{ProCmd, Progress};
 use crate::{utils, Error, Metainfo, TrackerResp};
 use rand::seq::SliceRandom;
@@ -77,11 +77,9 @@ impl Manager {
                 Command::RecvUnchoke { addr, resp_ch } => self.recv_unchoke(addr, resp_ch),
                 Command::RecvHave { addr, index } => self.recv_have(addr, index),
                 Command::PieceDone { addr, resp_ch } => self.recv_piece_done(addr, resp_ch),
-                Command::VerifyFail(cmd) => {
-                    self.recv_verify_fail(cmd);
-                }
-                Command::KillReq { key, index } => {
-                    self.kill_job(&key, &index).await;
+                Command::VerifyFail { addr, resp_ch } => self.recv_verify_fail(addr, resp_ch),
+                Command::KillReq { addr, index } => {
+                    self.kill_job(&addr, &index).await;
 
                     if self.peers.is_empty() {
                         self.kill_progress().await;
@@ -208,8 +206,8 @@ impl Manager {
         let _ = resp_ch.send(Command::End);
     }
 
-    fn recv_verify_fail(&mut self, msg: VerifyFail) {
-        let _ = msg.resp_ch.send(Command::End);
+    fn recv_verify_fail(&mut self, _: String, resp_ch: oneshot::Sender<Command>) {
+        let _ = resp_ch.send(Command::End);
     }
 
     fn piece_size(&self, index: usize) -> usize {
@@ -250,15 +248,15 @@ impl Manager {
         self.peers.insert(self.tracker.peers()[2].clone(), p);
     }
 
-    async fn kill_job(&mut self, key: &String, index: &Option<usize>) {
+    async fn kill_job(&mut self, addr: &String, index: &Option<usize>) {
         if index.is_some() && self.pieces_status[index.unwrap()] != Status::Have {
             self.pieces_status[index.unwrap()] = Status::Missing;
         }
 
-        let j = self.peers.get_mut(key).unwrap().job.take();
+        let j = self.peers.get_mut(addr).unwrap().job.take();
         j.unwrap().await.unwrap();
 
-        self.peers.remove(key);
+        self.peers.remove(addr);
 
         println!("Job killed");
     }
