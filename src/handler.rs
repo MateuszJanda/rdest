@@ -85,35 +85,41 @@ impl Handler {
         own_id: [u8; 20],
         info_hash: [u8; 20],
         pieces_count: usize,
-        job_ch: mpsc::Sender<JobCmd>,
+        mut job_ch: mpsc::Sender<JobCmd>,
         broad_ch: broadcast::Receiver<BroadCmd>,
     ) {
         println!("Try connect to {}", &addr);
-        let stream = TcpStream::connect(&addr).await.unwrap();
-        let connection = Connection::new(addr, stream);
-        println!("connect");
+        if let Ok(stream) = TcpStream::connect(&addr).await {
+            println!("connected");
 
-        let mut handler = Handler {
-            own_id,
-            info_hash,
-            index: None,
-            pieces_count,
-            buff_piece: vec![],
-            buff_pos: 0,
-            piece_hash: [0; 20],
-            keep_alive: false,
-            connection,
-            job_ch,
-            broad_ch,
-        };
+            let mut handler = Handler {
+                own_id,
+                info_hash,
+                index: None,
+                pieces_count,
+                buff_piece: vec![],
+                buff_pos: 0,
+                piece_hash: [0; 20],
+                keep_alive: false,
+                connection: Connection::new(addr, stream),
+                job_ch,
+                broad_ch,
+            };
 
-        // Process the connection. If an error is encountered, log it.
-        if let Err(e) = handler.event_loop().await {
-            // error!(cause = ?err, "connection error");
-            panic!("jkl {:?}", e);
+            // Process the connection. If an error is encountered, log it.
+            if let Err(e) = handler.event_loop().await {
+                println!("jkl {:?}", e);
+            }
+
+            Self::kill_req(
+                &handler.connection.addr,
+                &handler.index,
+                &mut handler.job_ch,
+            )
+            .await;
+        } else {
+            Self::kill_req(&addr, &None, &mut job_ch).await;
         }
-
-        handler.kill_req().await;
     }
 
     async fn event_loop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -150,19 +156,20 @@ impl Handler {
         Ok(())
     }
 
-    async fn kill_req(&mut self) {
+    async fn kill_req(addr: &String, index: &Option<usize>, job_ch: &mut mpsc::Sender<JobCmd>) {
         let cmd = JobCmd::KillReq {
-            addr: self.connection.addr.clone(),
-            index: self.index,
+            addr: addr.clone(),
+            index: *index,
         };
 
-        // Should panic if can't inform manager
-        self.job_ch.send(cmd).await.unwrap();
+        job_ch
+            .send(cmd)
+            .await
+            .expect("Can't inform manager about KillReq");
     }
 
     async fn send_keep_alive(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.connection.write_msg(&KeepAlive::new()).await?;
-
         Ok(())
     }
 
@@ -203,9 +210,7 @@ impl Handler {
                     bitfield: b,
                     resp_ch: resp_tx,
                 };
-                if let Err(e) = self.job_ch.send(cmd).await {
-                    println!("Coś nie tak {:?}", e);
-                }
+                self.job_ch.send(cmd).await?;
 
                 if let BitfieldCmd::SendBitfield {
                     bitfield,
