@@ -1,5 +1,5 @@
 use crate::frame::Bitfield;
-use crate::handler::{BroadcastCommand, Command, Done, Handler, RecvHave, RecvUnchoke, VerifyFail};
+use crate::handler::{BroadcastCommand, Command, Done, Handler, RecvHave, VerifyFail};
 use crate::progress::{ProCmd, Progress};
 use crate::{utils, Error, Metainfo, TrackerResp};
 use rand::seq::SliceRandom;
@@ -63,7 +63,7 @@ impl Manager {
     }
 
     pub async fn run(&mut self) {
-        // self.spawn_progress();
+        self.spawn_progress();
 
         self.spawn_jobs();
 
@@ -74,9 +74,7 @@ impl Manager {
                     bitfield,
                     channel,
                 } => self.recv_bitfield(addr, bitfield, channel),
-                Command::RecvUnchoke(cmd) => {
-                    self.recv_unchoke(cmd);
-                }
+                Command::RecvUnchoke { addr, channel } => self.recv_unchoke(addr, channel),
                 Command::RecvHave(cmd) => {
                     self.recv_have(cmd);
                 }
@@ -141,14 +139,14 @@ impl Manager {
         });
     }
 
-    fn recv_unchoke(&mut self, msg: RecvUnchoke) {
-        let pieces = &self.peers[&msg.key].pieces;
+    fn recv_unchoke(&mut self, addr: String, channel: oneshot::Sender<Command>) {
+        let pieces = &self.peers[&addr].pieces;
 
         let cmd = match self.choose_piece(pieces) {
             Err(_) => Command::SendNotInterested,
             Ok(idx) => {
                 self.pieces_status[idx] = Status::Reserved;
-                self.peers.get_mut(&msg.key).unwrap().index = idx;
+                self.peers.get_mut(&addr).unwrap().index = idx;
 
                 Command::SendRequest {
                     index: idx,
@@ -158,7 +156,7 @@ impl Manager {
             }
         };
 
-        let _ = msg.channel.send(cmd);
+        let _ = channel.send(cmd);
     }
 
     fn choose_piece(&self, pieces: &Vec<bool>) -> Result<usize, Error> {

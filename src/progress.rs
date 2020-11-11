@@ -44,8 +44,8 @@ impl Progress {
     }
 
     async fn animation(&mut self) {
-        let text = " ".repeat(self.pos) + "a";
-        print!("\r{}", text);
+        let _text = " ".repeat(self.pos) + "a";
+        // print!("\r{}", text);
 
         io::stdout().flush().unwrap();
 

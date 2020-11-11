@@ -17,7 +17,10 @@ pub enum Command {
         bitfield: Bitfield,
         channel: oneshot::Sender<Command>,
     },
-    RecvUnchoke(RecvUnchoke),
+    RecvUnchoke {
+        addr: String,
+        channel: oneshot::Sender<Command>,
+    },
     RecvHave(RecvHave),
 
     SendBitfield {
@@ -39,12 +42,6 @@ pub enum Command {
         key: String,
         index: Option<usize>,
     },
-}
-
-#[derive(Debug)]
-pub struct RecvUnchoke {
-    pub(crate) key: String,
-    pub(crate) channel: oneshot::Sender<Command>,
 }
 
 #[derive(Debug)]
@@ -266,12 +263,12 @@ impl Handler {
     async fn handle_unchoke(&mut self) {
         let (resp_tx, resp_rx) = oneshot::channel();
 
-        let cmd = RecvUnchoke {
-            key: self.connection.addr.clone(),
+        let cmd = Command::RecvUnchoke {
+            addr: self.connection.addr.clone(),
             channel: resp_tx,
         };
 
-        self.cmd_tx.send(Command::RecvUnchoke(cmd)).await.unwrap();
+        self.cmd_tx.send(cmd).await.unwrap();
 
         if let Command::SendRequest {
             index,
