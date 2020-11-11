@@ -282,6 +282,21 @@ impl Handler {
         Ok(resp_rx)
     }
 
+    async fn cmd_recv_bitfield(
+        &mut self,
+        bitfield: Bitfield,
+    ) -> Result<Receiver<BitfieldCmd>, Box<dyn std::error::Error>> {
+        let (resp_tx, resp_rx) = oneshot::channel();
+        self.job_ch
+            .send(JobCmd::RecvBitfield {
+                addr: self.connection.addr.clone(),
+                bitfield,
+                resp_ch: resp_tx,
+            })
+            .await?;
+        Ok(resp_rx)
+    }
+
     fn handle_interested(&mut self) {
         self.peer_status.interested = true;
     }
@@ -308,19 +323,11 @@ impl Handler {
     ) -> Result<(), Box<dyn std::error::Error>> {
         bitfield.validate(&self.pieces_count)?;
 
-        let (resp_tx, resp_rx) = oneshot::channel();
-
-        let cmd = JobCmd::RecvBitfield {
-            addr: self.connection.addr.clone(),
-            bitfield,
-            resp_ch: resp_tx,
-        };
-        self.job_ch.send(cmd).await?;
-
+        let resp = self.cmd_recv_bitfield(bitfield).await?;
         if let BitfieldCmd::SendBitfield {
             bitfield,
             interested,
-        } = resp_rx.await.unwrap()
+        } = resp.await?
         {
             println!("Odsyłam Bitfield {:?}", bitfield);
             if let Err(e) = self.connection.write_msg(&bitfield).await {
