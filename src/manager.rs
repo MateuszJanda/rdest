@@ -111,22 +111,10 @@ impl Manager {
             Command::RecvUnchoke { addr, resp_ch } => self.handle_unchoke(&addr, resp_ch),
             Command::RecvHave { addr, index } => self.handle_have(&addr, index),
             Command::PieceDone { addr, resp_ch } => self.handle_piece_done(&addr, resp_ch),
+            Command::KillReq { addr, index } => self.handle_kill_req(&addr, &index).await,
             Command::VerifyFail { addr, resp_ch } => self.handle_verify_fail(&addr, resp_ch),
-            Command::KillReq { addr, index } => {
-                self.kill_job(&addr, &index).await;
-
-                if self.peers.is_empty() {
-                    self.kill_progress().await;
-                    if let Err(_) = self.extract_files() {
-                        ()
-                    }
-                    return false;
-                }
-            }
-            _ => (),
+            _ => true,
         }
-
-        true
     }
 
     fn handle_bitfield(
@@ -134,7 +122,7 @@ impl Manager {
         addr: &String,
         bitfield: &Bitfield,
         resp_ch: oneshot::Sender<BitfieldCmd>,
-    ) {
+    ) -> bool {
         let p = bitfield.to_vec();
         self.peers
             .get_mut(addr)
@@ -162,9 +150,11 @@ impl Manager {
             bitfield,
             interested,
         });
+
+        true
     }
 
-    fn handle_unchoke(&mut self, addr: &String, resp_ch: oneshot::Sender<Command>) {
+    fn handle_unchoke(&mut self, addr: &String, resp_ch: oneshot::Sender<Command>) -> bool {
         let pieces = &self.peers[addr].pieces;
 
         let cmd = match self.choose_piece(pieces) {
@@ -182,13 +172,15 @@ impl Manager {
         };
 
         let _ = &resp_ch.send(cmd);
+        true
     }
 
-    fn handle_have(&mut self, addr: &String, index: usize) {
+    fn handle_have(&mut self, addr: &String, index: usize) -> bool {
         self.peers.get_mut(addr).unwrap().pieces[index] = true;
+        true
     }
 
-    fn handle_piece_done(&mut self, addr: &String, resp_ch: oneshot::Sender<Command>) {
+    fn handle_piece_done(&mut self, addr: &String, resp_ch: oneshot::Sender<Command>) -> bool {
         for (key, peer) in self.peers.iter() {
             if key == addr {
                 self.pieces_status[peer.index] = Status::Have;
@@ -203,12 +195,27 @@ impl Manager {
         }
 
         let _ = resp_ch.send(Command::End);
+        true
     }
 
-    fn handle_verify_fail(&mut self, _: &String, resp_ch: oneshot::Sender<Command>) {
+    fn handle_verify_fail(&mut self, _: &String, resp_ch: oneshot::Sender<Command>) -> bool {
         let _ = resp_ch.send(Command::End);
+        true
     }
 
+    async fn handle_kill_req(&mut self, addr: &String, index: &Option<usize>) -> bool {
+        self.kill_job(&addr, &index).await;
+
+        if self.peers.is_empty() {
+            self.kill_progress().await;
+            if let Err(_) = self.extract_files() {
+                ()
+            }
+            return false;
+        }
+
+        true
+    }
 
     fn choose_piece(&self, pieces: &Vec<bool>) -> Result<usize, Error> {
         let mut v: Vec<u32> = vec![0; self.metainfo.pieces().len()];
