@@ -3,18 +3,18 @@ use std::io::Write;
 use tokio::sync::mpsc;
 use tokio::time::{interval_at, Duration, Instant};
 
-pub enum ProCmd {
+pub enum ViewCmd {
     Kill,
 }
 
 pub struct Progress {
     pos: usize,
     dir: i32,
-    cmd_rx: mpsc::Receiver<ProCmd>,
+    cmd_rx: mpsc::Receiver<ViewCmd>,
 }
 
 impl Progress {
-    pub fn new() -> (Progress, mpsc::Sender<ProCmd>) {
+    pub fn new() -> (Progress, mpsc::Sender<ViewCmd>) {
         let (cmd_tx, cmd_rx) = mpsc::channel(32);
 
         let p = Progress {
@@ -35,7 +35,7 @@ impl Progress {
                  _ = interval.tick() => self.animation().await,
                  cmd = self.cmd_rx.recv() => {
                      match cmd {
-                        Some(ProCmd::Kill) => break,
+                        Some(ViewCmd::Kill) => break,
                         _ => (),
                     }
                 }

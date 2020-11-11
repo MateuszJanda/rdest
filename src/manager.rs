@@ -1,6 +1,6 @@
 use crate::frame::Bitfield;
 use crate::handler::{BitfieldCmd, BroadCmd, Command, Handler};
-use crate::progress::{ProCmd, Progress};
+use crate::progress::{Progress, ViewCmd};
 use crate::{utils, Error, Metainfo, TrackerResp};
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
@@ -22,9 +22,7 @@ pub struct Manager {
     cmd_rx: mpsc::Receiver<Command>,
 
     b_tx: broadcast::Sender<BroadCmd>,
-
-    pro_cmd: Option<mpsc::Sender<ProCmd>>,
-    progress_job: Option<JoinHandle<()>>,
+    view: View,
 }
 
 #[derive(Debug)]
@@ -32,6 +30,12 @@ struct Peer {
     pieces: Vec<bool>,
     job: Option<JoinHandle<()>>,
     index: usize,
+}
+
+#[derive(Debug)]
+struct View {
+    channel: Option<mpsc::Sender<ViewCmd>>,
+    job: Option<JoinHandle<()>>,
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -57,8 +61,10 @@ impl Manager {
             cmd_rx,
 
             b_tx,
-            pro_cmd: None,
-            progress_job: None,
+            view: View {
+                channel: None,
+                job: None,
+            },
         }
     }
 
@@ -75,8 +81,8 @@ impl Manager {
 
     fn spawn_progress_view(&mut self) {
         let (mut view, channel) = Progress::new();
-        self.progress_job = Some(tokio::spawn(async move { view.run().await }));
-        self.pro_cmd = Some(channel);
+        self.view.job = Some(tokio::spawn(async move { view.run().await }));
+        self.view.channel = Some(channel);
     }
 
     fn spawn_jobs(&mut self) {
@@ -272,14 +278,14 @@ impl Manager {
     }
 
     async fn kill_progress_view(&mut self) {
-        match &mut self.pro_cmd {
+        match &mut self.view.channel {
             Some(r) => {
-                let _ = r.send(ProCmd::Kill {}).await;
+                let _ = r.send(ViewCmd::Kill {}).await;
             }
             _ => (),
         }
 
-        match &mut self.progress_job {
+        match &mut self.view.job {
             Some(j) => {
                 j.await.unwrap();
             }
