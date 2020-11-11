@@ -3,6 +3,7 @@ use crate::frame::{Bitfield, Frame, Handshake, Have, Interested, KeepAlive, Piec
 use crate::utils;
 use std::fs;
 use tokio::net::TcpStream;
+use tokio::sync::oneshot::Receiver;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time::{interval_at, Duration, Instant};
 
@@ -250,20 +251,12 @@ impl Handler {
             self.msg_buff.clear();
         }
 
-        let (resp_tx, resp_rx) = oneshot::channel();
-
-        let cmd = JobCmd::RecvUnchoke {
-            addr: self.connection.addr.clone(),
-            resp_ch: resp_tx,
-        };
-
-        self.job_ch.send(cmd).await.unwrap();
-
+        let resp = self.cmd_recv_unchoke().await?;
         if let JobCmd::SendRequest {
             index,
             piece_size,
             piece_hash,
-        } = resp_rx.await?
+        } = resp.await?
         {
             self.buff_piece = vec![0; piece_size];
             self.piece_hash = piece_hash;
@@ -276,6 +269,17 @@ impl Handler {
         }
 
         Ok(())
+    }
+
+    async fn cmd_recv_unchoke(&mut self) -> Result<Receiver<JobCmd>, Box<dyn std::error::Error>> {
+        let (resp_tx, resp_rx) = oneshot::channel();
+        self.job_ch
+            .send(JobCmd::RecvUnchoke {
+                addr: self.connection.addr.clone(),
+                resp_ch: resp_tx,
+            })
+            .await?;
+        Ok(resp_rx)
     }
 
     fn handle_interested(&mut self) {
