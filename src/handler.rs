@@ -124,7 +124,6 @@ impl Handler {
             }
 
             let index = handler.piece.map_or(None, |p| Some(p.index));
-
             Self::kill_req(&handler.connection.addr, &index, &mut handler.job_ch).await;
         } else {
             Self::kill_req(&addr, &None, &mut job_ch).await;
@@ -180,7 +179,7 @@ impl Handler {
         match cmd {
             BroadCmd::SendHave { key, index } => {
                 if key == self.connection.addr {
-                    ()
+                    return Ok(());
                 }
 
                 if self.peer_status.choked {
@@ -335,7 +334,11 @@ impl Handler {
     async fn save_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
         println!("Piece");
 
-        let piece_data = self.piece.as_mut().ok_or(Box::new(Error::NotFound))?;
+        let piece_data = self
+            .piece
+            .as_mut()
+            .ok_or(Error::NotFound)
+            .expect("Piece data not exit after validation");
 
         piece_data.buff[piece_data.buff_pos..piece_data.buff_pos + piece.block.len()]
             .copy_from_slice(&piece.block);
@@ -361,7 +364,6 @@ impl Handler {
             }
 
             self.write_piece();
-            // self.piece_index = None; // TODO
 
             let (resp_tx, resp_rx) = oneshot::channel();
             let cmd = JobCmd::PieceDone {
@@ -452,10 +454,13 @@ impl Handler {
         return false;
     }
 
-    fn write_piece(&self) {
-        if let Some(piece_data) = self.piece.as_ref() {
-            let name = utils::hash_to_string(&piece_data.hash) + ".piece";
-            fs::write(name, &piece_data.buff).unwrap();
-        }
+    fn write_piece(&mut self) {
+        let piece_data = self
+            .piece
+            .take()
+            .ok_or(Error::NotFound)
+            .expect("Saving to file: piece data not exist after validation");
+        let name = utils::hash_to_string(&piece_data.hash) + ".piece";
+        fs::write(name, &piece_data.buff).unwrap();
     }
 }
