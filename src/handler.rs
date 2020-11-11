@@ -15,7 +15,7 @@ pub enum Command {
     RecvBitfield {
         addr: String,
         bitfield: Bitfield,
-        resp_ch: oneshot::Sender<Command>,
+        resp_ch: oneshot::Sender<BitfieldCmd>,
     },
     RecvChoke {
         addr: String,
@@ -44,10 +44,6 @@ pub enum Command {
         index: Option<usize>,
     },
 
-    SendBitfield {
-        bitfield: Bitfield,
-        interested: bool,
-    },
     SendRequest {
         index: usize,
         piece_size: usize,
@@ -56,6 +52,15 @@ pub enum Command {
 
     SendNotInterested,
 
+    End,
+}
+
+#[derive(Debug)]
+pub enum BitfieldCmd {
+    SendBitfield {
+        bitfield: Bitfield,
+        interested: bool,
+    },
     End,
 }
 
@@ -104,7 +109,7 @@ impl Handler {
         };
 
         // Process the connection. If an error is encountered, log it.
-        if let Err(e) = handler.msg_loop().await {
+        if let Err(e) = handler.event_loop().await {
             // error!(cause = ?err, "connection error");
             panic!("jkl {:?}", e);
         }
@@ -112,7 +117,7 @@ impl Handler {
         handler.kill_req().await;
     }
 
-    async fn msg_loop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn event_loop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.connection
             .write_msg(&Handshake::new(&self.info_hash, &self.own_id))
             .await
@@ -204,7 +209,7 @@ impl Handler {
                     println!("Coś nie tak {:?}", e);
                 }
 
-                if let Command::SendBitfield {
+                if let BitfieldCmd::SendBitfield {
                     bitfield,
                     interested,
                 } = resp_rx.await.unwrap()
@@ -216,7 +221,7 @@ impl Handler {
 
                     if interested {
                         println!("Wysyłam Interested");
-                        if let Err(e) = self.connection.write_msg(&Interested {}).await {
+                        if let Err(e) = self.connection.write_msg(&Interested::new()).await {
                             println!("After Interested {:?}", e);
                         }
                     }

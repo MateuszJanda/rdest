@@ -1,5 +1,5 @@
 use crate::frame::Bitfield;
-use crate::handler::{BroadCmd, Command, Handler};
+use crate::handler::{BitfieldCmd, BroadCmd, Command, Handler};
 use crate::progress::{ProCmd, Progress};
 use crate::{utils, Error, Metainfo, TrackerResp};
 use rand::seq::SliceRandom;
@@ -63,57 +63,60 @@ impl Manager {
     }
 
     pub async fn run(&mut self) {
-        self.spawn_progress();
-
+        self.spawn_progress_view();
         self.spawn_jobs();
 
         while let Some(cmd) = self.cmd_rx.recv().await {
-            match cmd {
-                Command::RecvBitfield {
-                    addr,
-                    bitfield,
-                    resp_ch,
-                } => self.recv_bitfield(addr, bitfield, resp_ch),
-                Command::RecvUnchoke { addr, resp_ch } => self.recv_unchoke(addr, resp_ch),
-                Command::RecvHave { addr, index } => self.recv_have(addr, index),
-                Command::PieceDone { addr, resp_ch } => self.recv_piece_done(addr, resp_ch),
-                Command::VerifyFail { addr, resp_ch } => self.recv_verify_fail(addr, resp_ch),
-                Command::KillReq { addr, index } => {
-                    self.kill_job(&addr, &index).await;
-
-                    if self.peers.is_empty() {
-                        self.kill_progress().await;
-                        if let Err(_) = self.extract_files() {
-                            ()
-                        }
-                        break;
-                    }
-                }
-                _ => (),
+            if self.event_loop(cmd).await == false {
+                break;
             }
         }
     }
 
-    fn recv_bitfield(
+    async fn event_loop(&mut self, cmd: Command) -> bool {
+        match cmd {
+            Command::RecvBitfield {
+                addr,
+                bitfield,
+                resp_ch,
+            } => self.handle_bitfield(&addr, &bitfield, resp_ch),
+            Command::RecvUnchoke { addr, resp_ch } => self.handle_unchoke(&addr, resp_ch),
+            Command::RecvHave { addr, index } => self.handle_have(&addr, index),
+            Command::PieceDone { addr, resp_ch } => self.handle_piece_done(&addr, resp_ch),
+            Command::VerifyFail { addr, resp_ch } => self.handle_verify_fail(&addr, resp_ch),
+            Command::KillReq { addr, index } => {
+                self.kill_job(&addr, &index).await;
+
+                if self.peers.is_empty() {
+                    self.kill_progress().await;
+                    if let Err(_) = self.extract_files() {
+                        ()
+                    }
+                    return false;
+                }
+            }
+            _ => (),
+        }
+
+        true
+    }
+
+    fn handle_bitfield(
         &mut self,
-        addr: String,
-        bitfield: Bitfield,
-        resp_ch: oneshot::Sender<Command>,
+        addr: &String,
+        bitfield: &Bitfield,
+        resp_ch: oneshot::Sender<BitfieldCmd>,
     ) {
         let p = bitfield.to_vec();
         self.peers
-            .get_mut(&addr)
+            .get_mut(addr)
             .unwrap()
             .pieces
             .resize(p.len(), false);
 
-        self.peers
-            .get_mut(&addr)
-            .unwrap()
-            .pieces
-            .copy_from_slice(&p);
+        self.peers.get_mut(addr).unwrap().pieces.copy_from_slice(&p);
 
-        let pieces = &self.peers[&addr].pieces;
+        let pieces = &self.peers[addr].pieces;
 
         let interested = match self.choose_piece(pieces) {
             Err(_) => false,
@@ -124,23 +127,23 @@ impl Manager {
             &self
                 .pieces_status
                 .iter()
-                .map(|x| *x == Status::Have)
+                .map(|status| *status == Status::Have)
                 .collect(),
         );
-        let _ = resp_ch.send(Command::SendBitfield {
+        let _ = resp_ch.send(BitfieldCmd::SendBitfield {
             bitfield,
             interested,
         });
     }
 
-    fn recv_unchoke(&mut self, addr: String, resp_ch: oneshot::Sender<Command>) {
-        let pieces = &self.peers[&addr].pieces;
+    fn handle_unchoke(&mut self, addr: &String, resp_ch: oneshot::Sender<Command>) {
+        let pieces = &self.peers[addr].pieces;
 
         let cmd = match self.choose_piece(pieces) {
             Err(_) => Command::SendNotInterested,
             Ok(idx) => {
                 self.pieces_status[idx] = Status::Reserved;
-                self.peers.get_mut(&addr).unwrap().index = idx;
+                self.peers.get_mut(addr).unwrap().index = idx;
 
                 Command::SendRequest {
                     index: idx,
@@ -150,7 +153,7 @@ impl Manager {
             }
         };
 
-        let _ = resp_ch.send(cmd);
+        let _ = &resp_ch.send(cmd);
     }
 
     fn choose_piece(&self, pieces: &Vec<bool>) -> Result<usize, Error> {
@@ -185,13 +188,13 @@ impl Manager {
         Err(Error::NotFound)
     }
 
-    fn recv_have(&mut self, addr: String, index: usize) {
-        self.peers.get_mut(&addr).unwrap().pieces[index] = true;
+    fn handle_have(&mut self, addr: &String, index: usize) {
+        self.peers.get_mut(addr).unwrap().pieces[index] = true;
     }
 
-    fn recv_piece_done(&mut self, addr: String, resp_ch: oneshot::Sender<Command>) {
+    fn handle_piece_done(&mut self, addr: &String, resp_ch: oneshot::Sender<Command>) {
         for (key, peer) in self.peers.iter() {
-            if key == &addr {
+            if key == addr {
                 self.pieces_status[peer.index] = Status::Have;
 
                 let _ = self.b_tx.send(BroadCmd::SendHave {
@@ -206,7 +209,7 @@ impl Manager {
         let _ = resp_ch.send(Command::End);
     }
 
-    fn recv_verify_fail(&mut self, _: String, resp_ch: oneshot::Sender<Command>) {
+    fn handle_verify_fail(&mut self, _: &String, resp_ch: oneshot::Sender<Command>) {
         let _ = resp_ch.send(Command::End);
     }
 
@@ -218,7 +221,7 @@ impl Manager {
         self.metainfo.total_length() as usize % self.metainfo.piece_length()
     }
 
-    fn spawn_progress(&mut self) {
+    fn spawn_progress_view(&mut self) {
         let (mut p, r) = Progress::new();
 
         self.progress_job = Some(tokio::spawn(async move { p.run().await }));
