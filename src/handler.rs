@@ -11,7 +11,7 @@ pub enum BroadCmd {
     SendHave { key: String, index: usize },
 }
 #[derive(Debug)]
-pub enum Command {
+pub enum JobCmd {
     RecvBitfield {
         addr: String,
         bitfield: Bitfield,
@@ -19,11 +19,11 @@ pub enum Command {
     },
     RecvChoke {
         addr: String,
-        resp_ch: oneshot::Sender<Command>,
+        resp_ch: oneshot::Sender<JobCmd>,
     },
     RecvUnchoke {
         addr: String,
-        resp_ch: oneshot::Sender<Command>,
+        resp_ch: oneshot::Sender<JobCmd>,
     },
     // RecvInterested,
     // RecvNotInterested,
@@ -33,11 +33,11 @@ pub enum Command {
     },
     PieceDone {
         addr: String,
-        resp_ch: oneshot::Sender<Command>,
+        resp_ch: oneshot::Sender<JobCmd>,
     },
     VerifyFail {
         addr: String,
-        resp_ch: oneshot::Sender<Command>,
+        resp_ch: oneshot::Sender<JobCmd>,
     },
     KillReq {
         addr: String,
@@ -51,7 +51,6 @@ pub enum Command {
     },
 
     SendNotInterested,
-
     End,
 }
 
@@ -61,7 +60,7 @@ pub enum BitfieldCmd {
         bitfield: Bitfield,
         interested: bool,
     },
-    End,
+    // PrepareKill,
 }
 
 pub struct Handler {
@@ -69,15 +68,15 @@ pub struct Handler {
     own_id: [u8; 20],
     index: Option<usize>,
     pieces_count: usize,
-    piece: Vec<u8>,
-    position: usize,
+    buff_piece: Vec<u8>,
+    buff_pos: usize,
     piece_hash: [u8; 20],
 
     keep_alive: bool,
 
     connection: Connection,
-    cmd_tx: mpsc::Sender<Command>,
-    b_rx: broadcast::Receiver<BroadCmd>,
+    job_ch: mpsc::Sender<JobCmd>,
+    broad_ch: broadcast::Receiver<BroadCmd>,
 }
 
 impl Handler {
@@ -86,8 +85,8 @@ impl Handler {
         own_id: [u8; 20],
         info_hash: [u8; 20],
         pieces_count: usize,
-        cmd_tx: mpsc::Sender<Command>,
-        b_rx: broadcast::Receiver<BroadCmd>,
+        job_ch: mpsc::Sender<JobCmd>,
+        broad_ch: broadcast::Receiver<BroadCmd>,
     ) {
         println!("Try connect to {}", &addr);
         let stream = TcpStream::connect(&addr).await.unwrap();
@@ -99,13 +98,13 @@ impl Handler {
             info_hash,
             index: None,
             pieces_count,
-            piece: vec![],
-            position: 0,
+            buff_piece: vec![],
+            buff_pos: 0,
             piece_hash: [0; 20],
             keep_alive: false,
             connection,
-            cmd_tx,
-            b_rx,
+            job_ch,
+            broad_ch,
         };
 
         // Process the connection. If an error is encountered, log it.
@@ -120,8 +119,7 @@ impl Handler {
     async fn event_loop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.connection
             .write_msg(&Handshake::new(&self.info_hash, &self.own_id))
-            .await
-            .unwrap();
+            .await?;
 
         let start = Instant::now() + Duration::from_secs(2 * 60);
         let mut interval = interval_at(start, Duration::from_secs(2 * 60));
@@ -136,7 +134,7 @@ impl Handler {
                     self.send_keep_alive().await?;
                     self.keep_alive = false;
                 }
-                c = self.b_rx.recv() => {
+                c = self.broad_ch.recv() => {
                     if false == self.send_have(c?).await? {
                         break;
                     }
@@ -153,13 +151,13 @@ impl Handler {
     }
 
     async fn kill_req(&mut self) {
-        let cmd = Command::KillReq {
+        let cmd = JobCmd::KillReq {
             addr: self.connection.addr.clone(),
             index: self.index,
         };
 
         // Should panic if can't inform manager
-        self.cmd_tx.send(cmd).await.unwrap();
+        self.job_ch.send(cmd).await.unwrap();
     }
 
     async fn send_keep_alive(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -200,12 +198,12 @@ impl Handler {
                 println!("Bitfield");
                 let (resp_tx, resp_rx) = oneshot::channel();
 
-                let cmd = Command::RecvBitfield {
+                let cmd = JobCmd::RecvBitfield {
                     addr: self.connection.addr.clone(),
                     bitfield: b,
                     resp_ch: resp_tx,
                 };
-                if let Err(e) = self.cmd_tx.send(cmd).await {
+                if let Err(e) = self.job_ch.send(cmd).await {
                     println!("Coś nie tak {:?}", e);
                 }
 
@@ -231,19 +229,19 @@ impl Handler {
                 h.validate(self.pieces_count)?;
 
                 self.keep_alive = true;
-                let cmd = Command::RecvHave {
+                let cmd = JobCmd::RecvHave {
                     addr: self.connection.addr.clone(),
                     index: h.index(),
                 };
 
-                self.cmd_tx.send(cmd).await?;
+                self.job_ch.send(cmd).await?;
             }
             Some(Frame::Unchoke(_)) => {
                 self.keep_alive = true;
                 self.handle_unchoke().await;
             }
             Some(Frame::Piece(p)) => {
-                p.validate(self.index.unwrap(), self.position, self.chunk_length())?;
+                p.validate(self.index.unwrap(), self.buff_pos, self.chunk_length())?;
 
                 self.keep_alive = true;
                 if false == self.handle_piece(&p).await? {
@@ -262,49 +260,53 @@ impl Handler {
     async fn handle_unchoke(&mut self) {
         let (resp_tx, resp_rx) = oneshot::channel();
 
-        let cmd = Command::RecvUnchoke {
+        let cmd = JobCmd::RecvUnchoke {
             addr: self.connection.addr.clone(),
             resp_ch: resp_tx,
         };
 
-        self.cmd_tx.send(cmd).await.unwrap();
+        self.job_ch.send(cmd).await.unwrap();
 
-        if let Command::SendRequest {
+        if let JobCmd::SendRequest {
             index,
             piece_size,
             piece_hash,
         } = resp_rx.await.unwrap()
         {
-            self.piece = vec![0; piece_size];
+            self.buff_piece = vec![0; piece_size];
             self.piece_hash = piece_hash;
             self.index = Some(index);
 
             let length = self.chunk_length();
-            let msg = Request::new(index, self.position, length);
+            let msg = Request::new(index, self.buff_pos, length);
             println!("Wysyłam request");
             self.connection.write_msg(&msg).await.unwrap();
         }
     }
 
-    async fn handle_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
+    async fn handle_piece(
+        &mut self,
+        buff_piece: &Piece,
+    ) -> Result<bool, Box<dyn std::error::Error>> {
         println!("Piece");
 
-        self.piece[self.position..self.position + piece.block.len()].copy_from_slice(&piece.block);
-        self.position += piece.block.len();
+        self.buff_piece[self.buff_pos..self.buff_pos + buff_piece.block.len()]
+            .copy_from_slice(&buff_piece.block);
+        self.buff_pos += buff_piece.block.len();
 
-        if self.position == self.piece.len() {
+        if self.buff_pos == self.buff_piece.len() {
             if !self.verify() {
                 let (resp_tx, resp_rx) = oneshot::channel();
                 println!("Verify fail");
-                let cmd = Command::VerifyFail {
+                let cmd = JobCmd::VerifyFail {
                     addr: self.connection.addr.clone(),
                     resp_ch: resp_tx,
                 };
 
-                self.cmd_tx.send(cmd).await?;
+                self.job_ch.send(cmd).await?;
 
                 match resp_rx.await? {
-                    Command::End => return Ok(false),
+                    JobCmd::End => return Ok(false),
                     _ => (),
                 }
 
@@ -314,35 +316,35 @@ impl Handler {
             self.write_piece();
 
             let (resp_tx, resp_rx) = oneshot::channel();
-            let cmd = Command::PieceDone {
+            let cmd = JobCmd::PieceDone {
                 addr: self.connection.addr.clone(),
                 resp_ch: resp_tx,
             };
 
-            self.cmd_tx.send(cmd).await?;
+            self.job_ch.send(cmd).await?;
 
             match resp_rx.await? {
-                Command::SendRequest {
+                JobCmd::SendRequest {
                     index,
                     piece_size,
                     piece_hash,
                 } => {
                     self.index = Some(index);
-                    self.position = 0;
-                    self.piece = vec![0; piece_size];
+                    self.buff_pos = 0;
+                    self.buff_piece = vec![0; piece_size];
                     self.piece_hash = piece_hash;
 
                     let length = self.chunk_length();
-                    let msg = Request::new(index, self.position, length);
+                    let msg = Request::new(index, self.buff_pos, length);
                     println!("Wysyłam nowy request");
                     self.connection.write_msg(&msg).await.unwrap();
                 }
-                Command::End => return Ok(false),
+                JobCmd::End => return Ok(false),
                 _ => (),
             }
         } else {
             let length = self.chunk_length();
-            let msg = Request::new(self.index.unwrap(), self.position, length);
+            let msg = Request::new(self.index.unwrap(), self.buff_pos, length);
             println!("Wysyłam kolejny request");
             self.connection.write_msg(&msg).await.unwrap();
         }
@@ -351,8 +353,8 @@ impl Handler {
     }
 
     fn chunk_length(&self) -> usize {
-        if self.position + 0x4000 > self.piece.len() {
-            return self.piece.len() % 0x4000;
+        if self.buff_pos + 0x4000 > self.buff_piece.len() {
+            return self.buff_piece.len() % 0x4000;
         }
 
         return 0x4000;
@@ -360,7 +362,7 @@ impl Handler {
 
     fn verify(&self) -> bool {
         let mut m = sha1::Sha1::new();
-        m.update(self.piece.as_ref());
+        m.update(self.buff_piece.as_ref());
 
         println!("Checksum: {:?} {:?}", m.digest().bytes(), self.piece_hash);
 
@@ -368,7 +370,7 @@ impl Handler {
     }
 
     fn write_piece(&self) {
-        let name = utils::hash_to_string(&self.piece_hash) + ".piece";
-        fs::write(name, &self.piece).unwrap(); // TODO: remove
+        let name = utils::hash_to_string(&self.piece_hash) + ".buff_piece";
+        fs::write(name, &self.buff_piece).unwrap(); // TODO: remove
     }
 }

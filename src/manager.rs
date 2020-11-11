@@ -1,5 +1,5 @@
 use crate::frame::Bitfield;
-use crate::handler::{BitfieldCmd, BroadCmd, Command, Handler};
+use crate::handler::{BitfieldCmd, BroadCmd, Handler, JobCmd};
 use crate::progress::{Progress, ViewCmd};
 use crate::{utils, Error, Metainfo, TrackerResp};
 use rand::seq::SliceRandom;
@@ -18,8 +18,8 @@ pub struct Manager {
 
     metainfo: Metainfo,
     tracker: TrackerResp,
-    cmd_tx: mpsc::Sender<Command>,
-    cmd_rx: mpsc::Receiver<Command>,
+    cmd_tx: mpsc::Sender<JobCmd>,
+    cmd_rx: mpsc::Receiver<JobCmd>,
 
     b_tx: broadcast::Sender<BroadCmd>,
     view: Option<View>,
@@ -106,18 +106,18 @@ impl Manager {
         self.peers.insert(self.tracker.peers()[2].clone(), p);
     }
 
-    async fn event_loop(&mut self, cmd: Command) -> bool {
+    async fn event_loop(&mut self, cmd: JobCmd) -> bool {
         match cmd {
-            Command::RecvBitfield {
+            JobCmd::RecvBitfield {
                 addr,
                 bitfield,
                 resp_ch,
             } => self.handle_bitfield(&addr, &bitfield, resp_ch),
-            Command::RecvUnchoke { addr, resp_ch } => self.handle_unchoke(&addr, resp_ch),
-            Command::RecvHave { addr, index } => self.handle_have(&addr, index),
-            Command::PieceDone { addr, resp_ch } => self.handle_piece_done(&addr, resp_ch),
-            Command::KillReq { addr, index } => self.handle_kill_req(&addr, &index).await,
-            Command::VerifyFail { addr, resp_ch } => self.handle_verify_fail(&addr, resp_ch),
+            JobCmd::RecvUnchoke { addr, resp_ch } => self.handle_unchoke(&addr, resp_ch),
+            JobCmd::RecvHave { addr, index } => self.handle_have(&addr, index),
+            JobCmd::PieceDone { addr, resp_ch } => self.handle_piece_done(&addr, resp_ch),
+            JobCmd::KillReq { addr, index } => self.handle_kill_req(&addr, &index).await,
+            JobCmd::VerifyFail { addr, resp_ch } => self.handle_verify_fail(&addr, resp_ch),
             _ => true,
         }
     }
@@ -159,16 +159,16 @@ impl Manager {
         true
     }
 
-    fn handle_unchoke(&mut self, addr: &String, resp_ch: oneshot::Sender<Command>) -> bool {
+    fn handle_unchoke(&mut self, addr: &String, resp_ch: oneshot::Sender<JobCmd>) -> bool {
         let pieces = &self.peers[addr].pieces;
 
         let cmd = match self.choose_piece(pieces) {
-            Err(_) => Command::SendNotInterested,
+            Err(_) => JobCmd::SendNotInterested,
             Ok(idx) => {
                 self.pieces_status[idx] = Status::Reserved;
                 self.peers.get_mut(addr).unwrap().index = idx;
 
-                Command::SendRequest {
+                JobCmd::SendRequest {
                     index: idx,
                     piece_size: self.piece_size(idx),
                     piece_hash: self.metainfo.pieces()[idx],
@@ -185,7 +185,7 @@ impl Manager {
         true
     }
 
-    fn handle_piece_done(&mut self, addr: &String, resp_ch: oneshot::Sender<Command>) -> bool {
+    fn handle_piece_done(&mut self, addr: &String, resp_ch: oneshot::Sender<JobCmd>) -> bool {
         for (key, peer) in self.peers.iter() {
             if key == addr {
                 self.pieces_status[peer.index] = Status::Have;
@@ -199,12 +199,12 @@ impl Manager {
             }
         }
 
-        let _ = resp_ch.send(Command::End);
+        let _ = resp_ch.send(JobCmd::End);
         true
     }
 
-    fn handle_verify_fail(&mut self, _: &String, resp_ch: oneshot::Sender<Command>) -> bool {
-        let _ = resp_ch.send(Command::End);
+    fn handle_verify_fail(&mut self, _: &String, resp_ch: oneshot::Sender<JobCmd>) -> bool {
+        let _ = resp_ch.send(JobCmd::End);
         true
     }
 
