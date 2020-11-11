@@ -256,12 +256,12 @@ impl Handler {
             self.msg_buff.clear();
         }
 
-        let resp = self.cmd_recv_unchoke().await?;
+        let resp_ch = self.cmd_recv_unchoke().await?;
         if let JobCmd::SendRequest {
             index,
             piece_size,
             piece_hash,
-        } = resp.await?
+        } = resp_ch.await?
         {
             self.prepare_for_new_piece(index, piece_size, &piece_hash);
             self.write_request().await?;
