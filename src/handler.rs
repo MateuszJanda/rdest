@@ -32,6 +32,11 @@ pub enum Command {
         index: usize,
     },
 
+    PieceDone {
+        addr: String,
+        resp_ch: oneshot::Sender<Command>,
+    },
+
     SendBitfield {
         bitfield: Bitfield,
         interested: bool,
@@ -44,7 +49,6 @@ pub enum Command {
 
     SendNotInterested,
 
-    Done(Done),
     VerifyFail(VerifyFail),
     End,
     KillReq {
@@ -54,10 +58,7 @@ pub enum Command {
 }
 
 #[derive(Debug)]
-pub struct Done {
-    pub key: String,
-    pub resp_ch: oneshot::Sender<Command>,
-}
+pub struct Done {}
 
 #[derive(Debug)]
 pub struct VerifyFail {
@@ -315,10 +316,10 @@ impl Handler {
             self.write_piece();
 
             let (resp_tx, resp_rx) = oneshot::channel();
-            let cmd = Command::Done(Done {
-                key: self.connection.addr.clone(),
+            let cmd = Command::PieceDone {
+                addr: self.connection.addr.clone(),
                 resp_ch: resp_tx,
-            });
+            };
 
             self.cmd_tx.send(cmd).await?;
 

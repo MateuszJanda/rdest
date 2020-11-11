@@ -1,5 +1,5 @@
 use crate::frame::Bitfield;
-use crate::handler::{BroadCmd, Command, Done, Handler, VerifyFail};
+use crate::handler::{BroadCmd, Command, Handler, VerifyFail};
 use crate::progress::{ProCmd, Progress};
 use crate::{utils, Error, Metainfo, TrackerResp};
 use rand::seq::SliceRandom;
@@ -76,9 +76,7 @@ impl Manager {
                 } => self.recv_bitfield(addr, bitfield, resp_ch),
                 Command::RecvUnchoke { addr, resp_ch } => self.recv_unchoke(addr, resp_ch),
                 Command::RecvHave { addr, index } => self.recv_have(addr, index),
-                Command::Done(cmd) => {
-                    self.recv_done(cmd);
-                }
+                Command::PieceDone { addr, resp_ch } => self.recv_piece_done(addr, resp_ch),
                 Command::VerifyFail(cmd) => {
                     self.recv_verify_fail(cmd);
                 }
@@ -193,13 +191,13 @@ impl Manager {
         self.peers.get_mut(&addr).unwrap().pieces[index] = true;
     }
 
-    fn recv_done(&mut self, msg: Done) {
+    fn recv_piece_done(&mut self, addr: String, resp_ch: oneshot::Sender<Command>) {
         for (key, peer) in self.peers.iter() {
-            if key == &msg.key {
+            if key == &addr {
                 self.pieces_status[peer.index] = Status::Have;
 
                 let _ = self.b_tx.send(BroadCmd::SendHave {
-                    key: msg.key.clone(),
+                    key: addr.clone(),
                     index: peer.index,
                 });
 
@@ -207,7 +205,7 @@ impl Manager {
             }
         }
 
-        let _ = msg.resp_ch.send(Command::End);
+        let _ = resp_ch.send(Command::End);
     }
 
     fn recv_verify_fail(&mut self, msg: VerifyFail) {
