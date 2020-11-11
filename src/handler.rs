@@ -243,8 +243,8 @@ impl Handler {
         self.peer_status.choked = false;
 
         if !self.msg_buff.is_empty() {
-            for have in self.msg_buff.iter() {
-                self.connection.write_frame(have).await?;
+            for frame in self.msg_buff.iter() {
+                self.connection.write_frame(frame).await?;
             }
             self.msg_buff.clear();
         }
@@ -260,10 +260,7 @@ impl Handler {
             self.piece_hash = piece_hash;
             self.piece_index = Some(index);
 
-            let length = self.block_length();
-            let msg = Request::new(index, self.buff_pos, length);
-            println!("Wysyłam request");
-            self.connection.write_msg(&msg).await?;
+            self.write_request().await?;
         }
 
         Ok(())
