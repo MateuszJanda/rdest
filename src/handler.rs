@@ -73,7 +73,7 @@ pub struct Handler {
     buff_piece: Vec<u8>,
     buff_pos: usize,
     peer_status: Status,
-    msg_buff: Vec<Have>,
+    msg_buff: Vec<Frame>,
     job_ch: mpsc::Sender<JobCmd>,
     broad_ch: broadcast::Receiver<BroadCmd>,
 }
@@ -187,7 +187,7 @@ impl Handler {
                 }
 
                 if self.peer_status.choked {
-                    self.msg_buff.push(Have::new(index));
+                    self.msg_buff.push(Frame::Have(Have::new(index)));
                 } else {
                     self.connection.write_msg(&Have::new(index)).await?;
                 }
@@ -245,7 +245,7 @@ impl Handler {
 
         if !self.msg_buff.is_empty() {
             for have in self.msg_buff.iter() {
-                self.connection.write_msg(have).await?;
+                self.connection.write_frame(have).await?;
             }
             self.msg_buff.clear();
         }
@@ -397,8 +397,13 @@ impl Handler {
 
                     let length = self.block_length();
                     let msg = Request::new(index, self.buff_pos, length);
-                    println!("Wysyłam nowy request");
-                    self.connection.write_msg(&msg).await.unwrap();
+
+                    if self.peer_status.choked {
+                        self.msg_buff.push(Frame::Request(msg));
+                    } else {
+                        println!("Wysyłam kolejny request");
+                        self.connection.write_msg(&msg).await?;
+                    }
                 }
                 JobCmd::End => return Ok(false),
                 _ => (),
@@ -406,8 +411,13 @@ impl Handler {
         } else {
             let length = self.block_length();
             let msg = Request::new(self.piece_index.unwrap(), self.buff_pos, length);
-            println!("Wysyłam kolejny request");
-            self.connection.write_msg(&msg).await.unwrap();
+
+            if self.peer_status.choked {
+                self.msg_buff.push(Frame::Request(msg));
+            } else {
+                println!("Wysyłam kolejny request");
+                self.connection.write_msg(&msg).await?;
+            }
         }
 
         Ok(true)

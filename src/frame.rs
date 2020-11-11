@@ -525,18 +525,18 @@ impl Piece {
     pub fn validate(
         &self,
         index: usize,
-        chunk_index: usize,
-        chunk_length: usize,
+        block_begin: usize,
+        block_length: usize,
     ) -> Result<(), Error> {
         if self.index as usize != index {
             return Err(Error::InvalidIndex);
         }
 
-        if self.begin as usize != chunk_index {
+        if self.begin as usize != block_begin {
             return Err(Error::InvalidIndex);
         }
 
-        if self.block.len() as usize != chunk_length {
+        if self.block.len() as usize != block_length {
             return Err(Error::InvalidSize);
         }
 

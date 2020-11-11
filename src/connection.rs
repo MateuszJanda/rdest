@@ -22,6 +22,16 @@ impl Connection {
         }
     }
 
+    pub async fn write_frame(&mut self, frame: &Frame) -> Result<(), Box<dyn std::error::Error>> {
+        match frame {
+            Frame::Have(msg) => self.write_msg(msg).await?,
+            Frame::Request(msg) => self.write_msg(msg).await?,
+            _ => (),
+        }
+
+        Ok(())
+    }
+
     pub async fn write_msg<T: Serializer>(
         &mut self,
         msg: &T,
