@@ -134,13 +134,11 @@ impl Handler {
     }
 
     async fn kill_req(addr: &String, index: &Option<usize>, job_ch: &mut mpsc::Sender<JobCmd>) {
-        let cmd = JobCmd::KillReq {
-            addr: addr.clone(),
-            index: *index,
-        };
-
         job_ch
-            .send(cmd)
+            .send(JobCmd::KillReq {
+                addr: addr.clone(),
+                index: *index,
+            })
             .await
             .expect("Can't inform manager about KillReq");
     }
@@ -271,32 +269,6 @@ impl Handler {
         Ok(())
     }
 
-    async fn cmd_recv_unchoke(&mut self) -> Result<Receiver<JobCmd>, Box<dyn std::error::Error>> {
-        let (resp_tx, resp_rx) = oneshot::channel();
-        self.job_ch
-            .send(JobCmd::RecvUnchoke {
-                addr: self.connection.addr.clone(),
-                resp_ch: resp_tx,
-            })
-            .await?;
-        Ok(resp_rx)
-    }
-
-    async fn cmd_recv_bitfield(
-        &mut self,
-        bitfield: Bitfield,
-    ) -> Result<Receiver<BitfieldCmd>, Box<dyn std::error::Error>> {
-        let (resp_tx, resp_rx) = oneshot::channel();
-        self.job_ch
-            .send(JobCmd::RecvBitfield {
-                addr: self.connection.addr.clone(),
-                bitfield,
-                resp_ch: resp_tx,
-            })
-            .await?;
-        Ok(resp_rx)
-    }
-
     fn handle_interested(&mut self) {
         self.peer_status.interested = true;
     }
@@ -406,32 +378,58 @@ impl Handler {
                     self.buff_piece = vec![0; piece_size];
                     self.piece_hash = piece_hash;
 
-                    let length = self.block_length();
-                    let msg = Request::new(index, self.buff_pos, length);
-
-                    if self.peer_status.choked {
-                        self.msg_buff.push(Frame::Request(msg));
-                    } else {
-                        println!("Wysyłam kolejny request");
-                        self.connection.write_msg(&msg).await?;
-                    }
+                    self.write_request().await?;
                 }
                 JobCmd::End => return Ok(false),
                 _ => (),
             }
         } else {
-            let length = self.block_length();
-            let msg = Request::new(self.piece_index.unwrap(), self.buff_pos, length);
-
-            if self.peer_status.choked {
-                self.msg_buff.push(Frame::Request(msg));
-            } else {
-                println!("Wysyłam kolejny request");
-                self.connection.write_msg(&msg).await?;
-            }
+            self.write_request().await?;
         }
 
         Ok(true)
+    }
+
+    async fn cmd_recv_unchoke(&mut self) -> Result<Receiver<JobCmd>, Box<dyn std::error::Error>> {
+        let (resp_tx, resp_rx) = oneshot::channel();
+        self.job_ch
+            .send(JobCmd::RecvUnchoke {
+                addr: self.connection.addr.clone(),
+                resp_ch: resp_tx,
+            })
+            .await?;
+        Ok(resp_rx)
+    }
+
+    async fn cmd_recv_bitfield(
+        &mut self,
+        bitfield: Bitfield,
+    ) -> Result<Receiver<BitfieldCmd>, Box<dyn std::error::Error>> {
+        let (resp_tx, resp_rx) = oneshot::channel();
+        self.job_ch
+            .send(JobCmd::RecvBitfield {
+                addr: self.connection.addr.clone(),
+                bitfield,
+                resp_ch: resp_tx,
+            })
+            .await?;
+        Ok(resp_rx)
+    }
+
+    async fn write_request(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let msg = Request::new(
+            self.piece_index.unwrap(),
+            self.buff_pos,
+            self.block_length(),
+        );
+        if self.peer_status.choked {
+            self.msg_buff.push(Frame::Request(msg));
+        } else {
+            println!("Wysyłam kolejny request");
+            self.connection.write_msg(&msg).await?;
+        }
+
+        Ok(())
     }
 
     fn block_length(&self) -> usize {
