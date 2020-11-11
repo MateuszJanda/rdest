@@ -256,14 +256,23 @@ impl Handler {
             piece_hash,
         } = resp.await?
         {
-            self.buff_piece = vec![0; piece_size];
-            self.piece_hash = piece_hash;
-            self.piece_index = Some(index);
-
+            self.prepare_for_new_piece(index, piece_size, &piece_hash);
             self.write_request().await?;
         }
 
         Ok(())
+    }
+
+    fn prepare_for_new_piece(
+        &mut self,
+        piece_index: usize,
+        piece_size: usize,
+        piece_hash: &[u8; 20],
+    ) {
+        self.piece_index = Some(piece_index);
+        self.buff_piece = vec![0; piece_size];
+        self.buff_pos = 0;
+        self.piece_hash = *piece_hash;
     }
 
     fn handle_interested(&mut self) {
@@ -298,16 +307,11 @@ impl Handler {
             interested,
         } = resp.await?
         {
-            println!("Odsyłam Bitfield {:?}", bitfield);
-            if let Err(e) = self.connection.write_msg(&bitfield).await {
-                println!("After Bitfield {:?}", e);
-            }
+            self.connection.write_msg(&bitfield).await?;
 
             if interested {
                 println!("Wysyłam Interested");
-                if let Err(e) = self.connection.write_msg(&Interested::new()).await {
-                    println!("After Interested {:?}", e);
-                }
+                self.connection.write_msg(&Interested::new()).await?
             }
         }
 
@@ -355,6 +359,7 @@ impl Handler {
             }
 
             self.write_piece();
+            self.piece_index = None;
 
             let (resp_tx, resp_rx) = oneshot::channel();
             let cmd = JobCmd::PieceDone {
@@ -370,11 +375,7 @@ impl Handler {
                     piece_size,
                     piece_hash,
                 } => {
-                    self.piece_index = Some(index);
-                    self.buff_pos = 0;
-                    self.buff_piece = vec![0; piece_size];
-                    self.piece_hash = piece_hash;
-
+                    self.prepare_for_new_piece(index, piece_size, &piece_hash);
                     self.write_request().await?;
                 }
                 JobCmd::End => return Ok(false),
