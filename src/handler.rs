@@ -66,7 +66,7 @@ pub enum BitfieldCmd {
 pub struct Handler {
     info_hash: [u8; 20],
     own_id: [u8; 20],
-    index: Option<usize>,
+    piece_index: Option<usize>,
     pieces_count: usize,
     buff_piece: Vec<u8>,
     buff_pos: usize,
@@ -95,7 +95,7 @@ impl Handler {
             let mut handler = Handler {
                 own_id,
                 info_hash,
-                index: None,
+                piece_index: None,
                 pieces_count,
                 buff_piece: vec![],
                 buff_pos: 0,
@@ -113,7 +113,7 @@ impl Handler {
 
             Self::kill_req(
                 &handler.connection.addr,
-                &handler.index,
+                &handler.piece_index,
                 &mut handler.job_ch,
             )
             .await;
@@ -245,7 +245,7 @@ impl Handler {
         {
             self.buff_piece = vec![0; piece_size];
             self.piece_hash = piece_hash;
-            self.index = Some(index);
+            self.piece_index = Some(index);
 
             let length = self.chunk_length();
             let msg = Request::new(index, self.buff_pos, length);
@@ -305,7 +305,11 @@ impl Handler {
 
     async fn handle_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
         self.keep_alive = true;
-        piece.validate(self.index.unwrap(), self.buff_pos, self.chunk_length())?;
+        piece.validate(
+            self.piece_index.unwrap(),
+            self.buff_pos,
+            self.chunk_length(),
+        )?;
 
         if self.save_piece(piece).await? == false {
             return Ok(false);
@@ -356,7 +360,7 @@ impl Handler {
                     piece_size,
                     piece_hash,
                 } => {
-                    self.index = Some(index);
+                    self.piece_index = Some(index);
                     self.buff_pos = 0;
                     self.buff_piece = vec![0; piece_size];
                     self.piece_hash = piece_hash;
@@ -371,7 +375,7 @@ impl Handler {
             }
         } else {
             let length = self.chunk_length();
-            let msg = Request::new(self.index.unwrap(), self.buff_pos, length);
+            let msg = Request::new(self.piece_index.unwrap(), self.buff_pos, length);
             println!("Wysyłam kolejny request");
             self.connection.write_msg(&msg).await.unwrap();
         }
@@ -397,7 +401,7 @@ impl Handler {
     }
 
     fn write_piece(&self) {
-        let name = utils::hash_to_string(&self.piece_hash) + ".buff_piece";
-        fs::write(name, &self.buff_piece).unwrap(); // TODO: remove
+        let name = utils::hash_to_string(&self.piece_hash) + ".piece";
+        fs::write(name, &self.buff_piece).unwrap();
     }
 }
