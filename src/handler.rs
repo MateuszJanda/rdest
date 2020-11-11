@@ -328,24 +328,24 @@ impl Handler {
     }
 
     async fn handle_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
-        if let Some(piece_data) = self.piece.as_ref() {
-            piece.validate(
-                piece_data.index,
-                piece_data.buff_pos,
-                piece_data.block_length(),
-            )?;
-        } else {
-            return Err(Box::new(Error::NotFound));
-        }
+        let piece_data = self.piece.as_ref().ok_or(Error::NotFound)?;
+        piece.validate(
+            piece_data.index,
+            piece_data.buff_pos,
+            piece_data.block_length(),
+        )?;
 
-        if self.save_piece(piece).await? == false {
+        if self.update_piece_data(piece).await? == false {
             return Ok(false);
         }
 
         Ok(true)
     }
 
-    async fn save_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
+    async fn update_piece_data(
+        &mut self,
+        piece: &Piece,
+    ) -> Result<bool, Box<dyn std::error::Error>> {
         println!("Piece");
 
         let piece_data = self
@@ -377,7 +377,7 @@ impl Handler {
                 return Ok(true);
             }
 
-            self.write_piece();
+            self.save_piece_to_file();
 
             let (resp_tx, resp_rx) = oneshot::channel();
             let cmd = JobCmd::PieceDone {
@@ -458,7 +458,7 @@ impl Handler {
         return false;
     }
 
-    fn write_piece(&mut self) {
+    fn save_piece_to_file(&mut self) {
         let piece_data = self
             .piece
             .take()
