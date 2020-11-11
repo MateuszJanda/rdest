@@ -73,6 +73,34 @@ impl Manager {
         }
     }
 
+    fn spawn_progress_view(&mut self) {
+        let (mut view, channel) = Progress::new();
+        self.progress_job = Some(tokio::spawn(async move { view.run().await }));
+        self.pro_cmd = Some(channel);
+    }
+
+    fn spawn_jobs(&mut self) {
+        let addr = self.tracker.peers()[2].clone();
+        let info_hash = *self.metainfo.info_hash();
+        let own_id = self.own_id.clone();
+        let pieces_count = self.metainfo.pieces().len();
+        let cmd_tx = self.cmd_tx.clone();
+
+        let b_rx = self.b_tx.subscribe();
+
+        let job = tokio::spawn(async move {
+            Handler::run(addr, own_id, info_hash, pieces_count, cmd_tx, b_rx).await
+        });
+
+        let p = Peer {
+            pieces: vec![],
+            job: Some(job),
+            index: 0,
+        };
+
+        self.peers.insert(self.tracker.peers()[2].clone(), p);
+    }
+
     async fn event_loop(&mut self, cmd: Command) -> bool {
         match cmd {
             Command::RecvBitfield {
@@ -156,6 +184,32 @@ impl Manager {
         let _ = &resp_ch.send(cmd);
     }
 
+    fn handle_have(&mut self, addr: &String, index: usize) {
+        self.peers.get_mut(addr).unwrap().pieces[index] = true;
+    }
+
+    fn handle_piece_done(&mut self, addr: &String, resp_ch: oneshot::Sender<Command>) {
+        for (key, peer) in self.peers.iter() {
+            if key == addr {
+                self.pieces_status[peer.index] = Status::Have;
+
+                let _ = self.b_tx.send(BroadCmd::SendHave {
+                    key: addr.clone(),
+                    index: peer.index,
+                });
+
+                break;
+            }
+        }
+
+        let _ = resp_ch.send(Command::End);
+    }
+
+    fn handle_verify_fail(&mut self, _: &String, resp_ch: oneshot::Sender<Command>) {
+        let _ = resp_ch.send(Command::End);
+    }
+
+
     fn choose_piece(&self, pieces: &Vec<bool>) -> Result<usize, Error> {
         let mut v: Vec<u32> = vec![0; self.metainfo.pieces().len()];
 
@@ -188,67 +242,12 @@ impl Manager {
         Err(Error::NotFound)
     }
 
-    fn handle_have(&mut self, addr: &String, index: usize) {
-        self.peers.get_mut(addr).unwrap().pieces[index] = true;
-    }
-
-    fn handle_piece_done(&mut self, addr: &String, resp_ch: oneshot::Sender<Command>) {
-        for (key, peer) in self.peers.iter() {
-            if key == addr {
-                self.pieces_status[peer.index] = Status::Have;
-
-                let _ = self.b_tx.send(BroadCmd::SendHave {
-                    key: addr.clone(),
-                    index: peer.index,
-                });
-
-                break;
-            }
-        }
-
-        let _ = resp_ch.send(Command::End);
-    }
-
-    fn handle_verify_fail(&mut self, _: &String, resp_ch: oneshot::Sender<Command>) {
-        let _ = resp_ch.send(Command::End);
-    }
-
     fn piece_size(&self, index: usize) -> usize {
         if index < self.metainfo.pieces().len() - 1 {
             return self.metainfo.piece_length();
         }
 
         self.metainfo.total_length() as usize % self.metainfo.piece_length()
-    }
-
-    fn spawn_progress_view(&mut self) {
-        let (mut p, r) = Progress::new();
-
-        self.progress_job = Some(tokio::spawn(async move { p.run().await }));
-
-        self.pro_cmd = Some(r);
-    }
-
-    fn spawn_jobs(&mut self) {
-        let addr = self.tracker.peers()[2].clone();
-        let info_hash = *self.metainfo.info_hash();
-        let own_id = self.own_id.clone();
-        let pieces_count = self.metainfo.pieces().len();
-        let cmd_tx = self.cmd_tx.clone();
-
-        let b_rx = self.b_tx.subscribe();
-
-        let job = tokio::spawn(async move {
-            Handler::run(addr, own_id, info_hash, pieces_count, cmd_tx, b_rx).await
-        });
-
-        let p = Peer {
-            pieces: vec![],
-            job: Some(job),
-            index: 0,
-        };
-
-        self.peers.insert(self.tracker.peers()[2].clone(), p);
     }
 
     async fn kill_job(&mut self, addr: &String, index: &Option<usize>) {
