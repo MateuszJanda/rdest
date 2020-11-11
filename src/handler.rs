@@ -122,6 +122,18 @@ impl Handler {
         }
     }
 
+    async fn kill_req(addr: &String, index: &Option<usize>, job_ch: &mut mpsc::Sender<JobCmd>) {
+        let cmd = JobCmd::KillReq {
+            addr: addr.clone(),
+            index: *index,
+        };
+
+        job_ch
+            .send(cmd)
+            .await
+            .expect("Can't inform manager about KillReq");
+    }
+
     async fn event_loop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.connection
             .write_msg(&Handshake::new(&self.info_hash, &self.own_id))
@@ -140,13 +152,13 @@ impl Handler {
                     self.send_keep_alive().await?;
                     self.keep_alive = false;
                 }
-                c = self.broad_ch.recv() => {
-                    if false == self.send_have(c?).await? {
+                cmd = self.broad_ch.recv() => {
+                    if self.send_have(cmd?).await? == false {
                         break;
                     }
                 }
                 frame = self.connection.read_frame() => {
-                    if false == self.handle_frame(frame?).await? {
+                    if self.handle_frame(frame?).await? == false {
                         break;
                     }
                 }
@@ -154,18 +166,6 @@ impl Handler {
         }
 
         Ok(())
-    }
-
-    async fn kill_req(addr: &String, index: &Option<usize>, job_ch: &mut mpsc::Sender<JobCmd>) {
-        let cmd = JobCmd::KillReq {
-            addr: addr.clone(),
-            index: *index,
-        };
-
-        job_ch
-            .send(cmd)
-            .await
-            .expect("Can't inform manager about KillReq");
     }
 
     async fn send_keep_alive(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -190,61 +190,11 @@ impl Handler {
         frame: Option<Frame>,
     ) -> Result<bool, Box<dyn std::error::Error>> {
         match frame {
-            Some(Frame::Handshake(h)) => {
-                println!("Handshake");
-                self.keep_alive = true;
-                h.validate(&self.info_hash)?;
-            }
-            Some(Frame::KeepAlive(_)) => {
-                self.keep_alive = true;
-            }
-            Some(Frame::Bitfield(b)) => {
-                b.validate(&self.pieces_count)?;
-
-                self.keep_alive = true;
-                println!("Bitfield");
-                let (resp_tx, resp_rx) = oneshot::channel();
-
-                let cmd = JobCmd::RecvBitfield {
-                    addr: self.connection.addr.clone(),
-                    bitfield: b,
-                    resp_ch: resp_tx,
-                };
-                self.job_ch.send(cmd).await?;
-
-                if let BitfieldCmd::SendBitfield {
-                    bitfield,
-                    interested,
-                } = resp_rx.await.unwrap()
-                {
-                    println!("Odsyłam Bitfield {:?}", bitfield);
-                    if let Err(e) = self.connection.write_msg(&bitfield).await {
-                        println!("After Bitfield {:?}", e);
-                    }
-
-                    if interested {
-                        println!("Wysyłam Interested");
-                        if let Err(e) = self.connection.write_msg(&Interested::new()).await {
-                            println!("After Interested {:?}", e);
-                        }
-                    }
-                }
-            }
-            Some(Frame::Have(h)) => {
-                h.validate(self.pieces_count)?;
-
-                self.keep_alive = true;
-                let cmd = JobCmd::RecvHave {
-                    addr: self.connection.addr.clone(),
-                    index: h.index(),
-                };
-
-                self.job_ch.send(cmd).await?;
-            }
-            Some(Frame::Unchoke(_)) => {
-                self.keep_alive = true;
-                self.handle_unchoke().await;
-            }
+            Some(Frame::Handshake(handshake)) => self.handle_handshake(&handshake)?,
+            Some(Frame::KeepAlive(_)) => self.handle_keep_alive(),
+            Some(Frame::Unchoke(_)) => self.handle_unchoke().await,
+            Some(Frame::Have(have)) => self.handle_have(&have).await?,
+            Some(Frame::Bitfield(bitfield)) => self.handle_bitfield(bitfield).await?,
             Some(Frame::Piece(p)) => {
                 p.validate(self.index.unwrap(), self.buff_pos, self.chunk_length())?;
 
@@ -262,7 +212,21 @@ impl Handler {
         return Ok(true);
     }
 
+    fn handle_handshake(
+        &mut self,
+        handshake: &Handshake,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.keep_alive = true;
+        handshake.validate(&self.info_hash)?;
+        Ok(())
+    }
+
+    fn handle_keep_alive(&mut self) {
+        self.keep_alive = true;
+    }
+
     async fn handle_unchoke(&mut self) {
+        self.keep_alive = true;
         let (resp_tx, resp_rx) = oneshot::channel();
 
         let cmd = JobCmd::RecvUnchoke {
@@ -287,6 +251,55 @@ impl Handler {
             println!("Wysyłam request");
             self.connection.write_msg(&msg).await.unwrap();
         }
+    }
+    async fn handle_have(&mut self, have: &Have) -> Result<(), Box<dyn std::error::Error>> {
+        self.keep_alive = true;
+        have.validate(self.pieces_count)?;
+
+        let cmd = JobCmd::RecvHave {
+            addr: self.connection.addr.clone(),
+            index: have.index(),
+        };
+
+        self.job_ch.send(cmd).await?;
+        Ok(())
+    }
+
+    async fn handle_bitfield(
+        &mut self,
+        bitfield: Bitfield,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.keep_alive = true;
+        bitfield.validate(&self.pieces_count)?;
+
+        let (resp_tx, resp_rx) = oneshot::channel();
+
+        let cmd = JobCmd::RecvBitfield {
+            addr: self.connection.addr.clone(),
+            bitfield,
+            resp_ch: resp_tx,
+        };
+        self.job_ch.send(cmd).await?;
+
+        if let BitfieldCmd::SendBitfield {
+            bitfield,
+            interested,
+        } = resp_rx.await.unwrap()
+        {
+            println!("Odsyłam Bitfield {:?}", bitfield);
+            if let Err(e) = self.connection.write_msg(&bitfield).await {
+                println!("After Bitfield {:?}", e);
+            }
+
+            if interested {
+                println!("Wysyłam Interested");
+                if let Err(e) = self.connection.write_msg(&Interested::new()).await {
+                    println!("After Interested {:?}", e);
+                }
+            }
+        }
+
+        Ok(())
     }
 
     async fn handle_piece(
