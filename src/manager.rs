@@ -121,7 +121,9 @@ impl Manager {
             JobCmd::RecvHave { addr, index } => self.handle_have(&addr, index),
             JobCmd::PieceDone { addr, resp_ch } => self.handle_piece_done(&addr, resp_ch),
             JobCmd::KillReq { addr, index } => self.handle_kill_req(&addr, &index).await,
-            JobCmd::VerifyFail { addr, resp_ch } => self.handle_verify_fail(&addr, resp_ch),
+            JobCmd::FailVerifyHash { addr, resp_ch } => {
+                self.handle_fail_verify_hash(&addr, resp_ch)
+            }
             _ => true,
         }
     }
@@ -211,7 +213,7 @@ impl Manager {
         true
     }
 
-    fn handle_verify_fail(&mut self, _: &String, resp_ch: oneshot::Sender<JobCmd>) -> bool {
+    fn handle_fail_verify_hash(&mut self, _: &String, resp_ch: oneshot::Sender<JobCmd>) -> bool {
         let _ = resp_ch.send(JobCmd::End);
         true
     }

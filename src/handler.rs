@@ -36,7 +36,7 @@ pub enum JobCmd {
         addr: String,
         resp_ch: oneshot::Sender<PieceDoneCmd>,
     },
-    VerifyFail {
+    FailVerifyHash {
         addr: String,
         resp_ch: oneshot::Sender<JobCmd>,
     },
@@ -314,46 +314,12 @@ impl Handler {
         piece_data.buff_pos += piece.block.len();
 
         if piece_data.buff_pos == piece_data.buff.len() {
-            if !self.verify() {
-                let (resp_tx, resp_rx) = oneshot::channel();
-                println!("Verify fail");
-                let cmd = JobCmd::VerifyFail {
-                    addr: self.connection.addr.clone(),
-                    resp_ch: resp_tx,
-                };
-
-                self.job_ch.send(cmd).await?;
-
-                match resp_rx.await? {
-                    JobCmd::End => return Ok(false),
-                    _ => (),
-                }
-
-                return Ok(true);
+            if !self.verify_hash() {
+                return Ok(self.cmd_fail_verify_hash().await?);
             }
 
             self.save_piece_to_file();
-
-            let (resp_tx, resp_rx) = oneshot::channel();
-            let cmd = JobCmd::PieceDone {
-                addr: self.connection.addr.clone(),
-                resp_ch: resp_tx,
-            };
-
-            self.job_ch.send(cmd).await?;
-
-            match resp_rx.await? {
-                PieceDoneCmd::SendRequest {
-                    index,
-                    piece_size,
-                    piece_hash,
-                } => {
-                    self.prepare_for_new_piece(index, piece_size, &piece_hash);
-                    self.send_request().await?;
-                }
-                PieceDoneCmd::End => return Ok(false),
-                _ => (),
-            }
+            return Ok(self.cmd_recv_piece().await?);
         } else {
             self.send_request().await?;
         }
@@ -419,6 +385,49 @@ impl Handler {
         Ok(())
     }
 
+    async fn cmd_recv_piece(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
+        let (resp_tx, resp_rx) = oneshot::channel();
+        let cmd = JobCmd::PieceDone {
+            addr: self.connection.addr.clone(),
+            resp_ch: resp_tx,
+        };
+
+        self.job_ch.send(cmd).await?;
+
+        match resp_rx.await? {
+            PieceDoneCmd::SendRequest {
+                index,
+                piece_size,
+                piece_hash,
+            } => {
+                self.prepare_for_new_piece(index, piece_size, &piece_hash);
+                self.send_request().await?;
+            }
+            PieceDoneCmd::End => return Ok(false),
+            _ => (),
+        }
+
+        Ok(true)
+    }
+
+    async fn cmd_fail_verify_hash(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
+        println!("verify piece hash fail");
+        let (resp_tx, resp_rx) = oneshot::channel();
+        self.job_ch
+            .send(JobCmd::FailVerifyHash {
+                addr: self.connection.addr.clone(),
+                resp_ch: resp_tx,
+            })
+            .await?;
+
+        match resp_rx.await? {
+            JobCmd::End => return Ok(false),
+            _ => (),
+        }
+
+        return Ok(true);
+    }
+
     async fn send_keep_alive(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.connection.send_msg(&KeepAlive::new()).await?;
         Ok(())
@@ -480,7 +489,7 @@ impl Handler {
         });
     }
 
-    fn verify(&self) -> bool {
+    fn verify_hash(&self) -> bool {
         if let Some(piece_data) = self.piece.as_ref() {
             let mut m = sha1::Sha1::new();
             m.update(piece_data.buff.as_ref());
