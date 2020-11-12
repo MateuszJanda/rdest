@@ -411,13 +411,13 @@ impl Handler {
                     piece_hash,
                 } => {
                     self.prepare_for_new_piece(index, piece_size, &piece_hash);
-                    self.write_request().await?;
+                    self.send_request().await?;
                 }
                 PieceDoneCmd::End => return Ok(false),
                 _ => (),
             }
         } else {
-            self.write_request().await?;
+            self.send_request().await?;
         }
 
         Ok(true)
@@ -443,7 +443,7 @@ impl Handler {
                 piece_hash,
             } => {
                 self.prepare_for_new_piece(index, piece_size, &piece_hash);
-                self.write_request().await?;
+                self.send_request().await?;
             }
             UnchokeCmd::SendNotInterested => (),
             UnchokeCmd::Nothing => (),
@@ -467,7 +467,7 @@ impl Handler {
         Ok(resp_rx)
     }
 
-    async fn write_request(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn send_request(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(piece) = self.piece.as_ref() {
             let msg = Request::new(piece.index, piece.buff_pos, piece.next_block_length());
             if self.peer_status.choked {
