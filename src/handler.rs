@@ -105,7 +105,7 @@ struct PieceData {
 }
 
 impl PieceData {
-    fn block_length(&self) -> usize {
+    fn next_block_length(&self) -> usize {
         if self.buff_pos + 0x4000 > self.buff.len() {
             return self.buff.len() % 0x4000;
         }
@@ -167,7 +167,7 @@ impl Handler {
 
     async fn event_loop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.connection
-            .write_msg(&Handshake::new(&self.info_hash, &self.own_id))
+            .send_msg(&Handshake::new(&self.info_hash, &self.own_id))
             .await?;
 
         let start = Instant::now() + Duration::from_secs(2 * 60);
@@ -184,7 +184,7 @@ impl Handler {
                     self.peer_status.keep_alive = false;
                 }
                 cmd = self.broad_ch.recv() => self.send_have(cmd?).await?,
-                frame = self.connection.read_frame() => {
+                frame = self.connection.recv_frame() => {
                     if self.handle_frame(frame?).await? == false {
                         break;
                     }
@@ -196,7 +196,7 @@ impl Handler {
     }
 
     async fn send_keep_alive(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.connection.write_msg(&KeepAlive::new()).await?;
+        self.connection.send_msg(&KeepAlive::new()).await?;
         Ok(())
     }
 
@@ -210,7 +210,7 @@ impl Handler {
                 if self.peer_status.choked {
                     self.msg_buff.push(Frame::Have(Have::new(index)));
                 } else {
-                    self.connection.write_msg(&Have::new(index)).await?;
+                    self.connection.send_msg(&Have::new(index)).await?;
                 }
             }
         }
@@ -267,7 +267,7 @@ impl Handler {
         let req_ongoing = self.any_request_in_msg_buff();
         if !self.msg_buff.is_empty() {
             for frame in self.msg_buff.iter() {
-                self.connection.write_frame(frame).await?;
+                self.connection.send_frame(frame).await?;
             }
             self.msg_buff.clear();
         }
@@ -333,11 +333,11 @@ impl Handler {
             interested,
         } = resp.await?
         {
-            self.connection.write_msg(&bitfield).await?;
+            self.connection.send_msg(&bitfield).await?;
 
             if interested {
                 println!("Wysyłam Interested");
-                self.connection.write_msg(&Interested::new()).await?
+                self.connection.send_msg(&Interested::new()).await?
             }
         }
 
@@ -349,7 +349,7 @@ impl Handler {
         piece.validate(
             piece_data.index,
             piece_data.buff_pos,
-            piece_data.block_length(),
+            piece_data.next_block_length(),
         )?;
 
         if self.update_piece_data(piece).await? == false {
@@ -469,12 +469,12 @@ impl Handler {
 
     async fn write_request(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(piece) = self.piece.as_ref() {
-            let msg = Request::new(piece.index, piece.buff_pos, piece.block_length());
+            let msg = Request::new(piece.index, piece.buff_pos, piece.next_block_length());
             if self.peer_status.choked {
                 self.msg_buff.push(Frame::Request(msg));
             } else {
                 println!("Wysyłam kolejny request");
-                self.connection.write_msg(&msg).await?;
+                self.connection.send_msg(&msg).await?;
             }
         }
 
