@@ -81,6 +81,7 @@ pub enum PieceDoneCmd {
 pub struct Handler {
     connection: Connection,
     own_id: [u8; 20],
+    peer_id: [u8; 20],
     info_hash: [u8; 20],
     pieces_count: usize,
     piece: Option<PieceData>,
@@ -117,6 +118,7 @@ impl Handler {
     pub async fn run(
         addr: String,
         own_id: [u8; 20],
+        peer_id: [u8; 20],
         info_hash: [u8; 20],
         pieces_count: usize,
         mut job_ch: mpsc::Sender<JobCmd>,
@@ -129,6 +131,7 @@ impl Handler {
             let mut handler = Handler {
                 connection: Connection::new(addr, stream),
                 own_id,
+                peer_id,
                 info_hash,
                 pieces_count,
                 piece: None,
@@ -229,7 +232,7 @@ impl Handler {
         &mut self,
         handshake: &Handshake,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        handshake.validate(&self.info_hash)?;
+        handshake.validate(&self.info_hash, &self.peer_id)?;
         Ok(())
     }
 

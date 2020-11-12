@@ -89,11 +89,23 @@ impl Handshake {
         return Err(Error::InvalidProtocolId);
     }
 
-    pub fn validate(&self, info_hash: &[u8; 20]) -> Result<(), Error> {
-        for i in 0..self.info_hash.len() {
-            if info_hash[i] != self.info_hash[i] {
-                return Err(Error::InvalidInfoHash);
-            }
+    pub fn validate(&self, info_hash: &[u8; 20], peer_id: &[u8; 20]) -> Result<(), Error> {
+        if self
+            .info_hash
+            .iter()
+            .enumerate()
+            .any(|(idx, b)| *b != info_hash[idx])
+        {
+            return Err(Error::InvalidInfoHash);
+        }
+
+        if self
+            .peer_id
+            .iter()
+            .enumerate()
+            .any(|(idx, b)| *b != peer_id[idx])
+        {
+            return Err(Error::InvalidInfoHash);
         }
 
         Ok(())

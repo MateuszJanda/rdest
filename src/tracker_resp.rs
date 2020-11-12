@@ -1,6 +1,6 @@
 use crate::{BDecoder, BValue, Error};
 use std::collections::HashMap;
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 use std::fs;
 
 #[derive(PartialEq, Clone, Debug)]
@@ -12,7 +12,7 @@ pub struct TrackerResp {
 #[derive(PartialEq, Clone, Debug)]
 pub struct Peer {
     ip: String,
-    peer_id: String,
+    peer_id: [u8; 20],
     port: u64,
 }
 
@@ -106,7 +106,7 @@ impl TrackerResp {
             .filter_map(|(ip, peer_id, port)| {
                 match (
                     String::from_utf8(ip.to_vec()),
-                    String::from_utf8(peer_id.to_vec()),
+                    peer_id.as_slice().try_into(),
                     u64::try_from(*port),
                 ) {
                     (Ok(ip), Ok(peer_id), Ok(port)) => Some(Peer { ip, peer_id, port }),
@@ -116,10 +116,10 @@ impl TrackerResp {
             .collect()
     }
 
-    pub fn peers(&self) -> Vec<String> {
+    pub fn peers(&self) -> Vec<(String, [u8; 20])> {
         self.peers
             .iter()
-            .map(|peer| peer.ip.clone() + ":" + peer.port.to_string().as_str())
+            .map(|p| (p.ip.clone() + ":" + p.port.to_string().as_str(), p.peer_id))
             .collect()
     }
 }

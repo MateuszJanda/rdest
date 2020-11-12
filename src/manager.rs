@@ -85,7 +85,8 @@ impl Manager {
     }
 
     fn spawn_jobs(&mut self) {
-        let addr = self.tracker.peers()[2].clone();
+        let (addr, peer_id) = self.tracker.peers()[2].clone();
+        let a = addr.clone();
         let info_hash = *self.metainfo.info_hash();
         let own_id = self.own_id.clone();
         let pieces_count = self.metainfo.pieces().len();
@@ -94,7 +95,7 @@ impl Manager {
         let b_rx = self.b_tx.subscribe();
 
         let job = tokio::spawn(async move {
-            Handler::run(addr, own_id, info_hash, pieces_count, cmd_tx, b_rx).await
+            Handler::run(addr, own_id, peer_id, info_hash, pieces_count, cmd_tx, b_rx).await
         });
 
         let p = Peer {
@@ -103,7 +104,7 @@ impl Manager {
             index: 0,
         };
 
-        self.peers.insert(self.tracker.peers()[2].clone(), p);
+        self.peers.insert(a, p);
     }
 
     async fn event_loop(&mut self, cmd: JobCmd) -> bool {
