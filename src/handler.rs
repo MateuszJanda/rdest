@@ -24,7 +24,8 @@ pub enum JobCmd {
     },
     RecvUnchoke {
         addr: String,
-        resp_ch: oneshot::Sender<JobCmd>,
+        req_ongoing: bool,
+        resp_ch: oneshot::Sender<UnchokeCmd>,
     },
     // RecvInterested,
     // RecvNotInterested,
@@ -34,7 +35,7 @@ pub enum JobCmd {
     },
     PieceDone {
         addr: String,
-        resp_ch: oneshot::Sender<JobCmd>,
+        resp_ch: oneshot::Sender<PieceDoneCmd>,
     },
     VerifyFail {
         addr: String,
@@ -45,13 +46,6 @@ pub enum JobCmd {
         index: Option<usize>,
     },
 
-    SendRequest {
-        index: usize,
-        piece_size: usize,
-        piece_hash: [u8; 20],
-    },
-
-    SendNotInterested,
     End,
 }
 
@@ -62,6 +56,27 @@ pub enum BitfieldCmd {
         interested: bool,
     },
     // PrepareKill,
+}
+
+#[derive(Debug)]
+pub enum UnchokeCmd {
+    SendRequest {
+        index: usize,
+        piece_size: usize,
+        piece_hash: [u8; 20],
+    },
+    SendNotInterested,
+    Nothing,
+}
+
+#[derive(Debug)]
+pub enum PieceDoneCmd {
+    SendRequest {
+        index: usize,
+        piece_size: usize,
+        piece_hash: [u8; 20],
+    },
+    End,
 }
 
 pub struct Handler {
@@ -249,6 +264,7 @@ impl Handler {
     async fn handle_unchoke(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.peer_status.choked = false;
 
+        let req_ongoing = self.any_request_in_msg_buff();
         if !self.msg_buff.is_empty() {
             for frame in self.msg_buff.iter() {
                 self.connection.write_frame(frame).await?;
@@ -256,18 +272,19 @@ impl Handler {
             self.msg_buff.clear();
         }
 
-        let resp_ch = self.cmd_recv_unchoke().await?;
-        if let JobCmd::SendRequest {
-            index,
-            piece_size,
-            piece_hash,
-        } = resp_ch.await?
-        {
-            self.prepare_for_new_piece(index, piece_size, &piece_hash);
-            self.write_request().await?;
-        }
+        self.cmd_recv_unchoke(req_ongoing).await?;
 
         Ok(())
+    }
+
+    fn any_request_in_msg_buff(&self) -> bool {
+        self.msg_buff.iter().any(|f| {
+            if let Frame::Request(_) = f {
+                true
+            } else {
+                false
+            }
+        })
     }
 
     fn prepare_for_new_piece(
@@ -388,7 +405,7 @@ impl Handler {
             self.job_ch.send(cmd).await?;
 
             match resp_rx.await? {
-                JobCmd::SendRequest {
+                PieceDoneCmd::SendRequest {
                     index,
                     piece_size,
                     piece_hash,
@@ -396,7 +413,7 @@ impl Handler {
                     self.prepare_for_new_piece(index, piece_size, &piece_hash);
                     self.write_request().await?;
                 }
-                JobCmd::End => return Ok(false),
+                PieceDoneCmd::End => return Ok(false),
                 _ => (),
             }
         } else {
@@ -406,15 +423,33 @@ impl Handler {
         Ok(true)
     }
 
-    async fn cmd_recv_unchoke(&mut self) -> Result<Receiver<JobCmd>, Box<dyn std::error::Error>> {
+    async fn cmd_recv_unchoke(
+        &mut self,
+        req_ongoing: bool,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let (resp_tx, resp_rx) = oneshot::channel();
         self.job_ch
             .send(JobCmd::RecvUnchoke {
                 addr: self.connection.addr.clone(),
+                req_ongoing,
                 resp_ch: resp_tx,
             })
             .await?;
-        Ok(resp_rx)
+
+        match resp_rx.await? {
+            UnchokeCmd::SendRequest {
+                index,
+                piece_size,
+                piece_hash,
+            } => {
+                self.prepare_for_new_piece(index, piece_size, &piece_hash);
+                self.write_request().await?;
+            }
+            UnchokeCmd::SendNotInterested => (),
+            UnchokeCmd::Nothing => (),
+        }
+
+        Ok(())
     }
 
     async fn cmd_recv_bitfield(

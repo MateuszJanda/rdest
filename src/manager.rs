@@ -1,5 +1,5 @@
 use crate::frame::Bitfield;
-use crate::handler::{BitfieldCmd, BroadCmd, Handler, JobCmd};
+use crate::handler::{BitfieldCmd, BroadCmd, Handler, JobCmd, PieceDoneCmd, UnchokeCmd};
 use crate::progress::{Progress, ViewCmd};
 use crate::{utils, Error, Metainfo, TrackerResp};
 use rand::seq::SliceRandom;
@@ -113,7 +113,11 @@ impl Manager {
                 bitfield,
                 resp_ch,
             } => self.handle_bitfield(&addr, &bitfield, resp_ch),
-            JobCmd::RecvUnchoke { addr, resp_ch } => self.handle_unchoke(&addr, resp_ch),
+            JobCmd::RecvUnchoke {
+                addr,
+                req_ongoing,
+                resp_ch,
+            } => self.handle_unchoke(&addr, req_ongoing, resp_ch),
             JobCmd::RecvHave { addr, index } => self.handle_have(&addr, index),
             JobCmd::PieceDone { addr, resp_ch } => self.handle_piece_done(&addr, resp_ch),
             JobCmd::KillReq { addr, index } => self.handle_kill_req(&addr, &index).await,
@@ -159,15 +163,20 @@ impl Manager {
         true
     }
 
-    fn handle_unchoke(&mut self, addr: &String, resp_ch: oneshot::Sender<JobCmd>) -> bool {
+    fn handle_unchoke(
+        &mut self,
+        addr: &String,
+        req_ongoing: bool,
+        resp_ch: oneshot::Sender<UnchokeCmd>,
+    ) -> bool {
         let pieces = &self.peers[addr].pieces;
         let cmd = match self.choose_piece(pieces) {
-            Err(_) => JobCmd::SendNotInterested,
+            Err(_) => UnchokeCmd::SendNotInterested,
             Ok(idx) => {
                 self.pieces_status[idx] = Status::Reserved;
                 self.peers.get_mut(addr).unwrap().index = idx;
 
-                JobCmd::SendRequest {
+                UnchokeCmd::SendRequest {
                     index: idx,
                     piece_size: self.piece_size(idx),
                     piece_hash: self.metainfo.pieces()[idx],
@@ -184,7 +193,7 @@ impl Manager {
         true
     }
 
-    fn handle_piece_done(&mut self, addr: &String, resp_ch: oneshot::Sender<JobCmd>) -> bool {
+    fn handle_piece_done(&mut self, addr: &String, resp_ch: oneshot::Sender<PieceDoneCmd>) -> bool {
         for (key, peer) in self.peers.iter() {
             if key == addr {
                 self.pieces_status[peer.index] = Status::Have;
@@ -198,7 +207,7 @@ impl Manager {
             }
         }
 
-        let _ = resp_ch.send(JobCmd::End);
+        let _ = resp_ch.send(PieceDoneCmd::End);
         true
     }
 
