@@ -3,7 +3,6 @@ use crate::frame::{Bitfield, Frame, Handshake, Have, Interested, KeepAlive, Piec
 use crate::{utils, Error};
 use std::fs;
 use tokio::net::TcpStream;
-use tokio::sync::oneshot::Receiver;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time::{interval_at, Duration, Instant};
 
@@ -195,29 +194,6 @@ impl Handler {
         Ok(())
     }
 
-    async fn send_keep_alive(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.connection.send_msg(&KeepAlive::new()).await?;
-        Ok(())
-    }
-
-    async fn send_have(&mut self, cmd: BroadCmd) -> Result<(), Box<dyn std::error::Error>> {
-        match cmd {
-            BroadCmd::SendHave { key, index } => {
-                if key == self.connection.addr {
-                    return Ok(());
-                }
-
-                if self.peer_status.choked {
-                    self.msg_buff.push(Frame::Have(Have::new(index)));
-                } else {
-                    self.connection.send_msg(&Have::new(index)).await?;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     async fn handle_frame(
         &mut self,
         opt_frame: Option<Frame>,
@@ -277,30 +253,6 @@ impl Handler {
         Ok(())
     }
 
-    fn any_request_in_msg_buff(&self) -> bool {
-        self.msg_buff.iter().any(|f| {
-            if let Frame::Request(_) = f {
-                true
-            } else {
-                false
-            }
-        })
-    }
-
-    fn prepare_for_new_piece(
-        &mut self,
-        piece_index: usize,
-        piece_size: usize,
-        piece_hash: &[u8; 20],
-    ) {
-        self.piece = Some(PieceData {
-            index: piece_index,
-            hash: *piece_hash,
-            buff: vec![0; piece_size],
-            buff_pos: 0,
-        });
-    }
-
     fn handle_interested(&mut self) {
         self.peer_status.interested = true;
     }
@@ -326,21 +278,7 @@ impl Handler {
         bitfield: Bitfield,
     ) -> Result<(), Box<dyn std::error::Error>> {
         bitfield.validate(&self.pieces_count)?;
-
-        let resp = self.cmd_recv_bitfield(bitfield).await?;
-        if let BitfieldCmd::SendBitfield {
-            bitfield,
-            interested,
-        } = resp.await?
-        {
-            self.connection.send_msg(&bitfield).await?;
-
-            if interested {
-                println!("Wysyłam Interested");
-                self.connection.send_msg(&Interested::new()).await?
-            }
-        }
-
+        self.cmd_recv_bitfield(bitfield).await?;
         Ok(())
     }
 
@@ -455,7 +393,7 @@ impl Handler {
     async fn cmd_recv_bitfield(
         &mut self,
         bitfield: Bitfield,
-    ) -> Result<Receiver<BitfieldCmd>, Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let (resp_tx, resp_rx) = oneshot::channel();
         self.job_ch
             .send(JobCmd::RecvBitfield {
@@ -464,7 +402,44 @@ impl Handler {
                 resp_ch: resp_tx,
             })
             .await?;
-        Ok(resp_rx)
+
+        if let BitfieldCmd::SendBitfield {
+            bitfield,
+            interested,
+        } = resp_rx.await?
+        {
+            self.connection.send_msg(&bitfield).await?;
+
+            if interested {
+                println!("Wysyłam Interested");
+                self.connection.send_msg(&Interested::new()).await?
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn send_keep_alive(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        self.connection.send_msg(&KeepAlive::new()).await?;
+        Ok(())
+    }
+
+    async fn send_have(&mut self, cmd: BroadCmd) -> Result<(), Box<dyn std::error::Error>> {
+        match cmd {
+            BroadCmd::SendHave { key, index } => {
+                if key == self.connection.addr {
+                    return Ok(());
+                }
+
+                if self.peer_status.choked {
+                    self.msg_buff.push(Frame::Have(Have::new(index)));
+                } else {
+                    self.connection.send_msg(&Have::new(index)).await?;
+                }
+            }
+        }
+
+        Ok(())
     }
 
     async fn send_request(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -479,6 +454,30 @@ impl Handler {
         }
 
         Ok(())
+    }
+
+    fn any_request_in_msg_buff(&self) -> bool {
+        self.msg_buff.iter().any(|f| {
+            if let Frame::Request(_) = f {
+                true
+            } else {
+                false
+            }
+        })
+    }
+
+    fn prepare_for_new_piece(
+        &mut self,
+        piece_index: usize,
+        piece_size: usize,
+        piece_hash: &[u8; 20],
+    ) {
+        self.piece = Some(PieceData {
+            index: piece_index,
+            hash: *piece_hash,
+            buff: vec![0; piece_size],
+            buff_pos: 0,
+        });
     }
 
     fn verify(&self) -> bool {
