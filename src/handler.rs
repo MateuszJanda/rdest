@@ -23,7 +23,7 @@ pub enum JobCmd {
     },
     RecvUnchoke {
         addr: String,
-        req_ongoing: bool,
+        buffered_req: bool,
         resp_ch: oneshot::Sender<UnchokeCmd>,
     },
     // RecvInterested,
@@ -243,7 +243,7 @@ impl Handler {
     async fn handle_unchoke(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.peer_status.choked = false;
 
-        let req_ongoing = self.any_request_in_msg_buff();
+        let buffered_req = self.any_request_in_msg_buff();
         if !self.msg_buff.is_empty() {
             for frame in self.msg_buff.iter() {
                 self.connection.send_frame(frame).await?;
@@ -251,7 +251,7 @@ impl Handler {
             self.msg_buff.clear();
         }
 
-        self.cmd_recv_unchoke(req_ongoing).await?;
+        self.cmd_recv_unchoke(buffered_req).await?;
 
         Ok(())
     }
@@ -332,13 +332,13 @@ impl Handler {
 
     async fn cmd_recv_unchoke(
         &mut self,
-        req_ongoing: bool,
+        buffered_req: bool,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let (resp_tx, resp_rx) = oneshot::channel();
         self.job_ch
             .send(JobCmd::RecvUnchoke {
                 addr: self.connection.addr.clone(),
-                req_ongoing,
+                buffered_req,
                 resp_ch: resp_tx,
             })
             .await?;

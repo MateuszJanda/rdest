@@ -636,53 +636,6 @@ impl Serializer for Cancel {
     }
 }
 
-#[derive(Debug)]
-pub struct Port {
-    port: u32,
-}
-
-impl Port {
-    const LEN: u32 = 3;
-    const ID: u8 = 9;
-    const LEN_SIZE: usize = LEN_SIZE;
-    const ID_SIZE: usize = ID_SIZE;
-    const PORT_SIZE: usize = 4;
-    const FULL_SIZE: usize = Port::LEN_SIZE + Port::LEN as usize;
-
-    pub fn new(port: u32) -> Port {
-        Port { port }
-    }
-
-    fn from(crs: &Cursor<&[u8]>) -> Port {
-        let start = Port::LEN_SIZE + Port::ID_SIZE;
-        let mut listen_port = [0; Port::PORT_SIZE];
-        listen_port.copy_from_slice(&crs.get_ref()[start..start + Port::PORT_SIZE]);
-
-        Port {
-            port: u32::from_be_bytes(listen_port),
-        }
-    }
-
-    fn check(available_data: usize, length: usize) -> Result<usize, Error> {
-        if length == Port::LEN as usize && available_data >= Port::LEN_SIZE + length {
-            return Ok(Port::FULL_SIZE);
-        }
-
-        Err(Error::Incomplete)
-    }
-}
-
-impl Serializer for Port {
-    fn data(&self) -> Vec<u8> {
-        let mut vec = vec![];
-        vec.extend_from_slice(&Port::LEN.to_be_bytes());
-        vec.push(Port::ID);
-        vec.extend_from_slice(&self.port.to_be_bytes());
-
-        vec
-    }
-}
-
 #[derive(PartialEq, FromPrimitive)]
 #[repr(u8)]
 enum MsgId {

@@ -116,9 +116,9 @@ impl Manager {
             } => self.handle_bitfield(&addr, &bitfield, resp_ch),
             JobCmd::RecvUnchoke {
                 addr,
-                req_ongoing,
+                buffered_req,
                 resp_ch,
-            } => self.handle_unchoke(&addr, req_ongoing, resp_ch),
+            } => self.handle_unchoke(&addr, buffered_req, resp_ch),
             JobCmd::RecvHave { addr, index } => self.handle_have(&addr, index),
             JobCmd::PieceDone { addr, resp_ch } => self.handle_piece_done(&addr, resp_ch),
             JobCmd::KillReq { addr, index } => self.handle_kill_req(&addr, &index).await,
@@ -169,7 +169,7 @@ impl Manager {
     fn handle_unchoke(
         &mut self,
         addr: &String,
-        req_ongoing: bool,
+        buffered_req: bool,
         resp_ch: oneshot::Sender<UnchokeCmd>,
     ) -> bool {
         let pieces = &self.peers[addr].pieces;
