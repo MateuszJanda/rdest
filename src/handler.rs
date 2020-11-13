@@ -43,6 +43,7 @@ pub enum JobCmd {
     KillReq {
         addr: String,
         index: Option<usize>,
+        reason: String,
     },
 
     End,
@@ -145,23 +146,36 @@ impl Handler {
                 broad_ch,
             };
 
-            // Process the connection. If an error is encountered, log it.
-            if let Err(e) = handler.event_loop().await {
-                println!("jkl {:?}", e);
-            }
+            let reason = if let Err(e) = handler.event_loop().await {
+                e.to_string()
+            } else {
+                "".to_string()
+            };
 
             let index = handler.piece.map_or(None, |p| Some(p.index));
-            Self::kill_req(&handler.connection.addr, &index, &mut handler.job_ch).await;
+            Self::kill_req(
+                &handler.connection.addr,
+                &index,
+                &reason,
+                &mut handler.job_ch,
+            )
+            .await;
         } else {
-            Self::kill_req(&addr, &None, &mut job_ch).await;
+            Self::kill_req(&addr, &None, &"Connection fail".to_string(), &mut job_ch).await;
         }
     }
 
-    async fn kill_req(addr: &String, index: &Option<usize>, job_ch: &mut mpsc::Sender<JobCmd>) {
+    async fn kill_req(
+        addr: &String,
+        index: &Option<usize>,
+        reason: &String,
+        job_ch: &mut mpsc::Sender<JobCmd>,
+    ) {
         job_ch
             .send(JobCmd::KillReq {
                 addr: addr.clone(),
                 index: *index,
+                reason: reason.clone(),
             })
             .await
             .expect("Can't inform manager about KillReq");

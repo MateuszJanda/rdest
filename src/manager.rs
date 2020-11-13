@@ -121,7 +121,11 @@ impl Manager {
             } => self.handle_unchoke(&addr, buffered_req, resp_ch),
             JobCmd::RecvHave { addr, index } => self.handle_have(&addr, index),
             JobCmd::PieceDone { addr, resp_ch } => self.handle_piece_done(&addr, resp_ch),
-            JobCmd::KillReq { addr, index } => self.handle_kill_req(&addr, &index).await,
+            JobCmd::KillReq {
+                addr,
+                index,
+                reason,
+            } => self.handle_kill_req(&addr, &index, &reason).await,
             JobCmd::FailVerifyHash { addr, resp_ch } => {
                 self.handle_fail_verify_hash(&addr, resp_ch)
             }
@@ -219,7 +223,12 @@ impl Manager {
         true
     }
 
-    async fn handle_kill_req(&mut self, addr: &String, index: &Option<usize>) -> bool {
+    async fn handle_kill_req(
+        &mut self,
+        addr: &String,
+        index: &Option<usize>,
+        reason: &String,
+    ) -> bool {
         self.kill_job(&addr, &index).await;
 
         if self.peers.is_empty() {
