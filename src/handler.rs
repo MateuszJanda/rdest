@@ -106,6 +106,15 @@ struct PieceData {
 }
 
 impl PieceData {
+    fn new(piece_index: usize, piece_size: usize, piece_hash: &[u8; 20]) -> PieceData {
+        PieceData {
+            index: piece_index,
+            hash: *piece_hash,
+            buff: vec![0; piece_size],
+            buff_pos: 0,
+        }
+    }
+
     fn next_block_length(&self) -> usize {
         if self.buff_pos + 0x4000 > self.buff.len() {
             return self.buff.len() % 0x4000;
@@ -363,7 +372,7 @@ impl Handler {
                 piece_size,
                 piece_hash,
             } => {
-                self.prepare_for_new_piece(index, piece_size, &piece_hash);
+                self.piece = Some(PieceData::new(index, piece_size, &piece_hash));
                 self.send_request().await?;
             }
             UnchokeCmd::SendNotInterested => (),
@@ -490,20 +499,6 @@ impl Handler {
                 false
             }
         })
-    }
-
-    fn prepare_for_new_piece(
-        &mut self,
-        piece_index: usize,
-        piece_size: usize,
-        piece_hash: &[u8; 20],
-    ) {
-        self.piece = Some(PieceData {
-            index: piece_index,
-            hash: *piece_hash,
-            buff: vec![0; piece_size],
-            buff_pos: 0,
-        });
     }
 
     fn verify_hash(&self) -> bool {
