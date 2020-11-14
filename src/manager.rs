@@ -205,10 +205,7 @@ impl Manager {
             if key == addr {
                 self.pieces_status[peer.index] = Status::Have;
 
-                let _ = self.b_tx.send(BroadCmd::SendHave {
-                    key: addr.clone(),
-                    index: peer.index,
-                });
+                let _ = self.b_tx.send(BroadCmd::SendHave { index: peer.index });
 
                 break;
             }

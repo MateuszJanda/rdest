@@ -8,7 +8,7 @@ use tokio::time::{interval_at, Duration, Instant};
 
 #[derive(Debug, Clone)]
 pub enum BroadCmd {
-    SendHave { key: String, index: usize },
+    SendHave { index: usize },
 }
 #[derive(Debug)]
 pub enum JobCmd {
@@ -426,7 +426,7 @@ impl Handler {
                 piece_size,
                 piece_hash,
             } => {
-                self.prepare_for_new_piece(index, piece_size, &piece_hash);
+                self.piece = Some(PieceData::new(index, piece_size, &piece_hash));
                 self.send_request().await?;
             }
             PieceDoneCmd::End => return Ok(false),
@@ -461,11 +461,7 @@ impl Handler {
 
     async fn send_have(&mut self, cmd: BroadCmd) -> Result<(), Box<dyn std::error::Error>> {
         match cmd {
-            BroadCmd::SendHave { key, index } => {
-                if key == self.connection.addr {
-                    return Ok(());
-                }
-
+            BroadCmd::SendHave { index } => {
                 if self.peer_status.choked {
                     self.msg_buff.push(Frame::Have(Have::new(index)));
                 } else {
