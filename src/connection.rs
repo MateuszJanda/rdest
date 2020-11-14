@@ -24,9 +24,17 @@ impl Connection {
 
     pub async fn send_frame(&mut self, frame: &Frame) -> Result<(), Box<dyn std::error::Error>> {
         match frame {
+            Frame::Handshake(msg) => self.send_msg(msg).await?,
+            Frame::KeepAlive(msg) => self.send_msg(msg).await?,
+            Frame::Choke(msg) => self.send_msg(msg).await?,
+            Frame::Unchoke(msg) => self.send_msg(msg).await?,
+            Frame::Interested(msg) => self.send_msg(msg).await?,
+            Frame::NotInterested(msg) => self.send_msg(msg).await?,
             Frame::Have(msg) => self.send_msg(msg).await?,
+            Frame::Bitfield(msg) => self.send_msg(msg).await?,
             Frame::Request(msg) => self.send_msg(msg).await?,
-            _ => (),
+            Frame::Piece(msg) => self.send_msg(msg).await?,
+            Frame::Cancel(msg) => self.send_msg(msg).await?,
         }
 
         Ok(())
