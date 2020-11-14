@@ -413,12 +413,12 @@ impl Handler {
 
     async fn cmd_recv_piece(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
         let (resp_tx, resp_rx) = oneshot::channel();
-        let cmd = JobCmd::PieceDone {
-            addr: self.connection.addr.clone(),
-            resp_ch: resp_tx,
-        };
-
-        self.job_ch.send(cmd).await?;
+        self.job_ch
+            .send(JobCmd::PieceDone {
+                addr: self.connection.addr.clone(),
+                resp_ch: resp_tx,
+            })
+            .await?;
 
         match resp_rx.await? {
             PieceDoneCmd::SendRequest {
