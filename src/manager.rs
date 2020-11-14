@@ -109,6 +109,7 @@ impl Manager {
 
     async fn event_loop(&mut self, cmd: JobCmd) -> bool {
         match cmd {
+            JobCmd::RecvChoke { addr } => self.handle_choke(&addr),
             JobCmd::RecvUnchoke {
                 addr,
                 buffered_req,
@@ -133,6 +134,10 @@ impl Manager {
             }
             _ => true,
         }
+    }
+
+    fn handle_choke(&mut self, addr: &String) -> bool {
+        true
     }
 
     fn handle_unchoke(

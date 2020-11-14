@@ -4,7 +4,8 @@ use crate::{utils, Error};
 use std::fs;
 use tokio::net::TcpStream;
 use tokio::sync::{broadcast, mpsc, oneshot};
-use tokio::time::{interval_at, Duration, Instant};
+use tokio::time;
+use tokio::time::{Duration, Instant};
 
 #[derive(Debug, Clone)]
 pub enum BroadCmd {
@@ -14,7 +15,6 @@ pub enum BroadCmd {
 pub enum JobCmd {
     RecvChoke {
         addr: String,
-        resp_ch: oneshot::Sender<JobCmd>,
     },
     RecvUnchoke {
         addr: String,
@@ -200,7 +200,7 @@ impl Handler {
             .await?;
 
         let start = Instant::now() + Duration::from_secs(2 * 60);
-        let mut interval = interval_at(start, Duration::from_secs(2 * 60));
+        let mut interval = time::interval_at(start, Duration::from_secs(2 * 60));
 
         loop {
             tokio::select! {
@@ -234,7 +234,7 @@ impl Handler {
                 match frame {
                     Frame::Handshake(handshake) => self.handle_handshake(&handshake)?,
                     Frame::KeepAlive(_) => (),
-                    Frame::Choke(_) => self.handle_choke(),
+                    Frame::Choke(_) => self.handle_choke().await?,
                     Frame::Unchoke(_) => self.handle_unchoke().await?,
                     Frame::Interested(_) => self.handle_interested().await?,
                     Frame::NotInterested(_) => self.handle_not_interested().await?,
@@ -263,8 +263,10 @@ impl Handler {
         Ok(())
     }
 
-    fn handle_choke(&mut self) {
+    async fn handle_choke(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.peer_status.choked = true;
+        self.cmd_recv_choke().await?;
+        Ok(())
     }
 
     async fn handle_unchoke(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -341,7 +343,7 @@ impl Handler {
             .piece
             .as_mut()
             .ok_or(Error::NotFound)
-            .expect("Piece data not exit after validation");
+            .expect("Piece data not exist after validation");
 
         piece_data.buff[piece_data.buff_pos..piece_data.buff_pos + piece.block.len()]
             .copy_from_slice(&piece.block);
@@ -359,6 +361,16 @@ impl Handler {
         }
 
         Ok(true)
+    }
+
+    async fn cmd_recv_choke(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        self.job_ch
+            .send(JobCmd::RecvChoke {
+                addr: self.connection.addr.clone(),
+            })
+            .await?;
+
+        Ok(())
     }
 
     async fn cmd_recv_unchoke(
