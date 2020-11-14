@@ -12,11 +12,6 @@ pub enum BroadCmd {
 }
 #[derive(Debug)]
 pub enum JobCmd {
-    RecvBitfield {
-        addr: String,
-        bitfield: Bitfield,
-        resp_ch: oneshot::Sender<BitfieldCmd>,
-    },
     RecvChoke {
         addr: String,
         resp_ch: oneshot::Sender<JobCmd>,
@@ -26,11 +21,20 @@ pub enum JobCmd {
         buffered_req: bool,
         resp_ch: oneshot::Sender<UnchokeCmd>,
     },
-    // RecvInterested,
-    // RecvNotInterested,
+    RecvInterested {
+        addr: String,
+    },
+    RecvNotInterested {
+        addr: String,
+    },
     RecvHave {
         addr: String,
         index: usize,
+    },
+    RecvBitfield {
+        addr: String,
+        bitfield: Bitfield,
+        resp_ch: oneshot::Sender<BitfieldCmd>,
     },
     PieceDone {
         addr: String,
@@ -232,8 +236,8 @@ impl Handler {
                     Frame::KeepAlive(_) => (),
                     Frame::Choke(_) => self.handle_choke(),
                     Frame::Unchoke(_) => self.handle_unchoke().await?,
-                    Frame::Interested(_) => self.handle_interested(),
-                    Frame::NotInterested(_) => self.handle_not_interested(),
+                    Frame::Interested(_) => self.handle_interested().await?,
+                    Frame::NotInterested(_) => self.handle_not_interested().await?,
                     Frame::Have(have) => self.handle_have(&have).await?,
                     Frame::Bitfield(bitfield) => self.handle_bitfield(bitfield).await?,
                     Frame::Request(_) => (),
@@ -279,12 +283,16 @@ impl Handler {
         Ok(())
     }
 
-    fn handle_interested(&mut self) {
+    async fn handle_interested(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.peer_status.interested = true;
+        self.cmd_recv_interested().await?;
+        Ok(())
     }
 
-    fn handle_not_interested(&mut self) {
+    async fn handle_not_interested(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.peer_status.interested = false;
+        self.cmd_recv_not_interested().await?;
+        Ok(())
     }
 
     async fn handle_have(&mut self, have: &Have) -> Result<(), Box<dyn std::error::Error>> {
@@ -380,6 +388,26 @@ impl Handler {
         }
 
         Ok(())
+    }
+
+    async fn cmd_recv_interested(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
+        self.job_ch
+            .send(JobCmd::RecvInterested {
+                addr: self.connection.addr.clone(),
+            })
+            .await?;
+
+        return Ok(true);
+    }
+
+    async fn cmd_recv_not_interested(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
+        self.job_ch
+            .send(JobCmd::RecvNotInterested {
+                addr: self.connection.addr.clone(),
+            })
+            .await?;
+
+        return Ok(true);
     }
 
     async fn cmd_recv_bitfield(

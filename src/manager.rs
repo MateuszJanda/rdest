@@ -109,17 +109,19 @@ impl Manager {
 
     async fn event_loop(&mut self, cmd: JobCmd) -> bool {
         match cmd {
-            JobCmd::RecvBitfield {
-                addr,
-                bitfield,
-                resp_ch,
-            } => self.handle_bitfield(&addr, &bitfield, resp_ch),
             JobCmd::RecvUnchoke {
                 addr,
                 buffered_req,
                 resp_ch,
             } => self.handle_unchoke(&addr, buffered_req, resp_ch),
+            JobCmd::RecvInterested { addr } => self.handle_interested(&addr),
+            JobCmd::RecvNotInterested { addr } => self.handle_not_interested(&addr),
             JobCmd::RecvHave { addr, index } => self.handle_have(&addr, index),
+            JobCmd::RecvBitfield {
+                addr,
+                bitfield,
+                resp_ch,
+            } => self.handle_bitfield(&addr, &bitfield, resp_ch),
             JobCmd::PieceDone { addr, resp_ch } => self.handle_piece_done(&addr, resp_ch),
             JobCmd::KillReq {
                 addr,
@@ -131,6 +133,44 @@ impl Manager {
             }
             _ => true,
         }
+    }
+
+    fn handle_unchoke(
+        &mut self,
+        addr: &String,
+        buffered_req: bool,
+        resp_ch: oneshot::Sender<UnchokeCmd>,
+    ) -> bool {
+        let pieces = &self.peers[addr].pieces;
+        let cmd = match self.choose_piece(pieces) {
+            Err(_) => UnchokeCmd::SendNotInterested,
+            Ok(idx) => {
+                self.pieces_status[idx] = Status::Reserved;
+                self.peers.get_mut(addr).unwrap().index = idx;
+
+                UnchokeCmd::SendRequest {
+                    index: idx,
+                    piece_size: self.piece_size(idx),
+                    piece_hash: self.metainfo.pieces()[idx],
+                }
+            }
+        };
+
+        let _ = &resp_ch.send(cmd);
+        true
+    }
+
+    fn handle_interested(&mut self, addr: &String) -> bool {
+        true
+    }
+
+    fn handle_not_interested(&mut self, addr: &String) -> bool {
+        true
+    }
+
+    fn handle_have(&mut self, addr: &String, index: usize) -> bool {
+        self.peers.get_mut(addr).unwrap().pieces[index] = true;
+        true
     }
 
     fn handle_bitfield(
@@ -167,36 +207,6 @@ impl Manager {
             interested,
         });
 
-        true
-    }
-
-    fn handle_unchoke(
-        &mut self,
-        addr: &String,
-        buffered_req: bool,
-        resp_ch: oneshot::Sender<UnchokeCmd>,
-    ) -> bool {
-        let pieces = &self.peers[addr].pieces;
-        let cmd = match self.choose_piece(pieces) {
-            Err(_) => UnchokeCmd::SendNotInterested,
-            Ok(idx) => {
-                self.pieces_status[idx] = Status::Reserved;
-                self.peers.get_mut(addr).unwrap().index = idx;
-
-                UnchokeCmd::SendRequest {
-                    index: idx,
-                    piece_size: self.piece_size(idx),
-                    piece_hash: self.metainfo.pieces()[idx],
-                }
-            }
-        };
-
-        let _ = &resp_ch.send(cmd);
-        true
-    }
-
-    fn handle_have(&mut self, addr: &String, index: usize) -> bool {
-        self.peers.get_mut(addr).unwrap().pieces[index] = true;
         true
     }
 
