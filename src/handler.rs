@@ -1,6 +1,7 @@
 use crate::connection::Connection;
 use crate::frame::{Bitfield, Frame, Handshake, Have, Interested, KeepAlive, Piece, Request};
 use crate::{utils, Error};
+use std::collections::VecDeque;
 use std::fs;
 use tokio::net::TcpStream;
 use tokio::sync::{broadcast, mpsc, oneshot};
@@ -96,17 +97,67 @@ pub struct Handler {
     broad_ch: broadcast::Receiver<BroadCmd>,
 }
 
-struct Status {
-    choked: bool,
-    interested: bool,
-    keep_alive: bool,
-}
-
 struct PieceData {
     index: usize,
     hash: [u8; 20],
     buff: Vec<u8>,
     buff_pos: usize,
+}
+
+struct Status {
+    choked: bool,
+    interested: bool,
+    keep_alive: bool,
+    stats: VecDeque<Stats>,
+}
+
+struct Stats {
+    downloaded: usize,
+    unexpected_piece: u32,
+    rejected_piece: u32,
+}
+
+impl Stats {
+    fn new() -> Stats {
+        Stats {
+            downloaded: 0,
+            unexpected_piece: 0,
+            rejected_piece: 0,
+        }
+    }
+}
+
+impl Status {
+    fn update_downloaded(&mut self, amount: usize) {
+        self.stats[0].downloaded += amount;
+    }
+
+    fn update_unexpected(&mut self) {
+        self.stats[0].unexpected_piece += 1;
+    }
+
+    fn update_rejected(&mut self) {
+        self.stats[0].rejected_piece += 1;
+    }
+
+    fn downloaded(&self) -> usize {
+        self.stats.iter().map(|s| s.downloaded).sum()
+    }
+
+    fn unexpected(&self) -> u32 {
+        self.stats.iter().map(|s| s.unexpected_piece).sum()
+    }
+
+    fn rejected(&self) -> u32 {
+        self.stats.iter().map(|s| s.rejected_piece).sum()
+    }
+
+    fn shift(&mut self) {
+        if self.stats.len() == 2 {
+            self.stats.pop_back();
+        }
+        self.stats.push_front(Stats::new());
+    }
 }
 
 impl PieceData {
@@ -153,6 +204,7 @@ impl Handler {
                     choked: true,
                     interested: false,
                     keep_alive: false,
+                    stats: VecDeque::from(vec![Stats::new()]),
                 },
                 msg_buff: vec![],
                 job_ch,
@@ -326,6 +378,7 @@ impl Handler {
             piece_data.next_block_length(),
         )?;
 
+        self.peer_status.update_downloaded(piece.block.len());
         if self.update_piece_data(piece).await? == false {
             return Ok(false);
         }
