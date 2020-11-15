@@ -41,10 +41,6 @@ pub enum JobCmd {
         addr: String,
         resp_ch: oneshot::Sender<PieceDoneCmd>,
     },
-    FailVerifyHash {
-        addr: String,
-        resp_ch: oneshot::Sender<JobCmd>,
-    },
     KillReq {
         addr: String,
         index: Option<usize>,
@@ -404,7 +400,8 @@ impl Handler {
 
         if piece_data.buff_pos == piece_data.buff.len() {
             if !self.verify_hash() {
-                return Ok(self.cmd_fail_verify_hash().await?);
+                self.peer_status.update_rejected();
+                return Ok(true);
             }
 
             self.save_piece_to_file();
@@ -527,24 +524,6 @@ impl Handler {
         }
 
         Ok(true)
-    }
-
-    async fn cmd_fail_verify_hash(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
-        println!("verify piece hash fail");
-        let (resp_tx, resp_rx) = oneshot::channel();
-        self.job_ch
-            .send(JobCmd::FailVerifyHash {
-                addr: self.connection.addr.clone(),
-                resp_ch: resp_tx,
-            })
-            .await?;
-
-        match resp_rx.await? {
-            JobCmd::End => return Ok(false),
-            _ => (),
-        }
-
-        return Ok(true);
     }
 
     async fn send_keep_alive(&mut self) -> Result<(), Box<dyn std::error::Error>> {

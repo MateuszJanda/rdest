@@ -129,9 +129,6 @@ impl Manager {
                 index,
                 reason,
             } => self.handle_kill_req(&addr, &index, &reason).await,
-            JobCmd::FailVerifyHash { addr, resp_ch } => {
-                self.handle_fail_verify_hash(&addr, resp_ch)
-            }
             _ => true,
         }
     }
@@ -227,11 +224,6 @@ impl Manager {
         }
 
         let _ = resp_ch.send(PieceDoneCmd::End);
-        true
-    }
-
-    fn handle_fail_verify_hash(&mut self, _: &String, resp_ch: oneshot::Sender<JobCmd>) -> bool {
-        let _ = resp_ch.send(JobCmd::End);
         true
     }
 
