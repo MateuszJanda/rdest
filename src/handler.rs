@@ -385,13 +385,9 @@ impl Handler {
         }
 
         // Removed piece metadata from requested
-        let idx = piece_data
-            .requested
-            .iter()
-            .position(|(block_begin, block_len)| {
-                *block_begin == piece.block_begin() && *block_len == piece.block_len()
-            }).unwrap();
-        piece_data.requested.remove(idx);
+        piece_data.requested.retain(|(block_begin, block_len)| {
+            *block_begin == piece.block_begin() && *block_len == piece.block_len()
+        });
         self.peer_status.update_downloaded(piece.block_len());
 
         if self.update_piece_data(piece).await? == false {
