@@ -453,6 +453,9 @@ impl Handler {
                 piece_hash,
             } => {
                 self.piece = Some(PieceData::new(index, piece_size, &piece_hash));
+
+                // BEP3 suggests send more than one request to get good TCP performance (pipeline)
+                self.send_request().await?;
                 self.send_request().await?;
             }
             UnchokeCmd::SendNotInterested => (),
@@ -556,9 +559,11 @@ impl Handler {
     }
 
     async fn send_request(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if let Some(piece) = self.piece.as_mut() {
-            if let Some((pos, length)) = piece.left.pop_front() {
-                let msg = Request::new(piece.index, pos, length);
+        if let Some(piece_data) = self.piece.as_mut() {
+            if let Some((block_begin, block_len)) = piece_data.left.pop_front() {
+                piece_data.requested.push_back((block_begin, block_len));
+
+                let msg = Request::new(piece_data.index, block_begin, block_len);
                 if self.peer_status.choked {
                     self.msg_buff.push(Frame::Request(msg));
                 } else {
