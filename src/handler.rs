@@ -97,7 +97,8 @@ struct PieceData {
     index: usize,
     hash: [u8; 20],
     buff: Vec<u8>,
-    buff_pos: usize,
+    requested: VecDeque<(usize, usize)>,
+    left: VecDeque<(usize, usize)>,
 }
 
 struct Status {
@@ -162,16 +163,23 @@ impl PieceData {
             index: piece_index,
             hash: *piece_hash,
             buff: vec![0; piece_size],
-            buff_pos: 0,
+            requested: VecDeque::from(vec![]),
+            left: Self::left(piece_size),
         }
     }
 
-    fn next_block_length(&self) -> usize {
-        if self.buff_pos + 0x4000 > self.buff.len() {
-            return self.buff.len() % 0x4000;
+    fn left(piece_size: usize) -> VecDeque<(usize, usize)> {
+        let mut res = VecDeque::from(vec![]);
+        for block_begin in (0..piece_size).step_by(0x4000) {
+            let block_len = if block_begin + 0x4000 > piece_size {
+                piece_size % 0x4000
+            } else {
+                0x4000
+            };
+            res.push_back((block_begin, block_len))
         }
 
-        return 0x4000;
+        res
     }
 }
 
@@ -368,13 +376,16 @@ impl Handler {
 
     async fn handle_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
         let piece_data = self.piece.as_ref().ok_or(Error::NotFound)?;
-        piece.validate(
-            piece_data.index,
-            piece_data.buff_pos,
-            piece_data.next_block_length(),
-        )?;
 
-        self.peer_status.update_downloaded(piece.block.len());
+        if !piece_data.requested.iter().any(|(block_begin, block_len)| {
+            piece
+                .validate(piece_data.index, *block_begin, *block_len)
+                .is_ok()
+        }) {
+            Err(Error::NotFound)?;
+        }
+
+        self.peer_status.update_downloaded(piece.block_len());
         if self.update_piece_data(piece).await? == false {
             return Ok(false);
         }
@@ -394,11 +405,10 @@ impl Handler {
             .ok_or(Error::NotFound)
             .expect("Piece data not exist after validation");
 
-        piece_data.buff[piece_data.buff_pos..piece_data.buff_pos + piece.block.len()]
-            .copy_from_slice(&piece.block);
-        piece_data.buff_pos += piece.block.len();
+        piece_data.buff[piece.block_begin()..piece.block_begin() + piece.block_len()]
+            .copy_from_slice(&piece.block());
 
-        if piece_data.buff_pos == piece_data.buff.len() {
+        if piece_data.left.is_empty() {
             if !self.verify_hash() {
                 self.peer_status.update_rejected();
                 return Ok(true);
@@ -546,13 +556,15 @@ impl Handler {
     }
 
     async fn send_request(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if let Some(piece) = self.piece.as_ref() {
-            let msg = Request::new(piece.index, piece.buff_pos, piece.next_block_length());
-            if self.peer_status.choked {
-                self.msg_buff.push(Frame::Request(msg));
-            } else {
-                println!("Wysyłam kolejny request");
-                self.connection.send_msg(&msg).await?;
+        if let Some(piece) = self.piece.as_mut() {
+            if let Some((pos, length)) = piece.left.pop_front() {
+                let msg = Request::new(piece.index, pos, length);
+                if self.peer_status.choked {
+                    self.msg_buff.push(Frame::Request(msg));
+                } else {
+                    println!("Wysyłam kolejny request");
+                    self.connection.send_msg(&msg).await?;
+                }
             }
         }
 

@@ -484,9 +484,9 @@ impl Serializer for Request {
 
 #[derive(Debug)]
 pub struct Piece {
-    pub index: u32,
-    pub begin: u32,
-    pub block: Vec<u8>,
+    index: u32,
+    begin: u32,
+    block: Vec<u8>,
 }
 
 impl Piece {
@@ -553,6 +553,22 @@ impl Piece {
         }
 
         Ok(())
+    }
+
+    pub fn index(&self) -> usize {
+        self.index as usize
+    }
+
+    pub fn block_begin(&self) -> usize {
+        self.begin as usize
+    }
+
+    pub fn block_len(&self) -> usize {
+        self.block.len()
+    }
+
+    pub fn block(&self) -> &Vec<u8> {
+        &self.block
     }
 }
 
