@@ -375,8 +375,7 @@ impl Handler {
     }
 
     async fn handle_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
-        let piece_data = self.piece.as_ref().ok_or(Error::NotFound)?;
-
+        let piece_data = self.piece.as_mut().ok_or(Error::NotFound)?;
         if !piece_data.requested.iter().any(|(block_begin, block_len)| {
             piece
                 .validate(piece_data.index, *block_begin, *block_len)
@@ -385,7 +384,16 @@ impl Handler {
             Err(Error::NotFound)?;
         }
 
+        // Removed piece metadata from requested
+        let idx = piece_data
+            .requested
+            .iter()
+            .position(|(block_begin, block_len)| {
+                *block_begin == piece.block_begin() && *block_len == piece.block_len()
+            }).unwrap();
+        piece_data.requested.remove(idx);
         self.peer_status.update_downloaded(piece.block_len());
+
         if self.update_piece_data(piece).await? == false {
             return Ok(false);
         }
@@ -408,7 +416,7 @@ impl Handler {
         piece_data.buff[piece.block_begin()..piece.block_begin() + piece.block_len()]
             .copy_from_slice(&piece.block());
 
-        if piece_data.left.is_empty() {
+        if piece_data.left.is_empty() && piece_data.requested.is_empty() {
             if !self.verify_hash() {
                 self.peer_status.update_rejected();
                 return Ok(true);
