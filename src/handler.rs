@@ -41,6 +41,12 @@ pub enum JobCmd {
         addr: String,
         resp_ch: oneshot::Sender<PieceDoneCmd>,
     },
+    SyncStats {
+        addr: String,
+        downloaded_rate: f32,
+        unexpected_piece: u32,
+        rejected_piece: u32,
+    },
     KillReq {
         addr: String,
         index: Option<usize>,
@@ -258,6 +264,9 @@ impl Handler {
         let start = Instant::now() + Duration::from_secs(2 * 60);
         let mut interval = time::interval_at(start, Duration::from_secs(2 * 60));
 
+        let start = Instant::now() + Duration::from_secs(10);
+        let mut download_rate = time::interval_at(start, Duration::from_secs(10));
+
         loop {
             tokio::select! {
                 _ = interval.tick() => {
@@ -267,6 +276,13 @@ impl Handler {
                     }
                     self.send_keep_alive().await?;
                     self.peer_status.keep_alive = false;
+                }
+                _ = download_rate.tick() =>
+                {
+                    if self.peer_status.stats.len() == 2 {
+                        self.cmd_sync_stats().await?;
+                    }
+                    self.peer_status.shift();
                 }
                 cmd = self.broad_ch.recv() => self.send_have(cmd?).await?,
                 frame = self.connection.recv_frame() => {
@@ -541,6 +557,25 @@ impl Handler {
         }
 
         Ok(true)
+    }
+
+    async fn cmd_sync_stats(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        self.job_ch
+            .send(JobCmd::SyncStats {
+                addr: self.connection.addr.clone(),
+                downloaded_rate: self
+                    .peer_status
+                    .stats
+                    .iter()
+                    .map(|s| s.downloaded as u32)
+                    .sum::<u32>() as f32
+                    / self.peer_status.stats.len() as f32,
+                unexpected_piece: self.peer_status.stats[0].unexpected_piece,
+                rejected_piece: self.peer_status.stats[0].rejected_piece,
+            })
+            .await?;
+
+        Ok(())
     }
 
     async fn send_keep_alive(&mut self) -> Result<(), Box<dyn std::error::Error>> {
