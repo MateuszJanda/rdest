@@ -410,6 +410,7 @@ impl Handler {
     }
 
     async fn handle_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
+        // Verify message
         let piece_data = self.piece_data.as_mut().ok_or(Error::NotFound)?;
         if !piece_data.requested.iter().any(|(block_begin, block_len)| {
             piece
@@ -419,36 +420,19 @@ impl Handler {
             Err(Error::NotFound)?;
         }
 
-        // Removed piece metadata from requested
+        // Removed piece from "requested" queue
         piece_data.requested.retain(|(block_begin, block_len)| {
             *block_begin == piece.block_begin() && *block_len == piece.block_len()
         });
+
+        // Save piece block
         self.peer_status.update_downloaded(piece.block_len());
-
-        if self.update_piece_data(piece).await? == false {
-            return Ok(false);
-        }
-
-        Ok(true)
-    }
-
-    async fn update_piece_data(
-        &mut self,
-        piece: &Piece,
-    ) -> Result<bool, Box<dyn std::error::Error>> {
-        println!("Piece");
-
-        let piece_data = self
-            .piece_data
-            .as_mut()
-            .ok_or(Error::NotFound)
-            .expect("Piece data not exist after validation");
-
         piece_data.buff[piece.block_begin()..piece.block_begin() + piece.block_len()]
             .copy_from_slice(&piece.block());
 
+        // Send new request or call manager to decide
         if piece_data.left.is_empty() && piece_data.requested.is_empty() {
-            if !self.verify_hash() {
+            if !self.verify_piece_hash() {
                 self.peer_status.update_rejected();
                 return Ok(true);
             }
@@ -672,7 +656,7 @@ impl Handler {
         })
     }
 
-    fn verify_hash(&self) -> bool {
+    fn verify_piece_hash(&self) -> bool {
         if let Some(piece_data) = self.piece_data.as_ref() {
             let mut m = sha1::Sha1::new();
             m.update(piece_data.buff.as_ref());
