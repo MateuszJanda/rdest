@@ -648,15 +648,16 @@ impl Handler {
     }
 
     fn verify_piece_hash(&self) -> bool {
-        if let Some(piece_data) = self.piece_data.as_ref() {
-            let mut m = sha1::Sha1::new();
-            m.update(piece_data.buff.as_ref());
-            println!("Checksum: {:?} {:?}", m.digest().bytes(), piece_data.hash);
+        match self.piece_data.as_ref() {
+            Some(piece_data) => {
+                let mut m = sha1::Sha1::new();
+                m.update(piece_data.buff.as_ref());
+                println!("Checksum: {:?} {:?}", m.digest().bytes(), piece_data.hash);
 
-            return m.digest().bytes() == piece_data.hash;
+                return m.digest().bytes() == piece_data.hash;
+            }
+            None => false,
         }
-
-        return false;
     }
 
     fn load_piece_from_file(&mut self) {
