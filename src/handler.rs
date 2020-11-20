@@ -11,6 +11,11 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time;
 use tokio::time::{Duration, Instant};
 
+const PIECE_BLOCK_SIZE: usize = 16384;
+const KEEP_ALIVE_INTERVAL_SEC: u64 = 2 * 60;
+const STATS_INTERVAL_SEC: u64 = 10;
+const MAX_STATS_QUEUE_SIZE: usize = 2;
+
 #[derive(Debug, Clone)]
 pub enum BroadCmd {
     SendHave { index: usize },
@@ -147,11 +152,11 @@ impl PieceData {
 
     fn left(piece_size: usize) -> VecDeque<(usize, usize)> {
         let mut res = VecDeque::from(vec![]);
-        for block_begin in (0..piece_size).step_by(0x4000) {
-            let block_len = if block_begin + 0x4000 > piece_size {
-                piece_size % 0x4000
+        for block_begin in (0..piece_size).step_by(PIECE_BLOCK_SIZE) {
+            let block_len = if block_begin + PIECE_BLOCK_SIZE > piece_size {
+                piece_size % PIECE_BLOCK_SIZE
             } else {
-                0x4000
+                PIECE_BLOCK_SIZE
             };
             res.push_back((block_begin, block_len))
         }
@@ -182,7 +187,7 @@ impl Stats {
     }
 
     fn shift(&mut self) {
-        if self.downloaded.len() == 2 {
+        if self.downloaded.len() == MAX_STATS_QUEUE_SIZE {
             self.downloaded.pop_back();
         }
         self.downloaded.push_front(0);
@@ -267,11 +272,11 @@ impl Handler {
             .send_msg(&Handshake::new(&self.info_hash, &self.own_id))
             .await?;
 
-        let start = Instant::now() + Duration::from_secs(2 * 60);
-        let mut interval = time::interval_at(start, Duration::from_secs(2 * 60));
+        let start = Instant::now() + Duration::from_secs(KEEP_ALIVE_INTERVAL_SEC);
+        let mut interval = time::interval_at(start, Duration::from_secs(KEEP_ALIVE_INTERVAL_SEC));
 
-        let start = Instant::now() + Duration::from_secs(10);
-        let mut download_rate = time::interval_at(start, Duration::from_secs(10));
+        let start = Instant::now() + Duration::from_secs(STATS_INTERVAL_SEC);
+        let mut download_rate = time::interval_at(start, Duration::from_secs(STATS_INTERVAL_SEC));
 
         loop {
             tokio::select! {
@@ -285,7 +290,7 @@ impl Handler {
                 }
                 _ = download_rate.tick() =>
                 {
-                    if self.stats.downloaded.len() == 2 {
+                    if self.stats.downloaded.len() == MAX_STATS_QUEUE_SIZE {
                         self.cmd_sync_stats().await?;
                     }
                     self.stats.shift();
