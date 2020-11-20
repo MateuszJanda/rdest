@@ -250,7 +250,7 @@ impl Manager {
             }
         }
 
-        let _ = resp_ch.send(PieceDoneCmd::End);
+        let _ = resp_ch.send(PieceDoneCmd::PrepareKill);
         true
     }
 

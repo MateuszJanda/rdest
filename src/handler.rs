@@ -1,5 +1,7 @@
 use crate::connection::Connection;
-use crate::frame::{Bitfield, Frame, Handshake, Have, Interested, KeepAlive, Piece, Request};
+use crate::frame::{
+    Bitfield, Frame, Handshake, Have, Interested, KeepAlive, NotInterested, Piece, Request,
+};
 use crate::{utils, Error};
 use std::collections::VecDeque;
 use std::fs;
@@ -69,7 +71,7 @@ pub enum BitfieldCmd {
         bitfield: Bitfield,
         interested: bool,
     },
-    // PrepareKill,
+    PrepareKill,
 }
 
 #[derive(Debug)]
@@ -86,7 +88,7 @@ pub enum UnchokeCmd {
         piece_hash: [u8; 20],
     },
     SendNotInterested,
-    Nothing,
+    Ignore,
 }
 
 #[derive(Debug)]
@@ -96,7 +98,7 @@ pub enum PieceDoneCmd {
         piece_size: usize,
         piece_hash: [u8; 20],
     },
-    End,
+    PrepareKill,
 }
 
 pub struct Handler {
@@ -497,7 +499,7 @@ impl Handler {
                 self.send_request().await?;
             }
             UnchokeCmd::SendNotInterested => (),
-            UnchokeCmd::Nothing => (),
+            UnchokeCmd::Ignore => (),
         }
 
         Ok(())
@@ -536,16 +538,22 @@ impl Handler {
             })
             .await?;
 
-        if let BitfieldCmd::SendBitfield {
-            bitfield,
-            interested,
-        } = resp_rx.await?
-        {
-            self.connection.send_msg(&bitfield).await?;
+        match resp_rx.await? {
+            BitfieldCmd::SendBitfield {
+                bitfield,
+                interested,
+            } => {
+                self.connection.send_msg(&bitfield).await?;
 
-            if interested {
-                println!("Wysyłam Interested");
-                self.connection.send_msg(&Interested::new()).await?
+                if interested {
+                    println!("Wysyłam Interested");
+                    self.connection.send_msg(&Interested::new()).await?
+                } else {
+                    self.connection.send_msg(&NotInterested::new()).await?
+                }
+            }
+            BitfieldCmd::PrepareKill => {
+                // TODO
             }
         }
 
@@ -568,8 +576,8 @@ impl Handler {
             .await?;
 
         match resp_rx.await? {
-            RequestCmd::SendPiece { hash } => (),
-            RequestCmd::Ignore => (),
+            RequestCmd::SendPiece { hash } => (), // TODO
+            RequestCmd::Ignore => (),             // TODO
         }
 
         Ok(())
@@ -593,8 +601,7 @@ impl Handler {
                 self.piece = Some(PieceData::new(index, piece_size, &piece_hash));
                 self.send_request().await?;
             }
-            PieceDoneCmd::End => return Ok(false),
-            _ => (),
+            PieceDoneCmd::PrepareKill => return Ok(false),
         }
 
         Ok(true)
