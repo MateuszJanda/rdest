@@ -61,8 +61,6 @@ pub enum JobCmd {
         index: Option<usize>,
         reason: String,
     },
-
-    End,
 }
 
 #[derive(Debug)]

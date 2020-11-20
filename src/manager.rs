@@ -144,7 +144,6 @@ impl Manager {
                 index,
                 reason,
             } => self.handle_kill_req(&addr, &index, &reason).await,
-            _ => true,
         }
     }
 
