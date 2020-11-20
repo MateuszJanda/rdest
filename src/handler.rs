@@ -639,12 +639,9 @@ impl Handler {
     }
 
     fn any_request_in_msg_buff(&self) -> bool {
-        self.msg_buff.iter().any(|f| {
-            if let Frame::Request(_) = f {
-                true
-            } else {
-                false
-            }
+        self.msg_buff.iter().any(|f| match f {
+            Frame::Request(_) => true,
+            _ => false,
         })
     }
 
