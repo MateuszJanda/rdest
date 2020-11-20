@@ -105,7 +105,7 @@ pub struct Handler {
     peer_id: [u8; 20],
     info_hash: [u8; 20],
     pieces_count: usize,
-    piece: Option<PieceData>,
+    piece_data: Option<PieceData>,
     peer_status: Status,
     msg_buff: Vec<Frame>,
     job_ch: mpsc::Sender<JobCmd>,
@@ -222,7 +222,7 @@ impl Handler {
                 peer_id,
                 info_hash,
                 pieces_count,
-                piece: None,
+                piece_data: None,
                 peer_status: Status {
                     choked: true,
                     interested: false,
@@ -240,7 +240,7 @@ impl Handler {
                 "".to_string()
             };
 
-            let index = handler.piece.map_or(None, |p| Some(p.index));
+            let index = handler.piece_data.map_or(None, |p| Some(p.index));
             Self::kill_req(
                 &handler.connection.addr,
                 &index,
@@ -410,7 +410,7 @@ impl Handler {
     }
 
     async fn handle_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
-        let piece_data = self.piece.as_mut().ok_or(Error::NotFound)?;
+        let piece_data = self.piece_data.as_mut().ok_or(Error::NotFound)?;
         if !piece_data.requested.iter().any(|(block_begin, block_len)| {
             piece
                 .validate(piece_data.index, *block_begin, *block_len)
@@ -439,7 +439,7 @@ impl Handler {
         println!("Piece");
 
         let piece_data = self
-            .piece
+            .piece_data
             .as_mut()
             .ok_or(Error::NotFound)
             .expect("Piece data not exist after validation");
@@ -491,7 +491,7 @@ impl Handler {
                 piece_size,
                 piece_hash,
             } => {
-                self.piece = Some(PieceData::new(index, piece_size, &piece_hash));
+                self.piece_data = Some(PieceData::new(index, piece_size, &piece_hash));
 
                 // BEP3 suggests send more than one request to get good TCP performance (pipeline)
                 self.send_request().await?;
@@ -597,7 +597,7 @@ impl Handler {
                 piece_size,
                 piece_hash,
             } => {
-                self.piece = Some(PieceData::new(index, piece_size, &piece_hash));
+                self.piece_data = Some(PieceData::new(index, piece_size, &piece_hash));
                 self.send_request().await?;
             }
             PieceDoneCmd::PrepareKill => return Ok(false),
@@ -645,7 +645,7 @@ impl Handler {
     }
 
     async fn send_request(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if let Some(piece_data) = self.piece.as_mut() {
+        if let Some(piece_data) = self.piece_data.as_mut() {
             if let Some((block_begin, block_len)) = piece_data.left.pop_front() {
                 piece_data.requested.push_back((block_begin, block_len));
 
@@ -673,7 +673,7 @@ impl Handler {
     }
 
     fn verify_hash(&self) -> bool {
-        if let Some(piece_data) = self.piece.as_ref() {
+        if let Some(piece_data) = self.piece_data.as_ref() {
             let mut m = sha1::Sha1::new();
             m.update(piece_data.buff.as_ref());
             println!("Checksum: {:?} {:?}", m.digest().bytes(), piece_data.hash);
@@ -686,7 +686,7 @@ impl Handler {
 
     fn save_piece_to_file(&mut self) {
         let piece_data = self
-            .piece
+            .piece_data
             .take()
             .ok_or(Error::NotFound)
             .expect("Saving to file: piece data not exist after validation");
