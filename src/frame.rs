@@ -395,8 +395,8 @@ impl Bitfield {
         Err(Error::Incomplete)
     }
 
-    pub fn validate(&self, pieces_count: &usize) -> Result<(), Error> {
-        if self.to_vec().len() != *pieces_count {
+    pub fn validate(&self, pieces_count: usize) -> Result<(), Error> {
+        if self.to_vec().len() != pieces_count {
             return Err(Error::InvalidSize);
         }
 
@@ -480,8 +480,8 @@ impl Request {
         self.length as usize
     }
 
-    pub fn validate(&self, pieces_count: &usize) -> Result<(), Error> {
-        if self.index >= *pieces_count as u32 {
+    pub fn validate(&self, pieces_count: usize) -> Result<(), Error> {
+        if self.index >= pieces_count as u32 {
             return Err(Error::InvalidIndex);
         }
 

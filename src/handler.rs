@@ -398,13 +398,14 @@ impl Handler {
         &mut self,
         bitfield: Bitfield,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        bitfield.validate(&self.pieces_count)?;
+        bitfield.validate(self.pieces_count)?;
         self.cmd_recv_bitfield(bitfield).await?;
         Ok(())
     }
 
     async fn handle_request(&mut self, request: Request) -> Result<(), Box<dyn std::error::Error>> {
-        request.validate(&self.pieces_count)?;
+        request.validate(self.pieces_count)?;
+        self.cmd_recv_request(request).await?;
         Ok(())
     }
 
