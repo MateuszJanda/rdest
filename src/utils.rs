@@ -1,3 +1,5 @@
+use crate::constant::HASH_SIZE;
+
 #[allow(unused_macros)]
 #[macro_export]
 macro_rules! hashmap {
@@ -8,7 +10,7 @@ macro_rules! hashmap {
     }}
 }
 
-pub fn hash_to_string(hash: &[u8; 20]) -> String {
+pub fn hash_to_string(hash: &[u8; HASH_SIZE]) -> String {
     hash.iter()
         .map(|b| format!("{:02X}", b))
         .collect::<String>()

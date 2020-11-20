@@ -1,3 +1,4 @@
+use crate::constant::HASH_SIZE;
 use crate::raw_finder::RawFinder;
 use crate::Error;
 use crate::{BDecoder, BValue, DeepFinder};
@@ -5,8 +6,6 @@ use sha1;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::fs;
-
-const HASH_SIZE: usize = 20;
 
 #[derive(PartialEq, Debug)]
 pub struct Metainfo {

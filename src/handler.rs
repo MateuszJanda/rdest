@@ -1,4 +1,5 @@
 use crate::connection::Connection;
+use crate::constant::HASH_SIZE;
 use crate::frame::{
     Bitfield, Frame, Handshake, Have, Interested, KeepAlive, NotInterested, Piece, Request,
 };
@@ -74,7 +75,7 @@ pub enum BitfieldCmd {
 
 #[derive(Debug)]
 pub enum RequestCmd {
-    SendPiece { hash: [u8; 20] },
+    SendPiece { hash: [u8; HASH_SIZE] },
     Ignore,
 }
 
@@ -83,7 +84,7 @@ pub enum UnchokeCmd {
     SendRequest {
         index: usize,
         piece_size: usize,
-        piece_hash: [u8; 20],
+        piece_hash: [u8; HASH_SIZE],
     },
     SendNotInterested,
     Ignore,
@@ -94,16 +95,16 @@ pub enum PieceDoneCmd {
     SendRequest {
         index: usize,
         piece_size: usize,
-        piece_hash: [u8; 20],
+        piece_hash: [u8; HASH_SIZE],
     },
     PrepareKill,
 }
 
 pub struct Handler {
     connection: Connection,
-    own_id: [u8; 20],
-    peer_id: [u8; 20],
-    info_hash: [u8; 20],
+    own_id: [u8; HASH_SIZE],
+    peer_id: [u8; HASH_SIZE],
+    info_hash: [u8; HASH_SIZE],
     pieces_count: usize,
     piece_data: Option<PieceData>,
     peer_status: Status,
@@ -115,7 +116,7 @@ pub struct Handler {
 
 struct PieceData {
     index: usize,
-    hash: [u8; 20],
+    hash: [u8; HASH_SIZE],
     buff: Vec<u8>,
     requested: VecDeque<(usize, usize)>,
     left: VecDeque<(usize, usize)>,
@@ -134,7 +135,7 @@ struct Stats {
 }
 
 impl PieceData {
-    fn new(piece_index: usize, piece_size: usize, piece_hash: &[u8; 20]) -> PieceData {
+    fn new(piece_index: usize, piece_size: usize, piece_hash: &[u8; HASH_SIZE]) -> PieceData {
         PieceData {
             index: piece_index,
             hash: *piece_hash,
@@ -197,9 +198,9 @@ impl Stats {
 impl Handler {
     pub async fn run(
         addr: String,
-        own_id: [u8; 20],
-        peer_id: [u8; 20],
-        info_hash: [u8; 20],
+        own_id: [u8; HASH_SIZE],
+        peer_id: [u8; HASH_SIZE],
+        info_hash: [u8; HASH_SIZE],
         pieces_count: usize,
         mut job_ch: mpsc::Sender<JobCmd>,
         broad_ch: broadcast::Receiver<BroadCmd>,

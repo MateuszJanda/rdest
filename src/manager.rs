@@ -1,3 +1,4 @@
+use crate::constant::HASH_SIZE;
 use crate::frame::Bitfield;
 use crate::handler::{
     BitfieldCmd, BroadCmd, Handler, JobCmd, PieceDoneCmd, RequestCmd, UnchokeCmd,
@@ -14,7 +15,7 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::task::JoinHandle;
 
 pub struct Manager {
-    own_id: [u8; 20],
+    own_id: [u8; HASH_SIZE],
     pieces_status: Vec<Status>,
     peers: HashMap<String, Peer>,
 
@@ -48,7 +49,7 @@ pub enum Status {
 }
 
 impl Manager {
-    pub fn new(metainfo: Metainfo, tracker: TrackerResp, own_id: [u8; 20]) -> Manager {
+    pub fn new(metainfo: Metainfo, tracker: TrackerResp, own_id: [u8; HASH_SIZE]) -> Manager {
         let (cmd_tx, cmd_rx) = mpsc::channel(64);
         let (b_tx, _) = broadcast::channel(32);
 

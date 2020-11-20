@@ -1,5 +1,6 @@
 mod bdecoder;
 mod connection;
+mod constant;
 mod deep_finder;
 mod error;
 mod frame;

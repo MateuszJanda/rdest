@@ -1,3 +1,4 @@
+use crate::constant::HASH_SIZE;
 use crate::{Metainfo, TrackerResp};
 use rand::distributions::Alphanumeric;
 use rand::Rng;
@@ -11,7 +12,7 @@ impl TrackerClient {
     pub async fn connect(metafile: &Metainfo) -> Result<TrackerResp, Box<dyn std::error::Error>> {
         let peer_id = rand::thread_rng()
             .sample_iter(&Alphanumeric)
-            .take(20)
+            .take(HASH_SIZE)
             .collect::<String>();
 
         let params = [

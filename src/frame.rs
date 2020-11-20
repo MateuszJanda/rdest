@@ -1,3 +1,4 @@
+use crate::constant::HASH_SIZE;
 use crate::Error;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
@@ -28,8 +29,8 @@ pub trait Serializer {
 
 #[derive(Debug)]
 pub struct Handshake {
-    info_hash: [u8; 20],
-    peer_id: [u8; 20],
+    info_hash: [u8; HASH_SIZE],
+    peer_id: [u8; HASH_SIZE],
 }
 
 impl Handshake {
@@ -41,11 +42,11 @@ impl Handshake {
     const ID_FROM_PROTOCOL: u8 = Handshake::PROTOCOL_ID[3];
     const LEN_SIZE: usize = 1;
     const RESERVED_SIZE: usize = 8;
-    const INFO_HASH_SIZE: usize = 20;
-    const PEER_ID_SIZE: usize = 20;
+    const INFO_HASH_SIZE: usize = HASH_SIZE;
+    const PEER_ID_SIZE: usize = HASH_SIZE;
     const FULL_SIZE: usize = Handshake::LEN_SIZE + Handshake::LEN as usize;
 
-    pub fn new(info_hash: &[u8; 20], peer_id: &[u8; 20]) -> Handshake {
+    pub fn new(info_hash: &[u8; HASH_SIZE], peer_id: &[u8; HASH_SIZE]) -> Handshake {
         Handshake {
             info_hash: info_hash.clone(),
             peer_id: peer_id.clone(),
@@ -89,7 +90,11 @@ impl Handshake {
         return Err(Error::InvalidProtocolId);
     }
 
-    pub fn validate(&self, info_hash: &[u8; 20], peer_id: &[u8; 20]) -> Result<(), Error> {
+    pub fn validate(
+        &self,
+        info_hash: &[u8; HASH_SIZE],
+        peer_id: &[u8; HASH_SIZE],
+    ) -> Result<(), Error> {
         if self
             .info_hash
             .iter()

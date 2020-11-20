@@ -1,3 +1,4 @@
+use crate::constant::HASH_SIZE;
 use crate::{BDecoder, BValue, Error};
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
@@ -12,7 +13,7 @@ pub struct TrackerResp {
 #[derive(PartialEq, Clone, Debug)]
 pub struct Peer {
     ip: String,
-    peer_id: [u8; 20],
+    peer_id: [u8; HASH_SIZE],
     port: u64,
 }
 
@@ -116,7 +117,7 @@ impl TrackerResp {
             .collect()
     }
 
-    pub fn peers(&self) -> Vec<(String, [u8; 20])> {
+    pub fn peers(&self) -> Vec<(String, [u8; HASH_SIZE])> {
         self.peers
             .iter()
             .map(|p| (p.ip.clone() + ":" + p.port.to_string().as_str(), p.peer_id))
