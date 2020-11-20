@@ -18,6 +18,7 @@ const MAX_STATS_QUEUE_SIZE: usize = 2;
 #[derive(Debug, Clone)]
 pub enum BroadCmd {
     SendHave { index: usize },
+    // Change // TODO
 }
 #[derive(Debug)]
 pub enum JobCmd {
@@ -480,7 +481,7 @@ impl Handler {
                 self.send_request().await?;
                 self.send_request().await?;
             }
-            UnchokeCmd::SendNotInterested => (),
+            UnchokeCmd::SendNotInterested => (), // TODO
             UnchokeCmd::Ignore => (),
         }
 
@@ -656,6 +657,10 @@ impl Handler {
         }
 
         return false;
+    }
+
+    fn load_piece_from_file(&mut self) {
+        // TODO
     }
 
     fn save_piece_to_file(&mut self) {
