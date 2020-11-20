@@ -1,4 +1,4 @@
-use crate::constant::HASH_SIZE;
+use crate::constant::{HASH_SIZE, PIECE_BLOCK_SIZE};
 use crate::Error;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
@@ -488,6 +488,10 @@ impl Request {
     pub fn validate(&self, pieces_count: usize) -> Result<(), Error> {
         if self.index >= pieces_count as u32 {
             return Err(Error::InvalidIndex);
+        }
+
+        if self.length >= PIECE_BLOCK_SIZE as u32 {
+            return Err(Error::InvalidSize);
         }
 
         Ok(())

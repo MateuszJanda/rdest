@@ -1,5 +1,5 @@
 use crate::connection::Connection;
-use crate::constant::HASH_SIZE;
+use crate::constant::{HASH_SIZE, PIECE_BLOCK_SIZE};
 use crate::frame::{
     Bitfield, Frame, Handshake, Have, Interested, KeepAlive, NotInterested, Piece, Request,
 };
@@ -11,7 +11,6 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time;
 use tokio::time::{Duration, Instant};
 
-const PIECE_BLOCK_SIZE: usize = 16384;
 const KEEP_ALIVE_INTERVAL_SEC: u64 = 2 * 60;
 const STATS_INTERVAL_SEC: u64 = 10;
 const MAX_STATS_QUEUE_SIZE: usize = 2;
