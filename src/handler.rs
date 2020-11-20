@@ -231,10 +231,9 @@ impl Handler {
                 broad_ch,
             };
 
-            let reason = if let Err(e) = handler.event_loop().await {
-                e.to_string()
-            } else {
-                "".to_string()
+            let reason = match handler.event_loop().await {
+                Ok(_) => "".to_string(),
+                Err(e) => e.to_string(),
             };
 
             let index = handler.piece_data.map_or(None, |p| Some(p.index));
