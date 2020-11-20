@@ -210,42 +210,45 @@ impl Handler {
         broad_ch: broadcast::Receiver<BroadCmd>,
     ) {
         println!("Try connect to {}", &addr);
-        if let Ok(stream) = TcpStream::connect(&addr).await {
-            println!("connected");
+        match TcpStream::connect(&addr).await {
+            Ok(stream) => {
+                println!("connected");
 
-            let mut handler = Handler {
-                connection: Connection::new(addr, stream),
-                own_id,
-                peer_id,
-                info_hash,
-                pieces_count,
-                piece_data: None,
-                peer_status: Status {
-                    choked: true,
-                    interested: false,
-                    keep_alive: false,
-                },
-                stats: Stats::new(),
-                msg_buff: vec![],
-                job_ch,
-                broad_ch,
-            };
+                let mut handler = Handler {
+                    connection: Connection::new(addr, stream),
+                    own_id,
+                    peer_id,
+                    info_hash,
+                    pieces_count,
+                    piece_data: None,
+                    peer_status: Status {
+                        choked: true,
+                        interested: false,
+                        keep_alive: false,
+                    },
+                    stats: Stats::new(),
+                    msg_buff: vec![],
+                    job_ch,
+                    broad_ch,
+                };
 
-            let reason = match handler.event_loop().await {
-                Ok(_) => "".to_string(),
-                Err(e) => e.to_string(),
-            };
+                let reason = match handler.event_loop().await {
+                    Ok(_) => "".to_string(),
+                    Err(e) => e.to_string(),
+                };
 
-            let index = handler.piece_data.map_or(None, |p| Some(p.index));
-            Self::kill_req(
-                &handler.connection.addr,
-                &index,
-                &reason,
-                &mut handler.job_ch,
-            )
-            .await;
-        } else {
-            Self::kill_req(&addr, &None, &"Connection fail".to_string(), &mut job_ch).await;
+                let index = handler.piece_data.map_or(None, |p| Some(p.index));
+                Self::kill_req(
+                    &handler.connection.addr,
+                    &index,
+                    &reason,
+                    &mut handler.job_ch,
+                )
+                .await;
+            }
+            Err(_) => {
+                Self::kill_req(&addr, &None, &"Connection fail".to_string(), &mut job_ch).await
+            }
         }
     }
 
