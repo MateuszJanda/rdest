@@ -37,6 +37,13 @@ pub enum JobCmd {
         bitfield: Bitfield,
         resp_ch: oneshot::Sender<BitfieldCmd>,
     },
+    RecvRequest {
+        addr: String,
+        index: usize,
+        begin: usize,
+        length: usize,
+        resp_ch: oneshot::Sender<RequestCmd>,
+    },
     PieceDone {
         addr: String,
         resp_ch: oneshot::Sender<PieceDoneCmd>,
@@ -63,6 +70,12 @@ pub enum BitfieldCmd {
         interested: bool,
     },
     // PrepareKill,
+}
+
+#[derive(Debug)]
+pub enum RequestCmd {
+    SendPiece { hash: [u8; 20] },
+    Ignore,
 }
 
 #[derive(Debug)]
@@ -312,7 +325,7 @@ impl Handler {
                     Frame::NotInterested(_) => self.handle_not_interested().await?,
                     Frame::Have(have) => self.handle_have(&have).await?,
                     Frame::Bitfield(bitfield) => self.handle_bitfield(bitfield).await?,
-                    Frame::Request(_) => (),
+                    Frame::Request(request) => self.handle_request(request).await?,
                     Frame::Piece(piece) => {
                         if self.handle_piece(&piece).await? == false {
                             return Ok(false);
@@ -387,6 +400,11 @@ impl Handler {
     ) -> Result<(), Box<dyn std::error::Error>> {
         bitfield.validate(&self.pieces_count)?;
         self.cmd_recv_bitfield(bitfield).await?;
+        Ok(())
+    }
+
+    async fn handle_request(&mut self, request: Request) -> Result<(), Box<dyn std::error::Error>> {
+        request.validate(&self.pieces_count)?;
         Ok(())
     }
 
@@ -529,6 +547,29 @@ impl Handler {
                 println!("Wysyłam Interested");
                 self.connection.send_msg(&Interested::new()).await?
             }
+        }
+
+        Ok(())
+    }
+
+    async fn cmd_recv_request(
+        &mut self,
+        request: Request,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let (resp_tx, resp_rx) = oneshot::channel();
+        self.job_ch
+            .send(JobCmd::RecvRequest {
+                addr: self.connection.addr.clone(),
+                index: request.index(),
+                begin: request.block_begin(),
+                length: request.block_len(),
+                resp_ch: resp_tx,
+            })
+            .await?;
+
+        match resp_rx.await? {
+            RequestCmd::SendPiece { hash } => (),
+            RequestCmd::Ignore => (),
         }
 
         Ok(())

@@ -467,6 +467,26 @@ impl Request {
 
         Err(Error::Incomplete)
     }
+
+    pub fn index(&self) -> usize {
+        self.index as usize
+    }
+
+    pub fn block_begin(&self) -> usize {
+        self.begin as usize
+    }
+
+    pub fn block_len(&self) -> usize {
+        self.length as usize
+    }
+
+    pub fn validate(&self, pieces_count: &usize) -> Result<(), Error> {
+        if self.index >= *pieces_count as u32 {
+            return Err(Error::InvalidIndex);
+        }
+
+        Ok(())
+    }
 }
 
 impl Serializer for Request {
@@ -534,6 +554,22 @@ impl Piece {
         Err(Error::Incomplete)
     }
 
+    pub fn index(&self) -> usize {
+        self.index as usize
+    }
+
+    pub fn block_begin(&self) -> usize {
+        self.begin as usize
+    }
+
+    pub fn block_len(&self) -> usize {
+        self.block.len()
+    }
+
+    pub fn block(&self) -> &Vec<u8> {
+        &self.block
+    }
+
     pub fn validate(
         &self,
         index: usize,
@@ -553,22 +589,6 @@ impl Piece {
         }
 
         Ok(())
-    }
-
-    pub fn index(&self) -> usize {
-        self.index as usize
-    }
-
-    pub fn block_begin(&self) -> usize {
-        self.begin as usize
-    }
-
-    pub fn block_len(&self) -> usize {
-        self.block.len()
-    }
-
-    pub fn block(&self) -> &Vec<u8> {
-        &self.block
     }
 }
 

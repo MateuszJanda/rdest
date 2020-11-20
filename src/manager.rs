@@ -1,5 +1,7 @@
 use crate::frame::Bitfield;
-use crate::handler::{BitfieldCmd, BroadCmd, Handler, JobCmd, PieceDoneCmd, UnchokeCmd};
+use crate::handler::{
+    BitfieldCmd, BroadCmd, Handler, JobCmd, PieceDoneCmd, RequestCmd, UnchokeCmd,
+};
 use crate::progress::{Progress, ViewCmd};
 use crate::{utils, Error, Metainfo, TrackerResp};
 use rand::seq::SliceRandom;
@@ -123,7 +125,20 @@ impl Manager {
                 bitfield,
                 resp_ch,
             } => self.handle_bitfield(&addr, &bitfield, resp_ch),
+            JobCmd::RecvRequest {
+                addr,
+                index,
+                begin,
+                length,
+                resp_ch,
+            } => self.handle_request(&addr, index, begin, length, resp_ch),
             JobCmd::PieceDone { addr, resp_ch } => self.handle_piece_done(&addr, resp_ch),
+            JobCmd::SyncStats {
+                addr,
+                downloaded_rate,
+                unexpected_piece,
+                rejected_piece,
+            } => true,
             JobCmd::KillReq {
                 addr,
                 index,
@@ -209,6 +224,18 @@ impl Manager {
             interested,
         });
 
+        true
+    }
+
+    fn handle_request(
+        &mut self,
+        addr: &String,
+        index: usize,
+        begin: usize,
+        length: usize,
+        resp_ch: oneshot::Sender<RequestCmd>,
+    ) -> bool {
+        let _ = resp_ch.send(RequestCmd::Ignore);
         true
     }
 
