@@ -107,6 +107,7 @@ pub struct Handler {
     pieces_count: usize,
     piece_data: Option<PieceData>,
     peer_status: Status,
+    stats: Stats,
     msg_buff: Vec<Frame>,
     job_ch: mpsc::Sender<JobCmd>,
     broad_ch: broadcast::Receiver<BroadCmd>,
@@ -124,56 +125,12 @@ struct Status {
     choked: bool,
     interested: bool,
     keep_alive: bool,
-    stats: VecDeque<Stats>,
 }
 
 struct Stats {
-    downloaded: usize,
+    downloaded: VecDeque<usize>,
     unexpected_piece: u32,
     rejected_piece: u32,
-}
-
-impl Stats {
-    fn new() -> Stats {
-        Stats {
-            downloaded: 0,
-            unexpected_piece: 0,
-            rejected_piece: 0,
-        }
-    }
-}
-
-impl Status {
-    fn update_downloaded(&mut self, amount: usize) {
-        self.stats[0].downloaded += amount;
-    }
-
-    fn update_unexpected(&mut self) {
-        self.stats[0].unexpected_piece += 1;
-    }
-
-    fn update_rejected(&mut self) {
-        self.stats[0].rejected_piece += 1;
-    }
-
-    fn downloaded(&self) -> usize {
-        self.stats.iter().map(|s| s.downloaded).sum()
-    }
-
-    fn unexpected(&self) -> u32 {
-        self.stats.iter().map(|s| s.unexpected_piece).sum()
-    }
-
-    fn rejected(&self) -> u32 {
-        self.stats.iter().map(|s| s.rejected_piece).sum()
-    }
-
-    fn shift(&mut self) {
-        if self.stats.len() == 2 {
-            self.stats.pop_back();
-        }
-        self.stats.push_front(Stats::new());
-    }
 }
 
 impl PieceData {
@@ -202,6 +159,41 @@ impl PieceData {
     }
 }
 
+impl Stats {
+    fn new() -> Stats {
+        Stats {
+            downloaded: VecDeque::from(vec![0]),
+            unexpected_piece: 0,
+            rejected_piece: 0,
+        }
+    }
+
+    fn update_downloaded(&mut self, amount: usize) {
+        self.downloaded[0] += amount;
+    }
+
+    fn update_unexpected(&mut self) {
+        self.unexpected_piece += 1;
+    }
+
+    fn update_rejected(&mut self) {
+        self.rejected_piece += 1;
+    }
+
+    fn shift(&mut self) {
+        if self.downloaded.len() == 2 {
+            self.downloaded.pop_back();
+        }
+        self.downloaded.push_front(0);
+        self.unexpected_piece = 0;
+        self.rejected_piece = 0;
+    }
+
+    fn downloaded_rate(&self) -> f32 {
+        self.downloaded.iter().map(|d| *d as u32).sum::<u32>() as f32 / self.downloaded.len() as f32
+    }
+}
+
 impl Handler {
     pub async fn run(
         addr: String,
@@ -227,8 +219,8 @@ impl Handler {
                     choked: true,
                     interested: false,
                     keep_alive: false,
-                    stats: VecDeque::from(vec![Stats::new()]),
                 },
+                stats: Stats::new(),
                 msg_buff: vec![],
                 job_ch,
                 broad_ch,
@@ -292,10 +284,10 @@ impl Handler {
                 }
                 _ = download_rate.tick() =>
                 {
-                    if self.peer_status.stats.len() == 2 {
+                    if self.stats.downloaded.len() == 2 {
                         self.cmd_sync_stats().await?;
                     }
-                    self.peer_status.shift();
+                    self.stats.shift();
                 }
                 cmd = self.broad_ch.recv() => self.send_have(cmd?).await?,
                 frame = self.connection.recv_frame() => {
@@ -426,14 +418,14 @@ impl Handler {
         });
 
         // Save piece block
-        self.peer_status.update_downloaded(piece.block_len());
+        self.stats.update_downloaded(piece.block_len());
         piece_data.buff[piece.block_begin()..piece.block_begin() + piece.block_len()]
             .copy_from_slice(&piece.block());
 
         // Send new request or call manager to decide
         if piece_data.left.is_empty() && piece_data.requested.is_empty() {
             if !self.verify_piece_hash() {
-                self.peer_status.update_rejected();
+                self.stats.update_rejected();
                 return Ok(true);
             }
 
@@ -594,15 +586,9 @@ impl Handler {
         self.job_ch
             .send(JobCmd::SyncStats {
                 addr: self.connection.addr.clone(),
-                downloaded_rate: self
-                    .peer_status
-                    .stats
-                    .iter()
-                    .map(|s| s.downloaded as u32)
-                    .sum::<u32>() as f32
-                    / self.peer_status.stats.len() as f32,
-                unexpected_piece: self.peer_status.stats[0].unexpected_piece,
-                rejected_piece: self.peer_status.stats[0].rejected_piece,
+                downloaded_rate: self.stats.downloaded_rate(),
+                unexpected_piece: self.stats.unexpected_piece,
+                rejected_piece: self.stats.rejected_piece,
             })
             .await?;
 
