@@ -118,7 +118,7 @@ pub struct Handler {
     pieces_count: usize,
     tmp_index: Option<usize>,
     tmp_data: Vec<u8>,
-    piece_data: Option<PieceData>,
+    piece_recv: Option<PieceData>,
     peer_status: Status,
     stats: Stats,
     msg_buff: Vec<Frame>,
@@ -230,7 +230,7 @@ impl Handler {
                     pieces_count,
                     tmp_index: None,
                     tmp_data: vec![],
-                    piece_data: None,
+                    piece_recv: None,
                     peer_status: Status {
                         choked: true,
                         interested: false,
@@ -247,7 +247,7 @@ impl Handler {
                     Err(e) => e.to_string(),
                 };
 
-                let index = handler.piece_data.map_or(None, |p| Some(p.index));
+                let index = handler.piece_recv.map_or(None, |p| Some(p.index));
                 Self::kill_req(
                     &handler.connection.addr,
                     &index,
@@ -448,13 +448,13 @@ impl Handler {
 
     async fn handle_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
         // Verify message
-        let piece_data = self.piece_data.as_mut().ok_or(Error::NotFound)?;
-        if !piece_data
+        let piece_recv = self.piece_recv.as_mut().ok_or(Error::NotFound)?;
+        if !piece_recv
             .requested
             .iter()
             .any(|(block_begin, block_length)| {
                 piece
-                    .validate(piece_data.index, *block_begin, *block_length)
+                    .validate(piece_recv.index, *block_begin, *block_length)
                     .is_ok()
             })
         {
@@ -462,17 +462,17 @@ impl Handler {
         }
 
         // Removed piece from "requested" queue
-        piece_data.requested.retain(|(block_begin, block_length)| {
+        piece_recv.requested.retain(|(block_begin, block_length)| {
             !(*block_begin == piece.block_begin() && *block_length == piece.block_length())
         });
 
         // Save piece block
         self.stats.update_downloaded(piece.block_length());
-        piece_data.buff[piece.block_begin()..piece.block_begin() + piece.block_length()]
+        piece_recv.buff[piece.block_begin()..piece.block_begin() + piece.block_length()]
             .copy_from_slice(&piece.block());
 
         // Send new request or call manager to decide
-        if piece_data.left.is_empty() && piece_data.requested.is_empty() {
+        if piece_recv.left.is_empty() && piece_recv.requested.is_empty() {
             if !self.verify_piece_hash() {
                 self.stats.update_rejected();
                 return Ok(true);
@@ -516,7 +516,7 @@ impl Handler {
                 piece_length,
                 piece_hash,
             } => {
-                self.piece_data = Some(PieceData::new(index, piece_length, &piece_hash));
+                self.piece_recv = Some(PieceData::new(index, piece_length, &piece_hash));
 
                 // BEP3 suggests send more than one request to get good better TCP performance (pipeline)
                 self.send_request().await?;
@@ -629,7 +629,7 @@ impl Handler {
                 piece_length,
                 piece_hash,
             } => {
-                self.piece_data = Some(PieceData::new(index, piece_length, &piece_hash));
+                self.piece_recv = Some(PieceData::new(index, piece_length, &piece_hash));
                 self.send_request().await?;
             }
             PieceDoneCmd::PrepareKill => return Ok(false),
@@ -669,11 +669,11 @@ impl Handler {
     }
 
     async fn send_request(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if let Some(piece_data) = self.piece_data.as_mut() {
-            if let Some((block_begin, block_len)) = piece_data.left.pop_front() {
-                piece_data.requested.push_back((block_begin, block_len));
+        if let Some(piece_recv) = self.piece_recv.as_mut() {
+            if let Some((block_begin, block_len)) = piece_recv.left.pop_front() {
+                piece_recv.requested.push_back((block_begin, block_len));
 
-                let msg = Request::new(piece_data.index, block_begin, block_len);
+                let msg = Request::new(piece_recv.index, block_begin, block_len);
                 println!("Wysyłam kolejny request");
                 match self.peer_status.choked {
                     true => self.msg_buff.push(Frame::Request(msg)),
@@ -709,13 +709,13 @@ impl Handler {
     }
 
     fn verify_piece_hash(&self) -> bool {
-        match self.piece_data.as_ref() {
-            Some(piece_data) => {
+        match self.piece_recv.as_ref() {
+            Some(piece_recv) => {
                 let mut m = sha1::Sha1::new();
-                m.update(piece_data.buff.as_ref());
-                println!("Checksum: {:?} {:?}", m.digest().bytes(), piece_data.hash);
+                m.update(piece_recv.buff.as_ref());
+                println!("Checksum: {:?} {:?}", m.digest().bytes(), piece_recv.hash);
 
-                return m.digest().bytes() == piece_data.hash;
+                return m.digest().bytes() == piece_recv.hash;
             }
             None => false,
         }
@@ -733,12 +733,12 @@ impl Handler {
     }
 
     fn save_piece_to_file(&mut self) {
-        let piece_data = self
-            .piece_data
+        let piece_recv = self
+            .piece_recv
             .take()
             .ok_or(Error::NotFound)
             .expect("Saving to file: piece data not exist after validation");
-        let name = utils::hash_to_string(&piece_data.hash) + ".piece";
-        fs::write(name, &piece_data.buff).unwrap();
+        let name = utils::hash_to_string(&piece_recv.hash) + ".piece";
+        fs::write(name, &piece_recv.buff).unwrap();
     }
 }
