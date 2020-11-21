@@ -111,6 +111,7 @@ pub struct Handler {
     peer_id: [u8; HASH_SIZE],
     info_hash: [u8; HASH_SIZE],
     pieces_count: usize,
+    tmp_data: Vec<u8>,
     piece_data: Option<PieceData>,
     peer_status: Status,
     stats: Stats,
@@ -221,6 +222,7 @@ impl Handler {
                     peer_id,
                     info_hash,
                     pieces_count,
+                    tmp_data: vec![],
                     piece_data: None,
                     peer_status: Status {
                         choked: true,
@@ -660,8 +662,15 @@ impl Handler {
         }
     }
 
-    fn load_piece_from_file(&mut self) {
-        // TODO
+    fn load_piece_from_file(&mut self, piece_hash: &[u8; HASH_SIZE]) -> Result<(), Error> {
+        let name = utils::hash_to_string(&piece_hash) + ".piece";
+        match fs::read(name) {
+            Ok(data) => {
+                self.tmp_data = data;
+                Ok(())
+            }
+            Err(_) => Err(Error::FileNotFound),
+        }
     }
 
     fn save_piece_to_file(&mut self) {
