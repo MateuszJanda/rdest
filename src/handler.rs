@@ -9,7 +9,7 @@ use std::fs;
 use tokio::net::TcpStream;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time;
-use tokio::time::{Duration, Instant};
+use tokio::time::{Duration, Instant, Interval};
 
 const KEEP_ALIVE_INTERVAL_SEC: u64 = 2 * 60;
 const STATS_INTERVAL_SEC: u64 = 10;
@@ -276,15 +276,12 @@ impl Handler {
             .send_msg(&Handshake::new(&self.info_hash, &self.own_id))
             .await?;
 
-        let start = Instant::now() + Duration::from_secs(KEEP_ALIVE_INTERVAL_SEC);
-        let mut interval = time::interval_at(start, Duration::from_secs(KEEP_ALIVE_INTERVAL_SEC));
-
-        let start = Instant::now() + Duration::from_secs(STATS_INTERVAL_SEC);
-        let mut download_rate = time::interval_at(start, Duration::from_secs(STATS_INTERVAL_SEC));
+        let mut keep_alive_timer = self.start_keep_alive_timer();
+        let mut sync_stats_timer = self.start_sync_stats_timer();
 
         loop {
             tokio::select! {
-                _ = interval.tick() => {
+                _ = keep_alive_timer.tick() => {
                     if !self.peer_status.keep_alive {
                         println!("Close connection, no messages from peer");
                         break;
@@ -292,7 +289,7 @@ impl Handler {
                     self.send_keep_alive().await?;
                     self.peer_status.keep_alive = false;
                 }
-                _ = download_rate.tick() =>
+                _ = sync_stats_timer.tick() =>
                 {
                     if self.stats.downloaded.len() == MAX_STATS_QUEUE_SIZE {
                         self.cmd_sync_stats().await?;
@@ -309,6 +306,16 @@ impl Handler {
         }
 
         Ok(())
+    }
+
+    fn start_keep_alive_timer(&self) -> Interval {
+        let start = Instant::now() + Duration::from_secs(KEEP_ALIVE_INTERVAL_SEC);
+        time::interval_at(start, Duration::from_secs(KEEP_ALIVE_INTERVAL_SEC))
+    }
+
+    fn start_sync_stats_timer(&self) -> Interval {
+        let start = Instant::now() + Duration::from_secs(STATS_INTERVAL_SEC);
+        time::interval_at(start, Duration::from_secs(STATS_INTERVAL_SEC))
     }
 
     async fn handle_frame(
