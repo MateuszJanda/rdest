@@ -18,7 +18,7 @@ const MAX_STATS_QUEUE_SIZE: usize = 2;
 #[derive(Debug, Clone)]
 pub enum BroadCmd {
     SendHave { index: usize },
-    // Change // TODO
+    Change, // TODO
 }
 #[derive(Debug)]
 pub enum JobCmd {
@@ -283,7 +283,7 @@ impl Handler {
             tokio::select! {
                 _ = keep_alive_timer.tick() => self.timeout_keep_alive().await?,
                 _ = sync_stats_timer.tick() => self.timeout_sync_stats().await?,
-                cmd = self.broad_ch.recv() => self.send_have(cmd?).await?,
+                cmd = self.broad_ch.recv() => self.handle_manager(cmd?).await?,
                 frame = self.connection.recv_frame() => {
                     if self.handle_frame(frame?).await? == false {
                         break;
@@ -493,7 +493,7 @@ impl Handler {
             } => {
                 self.piece_data = Some(PieceData::new(index, piece_size, &piece_hash));
 
-                // BEP3 suggests send more than one request to get good TCP performance (pipeline)
+                // BEP3 suggests send more than one request to get good better TCP performance (pipeline)
                 self.send_request().await?;
                 self.send_request().await?;
             }
@@ -543,12 +543,9 @@ impl Handler {
                 interested,
             } => {
                 self.connection.send_msg(&bitfield).await?;
-
-                if interested {
-                    println!("Wysyłam Interested");
-                    self.connection.send_msg(&Interested::new()).await?
-                } else {
-                    self.connection.send_msg(&NotInterested::new()).await?
+                match interested {
+                    true => self.connection.send_msg(&Interested::new()).await?,
+                    false => self.connection.send_msg(&NotInterested::new()).await?,
                 }
             }
             BitfieldCmd::PrepareKill => {
@@ -624,15 +621,13 @@ impl Handler {
         Ok(())
     }
 
-    async fn send_have(&mut self, cmd: BroadCmd) -> Result<(), Box<dyn std::error::Error>> {
+    async fn handle_manager(&mut self, cmd: BroadCmd) -> Result<(), Box<dyn std::error::Error>> {
         match cmd {
-            BroadCmd::SendHave { index } => {
-                if self.peer_status.choked {
-                    self.msg_buff.push(Frame::Have(Have::new(index)));
-                } else {
-                    self.connection.send_msg(&Have::new(index)).await?;
-                }
-            }
+            BroadCmd::SendHave { index } => match self.peer_status.choked {
+                true => self.msg_buff.push(Frame::Have(Have::new(index))),
+                false => self.connection.send_msg(&Have::new(index)).await?,
+            },
+            BroadCmd::Change => (),
         }
 
         Ok(())
@@ -644,11 +639,10 @@ impl Handler {
                 piece_data.requested.push_back((block_begin, block_len));
 
                 let msg = Request::new(piece_data.index, block_begin, block_len);
-                if self.peer_status.choked {
-                    self.msg_buff.push(Frame::Request(msg));
-                } else {
-                    println!("Wysyłam kolejny request");
-                    self.connection.send_msg(&msg).await?;
+                println!("Wysyłam kolejny request");
+                match self.peer_status.choked {
+                    true => self.msg_buff.push(Frame::Request(msg)),
+                    false => self.connection.send_msg(&msg).await?,
                 }
             }
         }
