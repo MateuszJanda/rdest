@@ -437,7 +437,7 @@ impl Handler {
 
         // Removed piece from "requested" queue
         piece_data.requested.retain(|(block_begin, block_len)| {
-            *block_begin == piece.block_begin() && *block_len == piece.block_len()
+            !(*block_begin == piece.block_begin() && *block_len == piece.block_len())
         });
 
         // Save piece block
