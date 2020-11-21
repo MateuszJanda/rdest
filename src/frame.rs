@@ -314,7 +314,7 @@ impl Have {
         Err(Error::Incomplete)
     }
 
-    pub(crate) fn index(&self) -> usize {
+    pub fn index(&self) -> usize {
         self.index as usize
     }
 
@@ -423,8 +423,8 @@ impl Serializer for Bitfield {
 #[derive(Debug)]
 pub struct Request {
     index: u32,
-    begin: u32,
-    length: u32,
+    block_begin: u32,
+    block_length: u32,
 }
 
 impl Request {
@@ -437,11 +437,11 @@ impl Request {
     const LENGTH_SIZE: usize = 4;
     const FULL_SIZE: usize = Request::LEN_SIZE + Request::LEN as usize;
 
-    pub fn new(index: usize, begin: usize, length: usize) -> Request {
+    pub fn new(index: usize, block_begin: usize, block_length: usize) -> Request {
         Request {
             index: index as u32,
-            begin: begin as u32,
-            length: length as u32,
+            block_begin: block_begin as u32,
+            block_length: block_length as u32,
         }
     }
 
@@ -451,17 +451,17 @@ impl Request {
         index.copy_from_slice(&crs.get_ref()[start..start + Request::INDEX_SIZE]);
 
         let start = start + Request::INDEX_SIZE;
-        let mut begin = [0; Request::BEGIN_SIZE];
-        begin.copy_from_slice(&crs.get_ref()[start..start + Request::BEGIN_SIZE]);
+        let mut block_begin = [0; Request::BEGIN_SIZE];
+        block_begin.copy_from_slice(&crs.get_ref()[start..start + Request::BEGIN_SIZE]);
 
         let start = start + Request::BEGIN_SIZE;
-        let mut length = [0; Request::LENGTH_SIZE];
-        length.copy_from_slice(&crs.get_ref()[start..start + Request::LENGTH_SIZE]);
+        let mut block_length = [0; Request::LENGTH_SIZE];
+        block_length.copy_from_slice(&crs.get_ref()[start..start + Request::LENGTH_SIZE]);
 
         Request {
             index: u32::from_be_bytes(index),
-            begin: u32::from_be_bytes(begin),
-            length: u32::from_be_bytes(length),
+            block_begin: u32::from_be_bytes(block_begin),
+            block_length: u32::from_be_bytes(block_length),
         }
     }
 
@@ -478,11 +478,11 @@ impl Request {
     }
 
     pub fn block_begin(&self) -> usize {
-        self.begin as usize
+        self.block_begin as usize
     }
 
     pub fn block_len(&self) -> usize {
-        self.length as usize
+        self.block_length as usize
     }
 
     pub fn validate(&self, piece_len: Option<usize>, pieces_count: usize) -> Result<(), Error> {
@@ -490,12 +490,12 @@ impl Request {
             return Err(Error::InvalidIndex);
         }
 
-        if self.length >= PIECE_BLOCK_SIZE as u32 {
+        if self.block_length >= PIECE_BLOCK_SIZE as u32 {
             return Err(Error::InvalidSize);
         }
 
         if let Some(piece_len) = piece_len {
-            if self.begin + self.length > piece_len as u32 {
+            if self.block_begin + self.block_length > piece_len as u32 {
                 return Err(Error::InvalidSize);
             }
         }
@@ -510,8 +510,8 @@ impl Serializer for Request {
         vec.extend_from_slice(&Request::LEN.to_be_bytes());
         vec.push(Request::ID);
         vec.extend_from_slice(&self.index.to_be_bytes());
-        vec.extend_from_slice(&self.begin.to_be_bytes());
-        vec.extend_from_slice(&self.length.to_be_bytes());
+        vec.extend_from_slice(&self.block_begin.to_be_bytes());
+        vec.extend_from_slice(&self.block_length.to_be_bytes());
 
         vec
     }
@@ -520,7 +520,7 @@ impl Serializer for Request {
 #[derive(Debug)]
 pub struct Piece {
     index: u32,
-    begin: u32,
+    block_begin: u32,
     block: Vec<u8>,
 }
 
@@ -535,7 +535,7 @@ impl Piece {
     pub fn new(index: usize, block_begin: usize, block: Vec<u8>) -> Piece {
         Piece {
             index: index as u32,
-            begin: block_begin as u32,
+            block_begin: block_begin as u32,
             block,
         }
     }
@@ -546,8 +546,8 @@ impl Piece {
         index.copy_from_slice(&crs.get_ref()[start..start + Piece::INDEX_SIZE]);
 
         let start = start + Piece::INDEX_SIZE;
-        let mut begin = [0; Piece::BEGIN_SIZE];
-        begin.copy_from_slice(&crs.get_ref()[start..start + Piece::BEGIN_SIZE]);
+        let mut block_begin = [0; Piece::BEGIN_SIZE];
+        block_begin.copy_from_slice(&crs.get_ref()[start..start + Piece::BEGIN_SIZE]);
 
         let start = start + Piece::BEGIN_SIZE;
         let end = crs.position() as usize;
@@ -556,7 +556,7 @@ impl Piece {
 
         Piece {
             index: u32::from_be_bytes(index),
-            begin: u32::from_be_bytes(begin),
+            block_begin: u32::from_be_bytes(block_begin),
             block,
         }
     }
@@ -574,10 +574,10 @@ impl Piece {
     }
 
     pub fn block_begin(&self) -> usize {
-        self.begin as usize
+        self.block_begin as usize
     }
 
-    pub fn block_len(&self) -> usize {
+    pub fn block_length(&self) -> usize {
         self.block.len()
     }
 
@@ -595,7 +595,7 @@ impl Piece {
             return Err(Error::InvalidIndex);
         }
 
-        if self.begin as usize != block_begin {
+        if self.block_begin as usize != block_begin {
             return Err(Error::InvalidIndex);
         }
 
@@ -613,7 +613,7 @@ impl Serializer for Piece {
         vec.extend_from_slice(&((Piece::ID_SIZE + self.block.len()) as u32).to_be_bytes());
         vec.push(Piece::ID);
         vec.extend_from_slice(&self.index.to_be_bytes());
-        vec.extend_from_slice(&self.begin.to_be_bytes());
+        vec.extend_from_slice(&self.block_begin.to_be_bytes());
         vec.extend_from_slice(self.block.as_slice());
 
         vec
@@ -623,8 +623,8 @@ impl Serializer for Piece {
 #[derive(Debug)]
 pub struct Cancel {
     index: u32,
-    begin: u32,
-    length: u32,
+    block_begin: u32,
+    block_length: u32,
 }
 
 impl Cancel {
@@ -640,8 +640,8 @@ impl Cancel {
     pub fn new(index: usize, begin: usize, length: usize) -> Cancel {
         Cancel {
             index: index as u32,
-            begin: begin as u32,
-            length: length as u32,
+            block_begin: begin as u32,
+            block_length: length as u32,
         }
     }
 
@@ -651,17 +651,17 @@ impl Cancel {
         index.copy_from_slice(&crs.get_ref()[start..start + Cancel::INDEX_SIZE]);
 
         let start = start + Cancel::INDEX_SIZE;
-        let mut begin = [0; Cancel::BEGIN_SIZE];
-        begin.clone_from_slice(&crs.get_ref()[start..start + Cancel::BEGIN_SIZE]);
+        let mut block_begin = [0; Cancel::BEGIN_SIZE];
+        block_begin.clone_from_slice(&crs.get_ref()[start..start + Cancel::BEGIN_SIZE]);
 
         let start = start + Cancel::BEGIN_SIZE;
-        let mut length = [0; Cancel::LENGTH_SIZE];
-        length.clone_from_slice(&crs.get_ref()[start..start + Cancel::LENGTH_SIZE]);
+        let mut block_length = [0; Cancel::LENGTH_SIZE];
+        block_length.clone_from_slice(&crs.get_ref()[start..start + Cancel::LENGTH_SIZE]);
 
         Cancel {
             index: u32::from_be_bytes(index),
-            begin: u32::from_be_bytes(begin),
-            length: u32::from_be_bytes(length),
+            block_begin: u32::from_be_bytes(block_begin),
+            block_length: u32::from_be_bytes(block_length),
         }
     }
 
@@ -680,8 +680,8 @@ impl Serializer for Cancel {
         vec.extend_from_slice(&Cancel::LEN.to_be_bytes());
         vec.push(Cancel::ID);
         vec.extend_from_slice(&self.index.to_be_bytes());
-        vec.extend_from_slice(&self.begin.to_be_bytes());
-        vec.extend_from_slice(&self.length.to_be_bytes());
+        vec.extend_from_slice(&self.block_begin.to_be_bytes());
+        vec.extend_from_slice(&self.block_length.to_be_bytes());
 
         vec
     }

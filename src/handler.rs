@@ -452,22 +452,22 @@ impl Handler {
     async fn handle_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
         // Verify message
         let piece_data = self.piece_data.as_mut().ok_or(Error::NotFound)?;
-        if !piece_data.requested.iter().any(|(block_begin, block_len)| {
+        if !piece_data.requested.iter().any(|(block_begin, block_length)| {
             piece
-                .validate(piece_data.index, *block_begin, *block_len)
+                .validate(piece_data.index, *block_begin, *block_length)
                 .is_ok()
         }) {
             Err(Error::NotFound)?;
         }
 
         // Removed piece from "requested" queue
-        piece_data.requested.retain(|(block_begin, block_len)| {
-            !(*block_begin == piece.block_begin() && *block_len == piece.block_len())
+        piece_data.requested.retain(|(block_begin, block_length)| {
+            !(*block_begin == piece.block_begin() && *block_length == piece.block_length())
         });
 
         // Save piece block
-        self.stats.update_downloaded(piece.block_len());
-        piece_data.buff[piece.block_begin()..piece.block_begin() + piece.block_len()]
+        self.stats.update_downloaded(piece.block_length());
+        piece_data.buff[piece.block_begin()..piece.block_begin() + piece.block_length()]
             .copy_from_slice(&piece.block());
 
         // Send new request or call manager to decide
