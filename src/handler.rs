@@ -80,7 +80,12 @@ pub enum BitfieldCmd {
 
 #[derive(Debug)]
 pub enum RequestCmd {
-    SendPiece { hash: [u8; HASH_SIZE] },
+    SendPiece {
+        index: usize,
+        block_begin: usize,
+        block_len: usize,
+        hash: [u8; HASH_SIZE],
+    },
     Ignore,
 }
 
@@ -111,6 +116,7 @@ pub struct Handler {
     peer_id: [u8; HASH_SIZE],
     info_hash: [u8; HASH_SIZE],
     pieces_count: usize,
+    tmp_index: Option<usize>,
     tmp_data: Vec<u8>,
     piece_data: Option<PieceData>,
     peer_status: Status,
@@ -222,6 +228,7 @@ impl Handler {
                     peer_id,
                     info_hash,
                     pieces_count,
+                    tmp_index: None,
                     tmp_data: vec![],
                     piece_data: None,
                     peer_status: Status {
@@ -569,8 +576,24 @@ impl Handler {
             .await?;
 
         match resp_rx.await? {
-            RequestCmd::SendPiece { hash } => (), // TODO
-            RequestCmd::Ignore => (),             // TODO
+            RequestCmd::SendPiece {
+                index,
+                block_begin,
+                block_len,
+                hash,
+            } => {
+                self.tmp_index = Some(index);
+                self.load_piece_from_file(&hash)?;
+
+                self.connection
+                    .send_msg(&Piece::new(
+                        index,
+                        block_begin,
+                        self.tmp_data[block_begin..block_begin + block_len].to_vec(),
+                    ))
+                    .await?;
+            }
+            RequestCmd::Ignore => (),
         }
 
         Ok(())
@@ -668,7 +691,7 @@ impl Handler {
     }
 
     fn load_piece_from_file(&mut self, piece_hash: &[u8; HASH_SIZE]) -> Result<(), Error> {
-        let name = utils::hash_to_string(&piece_hash) + ".piece";
+        let name = utils::hash_to_string(piece_hash) + ".piece";
         match fs::read(name) {
             Ok(data) => {
                 self.tmp_data = data;

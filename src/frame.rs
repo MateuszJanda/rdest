@@ -526,10 +526,10 @@ impl Piece {
     const BEGIN_SIZE: usize = 4;
     const MIN_LEN: usize = 9;
 
-    pub fn new(index: u32, begin: u32, block: Vec<u8>) -> Piece {
+    pub fn new(index: usize, block_begin: usize, block: Vec<u8>) -> Piece {
         Piece {
-            index,
-            begin,
+            index: index as u32,
+            begin: block_begin as u32,
             block,
         }
     }
