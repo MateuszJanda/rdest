@@ -260,6 +260,7 @@ impl Manager {
         index: &Option<usize>,
         reason: &String,
     ) -> bool {
+        println!("Kill reason: {}", reason);
         self.kill_job(&addr, &index).await;
 
         if self.peers.is_empty() {
