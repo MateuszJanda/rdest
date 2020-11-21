@@ -430,12 +430,12 @@ impl Handler {
         request: Request,
     ) -> Result<bool, Box<dyn std::error::Error>> {
         match &self.piece_send {
-            Some(p) => request.validate(Some(p.buff.len()), self.pieces_count)?,
+            Some(piece_send) => request.validate(Some(piece_send.buff.len()), self.pieces_count)?,
             None => request.validate(None, self.pieces_count)?,
         }
 
         match &self.piece_send {
-            Some(p) if p.index == request.index() => {
+            Some(piece_send) if piece_send.index == request.index() => {
                 self.send_piece(
                     request.index(),
                     request.block_begin(),
