@@ -84,7 +84,7 @@ pub enum RequestCmd {
         index: usize,
         block_begin: usize,
         block_length: usize,
-        hash: [u8; HASH_SIZE],
+        piece_hash: [u8; HASH_SIZE],
     },
     Ignore,
 }
@@ -116,9 +116,8 @@ pub struct Handler {
     peer_id: [u8; HASH_SIZE],
     info_hash: [u8; HASH_SIZE],
     pieces_count: usize,
-    tmp_index: Option<usize>,
-    tmp_data: Vec<u8>,
-    piece_recv: Option<PieceData>,
+    piece_send: Option<PieceSend>,
+    piece_recv: Option<PieceRecv>,
     peer_status: Status,
     stats: Stats,
     msg_buff: Vec<Frame>,
@@ -126,7 +125,12 @@ pub struct Handler {
     broad_ch: broadcast::Receiver<BroadCmd>,
 }
 
-struct PieceData {
+struct PieceSend {
+    index: usize,
+    buff: Vec<u8>,
+}
+
+struct PieceRecv {
     index: usize,
     hash: [u8; HASH_SIZE],
     buff: Vec<u8>,
@@ -146,9 +150,9 @@ struct Stats {
     rejected_piece: u32,
 }
 
-impl PieceData {
-    fn new(index: usize, piece_length: usize, piece_hash: &[u8; HASH_SIZE]) -> PieceData {
-        PieceData {
+impl PieceRecv {
+    fn new(index: usize, piece_length: usize, piece_hash: &[u8; HASH_SIZE]) -> PieceRecv {
+        PieceRecv {
             index,
             hash: *piece_hash,
             buff: vec![0; piece_length],
@@ -228,8 +232,7 @@ impl Handler {
                     peer_id,
                     info_hash,
                     pieces_count,
-                    tmp_index: None,
-                    tmp_data: vec![],
+                    piece_send: None,
                     piece_recv: None,
                     peer_status: Status {
                         choked: true,
@@ -426,21 +429,21 @@ impl Handler {
         &mut self,
         request: Request,
     ) -> Result<bool, Box<dyn std::error::Error>> {
-        if self.tmp_index.is_some() {
-            request.validate(Some(self.tmp_data.len()), self.pieces_count)?;
-        } else {
-            request.validate(None, self.pieces_count)?;
+        match &self.piece_send {
+            Some(p) => request.validate(Some(p.buff.len()), self.pieces_count)?,
+            None => request.validate(None, self.pieces_count)?,
         }
 
-        if self.tmp_index == Some(request.index()) {
-            self.send_piece(
-                request.index(),
-                request.block_begin(),
-                request.block_length(),
-            )
-            .await?;
-        } else {
-            self.cmd_recv_request(request).await?;
+        match &self.piece_send {
+            Some(p) if p.index == request.index() => {
+                self.send_piece(
+                    request.index(),
+                    request.block_begin(),
+                    request.block_length(),
+                )
+                .await?;
+            }
+            _ => self.cmd_recv_request(request).await?,
         }
 
         Ok(true)
@@ -516,7 +519,7 @@ impl Handler {
                 piece_length,
                 piece_hash,
             } => {
-                self.piece_recv = Some(PieceData::new(index, piece_length, &piece_hash));
+                self.piece_recv = Some(PieceRecv::new(index, piece_length, &piece_hash));
 
                 // BEP3 suggests send more than one request to get good better TCP performance (pipeline)
                 self.send_request().await?;
@@ -599,11 +602,12 @@ impl Handler {
                 index,
                 block_begin,
                 block_length,
-                hash,
+                piece_hash,
             } => {
-                if self.tmp_index != Some(index) {
-                    self.tmp_index = Some(index);
-                    self.load_piece_from_file(&hash)?;
+                if let Some(piece_send) = &self.piece_send {
+                    if piece_send.index != index {
+                        self.load_piece_from_file(index, &piece_hash)?;
+                    }
                 }
 
                 self.send_piece(index, block_begin, block_length).await?;
@@ -629,7 +633,7 @@ impl Handler {
                 piece_length,
                 piece_hash,
             } => {
-                self.piece_recv = Some(PieceData::new(index, piece_length, &piece_hash));
+                self.piece_recv = Some(PieceRecv::new(index, piece_length, &piece_hash));
                 self.send_request().await?;
             }
             PieceDoneCmd::PrepareKill => return Ok(false),
@@ -691,14 +695,19 @@ impl Handler {
         block_begin: usize,
         block_length: usize,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        self.connection
-            .send_msg(&Piece::new(
-                index,
-                block_begin,
-                self.tmp_data[block_begin..block_begin + block_length].to_vec(),
-            ))
-            .await?;
-        Ok(())
+        match &self.piece_send {
+            Some(piece_send) => {
+                self.connection
+                    .send_msg(&Piece::new(
+                        index,
+                        block_begin,
+                        piece_send.buff[block_begin..block_begin + block_length].to_vec(),
+                    ))
+                    .await?;
+                Ok(())
+            }
+            None => Err(Error::NotFound)?,
+        }
     }
 
     fn any_request_in_msg_buff(&self) -> bool {
@@ -721,11 +730,15 @@ impl Handler {
         }
     }
 
-    fn load_piece_from_file(&mut self, piece_hash: &[u8; HASH_SIZE]) -> Result<(), Error> {
+    fn load_piece_from_file(
+        &mut self,
+        index: usize,
+        piece_hash: &[u8; HASH_SIZE],
+    ) -> Result<(), Error> {
         let name = utils::hash_to_string(piece_hash) + ".piece";
         match fs::read(name) {
             Ok(data) => {
-                self.tmp_data = data;
+                self.piece_send = Some(PieceSend { index, buff: data });
                 Ok(())
             }
             Err(_) => Err(Error::FileNotFound),

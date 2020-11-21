@@ -485,7 +485,7 @@ impl Request {
         self.block_length as usize
     }
 
-    pub fn validate(&self, piece_len: Option<usize>, pieces_count: usize) -> Result<(), Error> {
+    pub fn validate(&self, piece_length: Option<usize>, pieces_count: usize) -> Result<(), Error> {
         if self.index >= pieces_count as u32 {
             return Err(Error::InvalidIndex);
         }
@@ -494,8 +494,8 @@ impl Request {
             return Err(Error::InvalidSize);
         }
 
-        if let Some(piece_len) = piece_len {
-            if self.block_begin + self.block_length > piece_len as u32 {
+        if let Some(piece_length) = piece_length {
+            if self.block_begin + self.block_length > piece_length as u32 {
                 return Err(Error::InvalidSize);
             }
         }
