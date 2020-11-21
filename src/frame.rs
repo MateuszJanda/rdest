@@ -485,13 +485,19 @@ impl Request {
         self.length as usize
     }
 
-    pub fn validate(&self, pieces_count: usize) -> Result<(), Error> {
+    pub fn validate(&self, piece_len: Option<usize>, pieces_count: usize) -> Result<(), Error> {
         if self.index >= pieces_count as u32 {
             return Err(Error::InvalidIndex);
         }
 
         if self.length >= PIECE_BLOCK_SIZE as u32 {
             return Err(Error::InvalidSize);
+        }
+
+        if let Some(piece_len) = piece_len {
+            if self.begin + self.length > piece_len as u32 {
+                return Err(Error::InvalidSize);
+            }
         }
 
         Ok(())

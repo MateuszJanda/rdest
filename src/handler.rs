@@ -426,7 +426,11 @@ impl Handler {
         &mut self,
         request: Request,
     ) -> Result<bool, Box<dyn std::error::Error>> {
-        request.validate(self.pieces_count)?;
+        if self.tmp_index.is_some() {
+            request.validate(Some(self.tmp_data.len()), self.pieces_count)?;
+        } else {
+            request.validate(None, self.pieces_count)?;
+        }
 
         if self.tmp_index == Some(request.index()) {
             self.connection
