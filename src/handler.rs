@@ -48,8 +48,8 @@ pub enum JobCmd {
     RecvRequest {
         addr: String,
         index: usize,
-        begin: usize,
-        length: usize,
+        block_begin: usize,
+        block_length: usize,
         resp_ch: oneshot::Sender<RequestCmd>,
     },
     PieceDone {
@@ -83,7 +83,7 @@ pub enum RequestCmd {
     SendPiece {
         index: usize,
         block_begin: usize,
-        block_len: usize,
+        block_length: usize,
         hash: [u8; HASH_SIZE],
     },
     Ignore,
@@ -93,7 +93,7 @@ pub enum RequestCmd {
 pub enum UnchokeCmd {
     SendRequest {
         index: usize,
-        piece_size: usize,
+        piece_length: usize,
         piece_hash: [u8; HASH_SIZE],
     },
     SendNotInterested,
@@ -104,7 +104,7 @@ pub enum UnchokeCmd {
 pub enum PieceDoneCmd {
     SendRequest {
         index: usize,
-        piece_size: usize,
+        piece_length: usize,
         piece_hash: [u8; HASH_SIZE],
     },
     PrepareKill,
@@ -147,25 +147,25 @@ struct Stats {
 }
 
 impl PieceData {
-    fn new(piece_index: usize, piece_size: usize, piece_hash: &[u8; HASH_SIZE]) -> PieceData {
+    fn new(index: usize, piece_length: usize, piece_hash: &[u8; HASH_SIZE]) -> PieceData {
         PieceData {
-            index: piece_index,
+            index,
             hash: *piece_hash,
-            buff: vec![0; piece_size],
+            buff: vec![0; piece_length],
             requested: VecDeque::from(vec![]),
-            left: Self::left(piece_size),
+            left: Self::left(piece_length),
         }
     }
 
-    fn left(piece_size: usize) -> VecDeque<(usize, usize)> {
+    fn left(piece_length: usize) -> VecDeque<(usize, usize)> {
         let mut res = VecDeque::from(vec![]);
-        for block_begin in (0..piece_size).step_by(PIECE_BLOCK_SIZE) {
-            let block_len = if block_begin + PIECE_BLOCK_SIZE > piece_size {
-                piece_size % PIECE_BLOCK_SIZE
+        for block_begin in (0..piece_length).step_by(PIECE_BLOCK_SIZE) {
+            let block_length = if block_begin + PIECE_BLOCK_SIZE > piece_length {
+                piece_length % PIECE_BLOCK_SIZE
             } else {
                 PIECE_BLOCK_SIZE
             };
-            res.push_back((block_begin, block_len))
+            res.push_back((block_begin, block_length))
         }
 
         res
@@ -452,11 +452,15 @@ impl Handler {
     async fn handle_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
         // Verify message
         let piece_data = self.piece_data.as_mut().ok_or(Error::NotFound)?;
-        if !piece_data.requested.iter().any(|(block_begin, block_length)| {
-            piece
-                .validate(piece_data.index, *block_begin, *block_length)
-                .is_ok()
-        }) {
+        if !piece_data
+            .requested
+            .iter()
+            .any(|(block_begin, block_length)| {
+                piece
+                    .validate(piece_data.index, *block_begin, *block_length)
+                    .is_ok()
+            })
+        {
             Err(Error::NotFound)?;
         }
 
@@ -512,10 +516,10 @@ impl Handler {
         match resp_rx.await? {
             UnchokeCmd::SendRequest {
                 index,
-                piece_size,
+                piece_length,
                 piece_hash,
             } => {
-                self.piece_data = Some(PieceData::new(index, piece_size, &piece_hash));
+                self.piece_data = Some(PieceData::new(index, piece_length, &piece_hash));
 
                 // BEP3 suggests send more than one request to get good better TCP performance (pipeline)
                 self.send_request().await?;
@@ -587,8 +591,8 @@ impl Handler {
             .send(JobCmd::RecvRequest {
                 addr: self.connection.addr.clone(),
                 index: request.index(),
-                begin: request.block_begin(),
-                length: request.block_len(),
+                block_begin: request.block_begin(),
+                block_length: request.block_len(),
                 resp_ch: resp_tx,
             })
             .await?;
@@ -597,7 +601,7 @@ impl Handler {
             RequestCmd::SendPiece {
                 index,
                 block_begin,
-                block_len,
+                block_length,
                 hash,
             } => {
                 if self.tmp_index != Some(index) {
@@ -609,7 +613,7 @@ impl Handler {
                     .send_msg(&Piece::new(
                         index,
                         block_begin,
-                        self.tmp_data[block_begin..block_begin + block_len].to_vec(),
+                        self.tmp_data[block_begin..block_begin + block_length].to_vec(),
                     ))
                     .await?;
             }
@@ -631,10 +635,10 @@ impl Handler {
         match resp_rx.await? {
             PieceDoneCmd::SendRequest {
                 index,
-                piece_size,
+                piece_length,
                 piece_hash,
             } => {
-                self.piece_data = Some(PieceData::new(index, piece_size, &piece_hash));
+                self.piece_data = Some(PieceData::new(index, piece_length, &piece_hash));
                 self.send_request().await?;
             }
             PieceDoneCmd::PrepareKill => return Ok(false),

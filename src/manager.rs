@@ -129,10 +129,10 @@ impl Manager {
             JobCmd::RecvRequest {
                 addr,
                 index,
-                begin,
-                length,
+                block_begin,
+                block_length,
                 resp_ch,
-            } => self.handle_request(&addr, index, begin, length, resp_ch),
+            } => self.handle_request(&addr, index, block_begin, block_length, resp_ch),
             JobCmd::PieceDone { addr, resp_ch } => self.handle_piece_done(&addr, resp_ch),
             JobCmd::SyncStats {
                 addr,
@@ -167,7 +167,7 @@ impl Manager {
 
                 UnchokeCmd::SendRequest {
                     index: idx,
-                    piece_size: self.piece_size(idx),
+                    piece_length: self.piece_length(idx),
                     piece_hash: self.metainfo.pieces()[idx],
                 }
             }
@@ -231,8 +231,8 @@ impl Manager {
         &mut self,
         addr: &String,
         index: usize,
-        begin: usize,
-        length: usize,
+        block_begin: usize,
+        block_length: usize,
         resp_ch: oneshot::Sender<RequestCmd>,
     ) -> bool {
         let _ = resp_ch.send(RequestCmd::Ignore);
@@ -307,7 +307,7 @@ impl Manager {
         Err(Error::NotFound)
     }
 
-    fn piece_size(&self, index: usize) -> usize {
+    fn piece_length(&self, index: usize) -> usize {
         if index < self.metainfo.pieces().len() - 1 {
             return self.metainfo.piece_length();
         }
