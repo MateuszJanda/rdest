@@ -281,8 +281,8 @@ impl Handler {
 
         loop {
             tokio::select! {
-                _ = keep_alive_timer.tick() => self.handle_keep_alive_timer().await?,
-                _ = sync_stats_timer.tick() => self.handle_sync_stats_timer().await?,
+                _ = keep_alive_timer.tick() => self.timeout_keep_alive().await?,
+                _ = sync_stats_timer.tick() => self.timeout_sync_stats().await?,
                 cmd = self.broad_ch.recv() => self.send_have(cmd?).await?,
                 frame = self.connection.recv_frame() => {
                     if self.handle_frame(frame?).await? == false {
@@ -305,7 +305,7 @@ impl Handler {
         time::interval_at(start, Duration::from_secs(STATS_INTERVAL_SEC))
     }
 
-    async fn handle_keep_alive_timer(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn timeout_keep_alive(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if !self.peer_status.keep_alive {
             Err(Error::KeepAliveTimeout)?
         }
@@ -314,7 +314,7 @@ impl Handler {
         Ok(())
     }
 
-    async fn handle_sync_stats_timer(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn timeout_sync_stats(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if self.stats.downloaded.len() == MAX_STATS_QUEUE_SIZE {
             self.cmd_sync_stats().await?;
         }
@@ -329,9 +329,9 @@ impl Handler {
         match opt_frame {
             Some(frame) => {
                 self.peer_status.keep_alive = true;
-                match frame {
+                let handled = match frame {
                     Frame::Handshake(handshake) => self.handle_handshake(&handshake)?,
-                    Frame::KeepAlive(_) => (),
+                    Frame::KeepAlive(_) => true,
                     Frame::Choke(_) => self.handle_choke().await?,
                     Frame::Unchoke(_) => self.handle_unchoke().await?,
                     Frame::Interested(_) => self.handle_interested().await?,
@@ -339,12 +339,12 @@ impl Handler {
                     Frame::Have(have) => self.handle_have(&have).await?,
                     Frame::Bitfield(bitfield) => self.handle_bitfield(bitfield).await?,
                     Frame::Request(request) => self.handle_request(request).await?,
-                    Frame::Piece(piece) => {
-                        if self.handle_piece(&piece).await? == false {
-                            return Ok(false);
-                        }
-                    }
-                    Frame::Cancel(_) => (),
+                    Frame::Piece(piece) => self.handle_piece(&piece).await?,
+                    Frame::Cancel(_) => true,
+                };
+
+                if handled == false {
+                    return Ok(false);
                 }
             }
             None => return Ok(false),
@@ -356,18 +356,18 @@ impl Handler {
     fn handle_handshake(
         &mut self,
         handshake: &Handshake,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<bool, Box<dyn std::error::Error>> {
         handshake.validate(&self.info_hash, &self.peer_id)?;
-        Ok(())
+        Ok(true)
     }
 
-    async fn handle_choke(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn handle_choke(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
         self.peer_status.choked = true;
         self.cmd_recv_choke().await?;
-        Ok(())
+        Ok(true)
     }
 
-    async fn handle_unchoke(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn handle_unchoke(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
         self.peer_status.choked = false;
 
         let buffered_req = self.any_request_in_msg_buff();
@@ -380,22 +380,22 @@ impl Handler {
 
         self.cmd_recv_unchoke(buffered_req).await?;
 
-        Ok(())
+        Ok(true)
     }
 
-    async fn handle_interested(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn handle_interested(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
         self.peer_status.interested = true;
         self.cmd_recv_interested().await?;
-        Ok(())
+        Ok(true)
     }
 
-    async fn handle_not_interested(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn handle_not_interested(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
         self.peer_status.interested = false;
         self.cmd_recv_not_interested().await?;
-        Ok(())
+        Ok(true)
     }
 
-    async fn handle_have(&mut self, have: &Have) -> Result<(), Box<dyn std::error::Error>> {
+    async fn handle_have(&mut self, have: &Have) -> Result<bool, Box<dyn std::error::Error>> {
         have.validate(self.pieces_count)?;
 
         let cmd = JobCmd::RecvHave {
@@ -404,22 +404,25 @@ impl Handler {
         };
 
         self.job_ch.send(cmd).await?;
-        Ok(())
+        Ok(true)
     }
 
     async fn handle_bitfield(
         &mut self,
         bitfield: Bitfield,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<bool, Box<dyn std::error::Error>> {
         bitfield.validate(self.pieces_count)?;
         self.cmd_recv_bitfield(bitfield).await?;
-        Ok(())
+        Ok(true)
     }
 
-    async fn handle_request(&mut self, request: Request) -> Result<(), Box<dyn std::error::Error>> {
+    async fn handle_request(
+        &mut self,
+        request: Request,
+    ) -> Result<bool, Box<dyn std::error::Error>> {
         request.validate(self.pieces_count)?;
         self.cmd_recv_request(request).await?;
-        Ok(())
+        Ok(true)
     }
 
     async fn handle_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
