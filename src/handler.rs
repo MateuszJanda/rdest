@@ -11,7 +11,7 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time;
 use tokio::time::{Duration, Instant, Interval};
 
-const KEEP_ALIVE_INTERVAL_SEC: u64 = 2 * 60;
+const KEEP_ALIVE_INTERVAL_SEC: u64 = 120;
 const STATS_INTERVAL_SEC: u64 = 10;
 const MAX_STATS_QUEUE_SIZE: usize = 2;
 
@@ -412,8 +412,7 @@ impl Handler {
         bitfield: Bitfield,
     ) -> Result<bool, Box<dyn std::error::Error>> {
         bitfield.validate(self.pieces_count)?;
-        self.cmd_recv_bitfield(bitfield).await?;
-        Ok(true)
+        self.cmd_recv_bitfield(bitfield).await
     }
 
     async fn handle_request(
@@ -527,7 +526,7 @@ impl Handler {
     async fn cmd_recv_bitfield(
         &mut self,
         bitfield: Bitfield,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<bool, Box<dyn std::error::Error>> {
         let (resp_tx, resp_rx) = oneshot::channel();
         self.job_ch
             .send(JobCmd::RecvBitfield {
@@ -548,12 +547,10 @@ impl Handler {
                     false => self.connection.send_msg(&NotInterested::new()).await?,
                 }
             }
-            BitfieldCmd::PrepareKill => {
-                // TODO
-            }
+            BitfieldCmd::PrepareKill => return Ok(false),
         }
 
-        Ok(())
+        Ok(true)
     }
 
     async fn cmd_recv_request(
