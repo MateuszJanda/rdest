@@ -481,7 +481,7 @@ impl Request {
         self.block_begin as usize
     }
 
-    pub fn block_len(&self) -> usize {
+    pub fn block_length(&self) -> usize {
         self.block_length as usize
     }
 

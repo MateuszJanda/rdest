@@ -433,15 +433,12 @@ impl Handler {
         }
 
         if self.tmp_index == Some(request.index()) {
-            self.connection
-                .send_msg(&Piece::new(
-                    request.index(),
-                    request.block_begin(),
-                    self.tmp_data
-                        [request.block_begin()..request.block_begin() + request.block_len()]
-                        .to_vec(),
-                ))
-                .await?;
+            self.send_piece(
+                request.index(),
+                request.block_begin(),
+                request.block_length(),
+            )
+            .await?;
         } else {
             self.cmd_recv_request(request).await?;
         }
@@ -592,7 +589,7 @@ impl Handler {
                 addr: self.connection.addr.clone(),
                 index: request.index(),
                 block_begin: request.block_begin(),
-                block_length: request.block_len(),
+                block_length: request.block_length(),
                 resp_ch: resp_tx,
             })
             .await?;
@@ -609,13 +606,7 @@ impl Handler {
                     self.load_piece_from_file(&hash)?;
                 }
 
-                self.connection
-                    .send_msg(&Piece::new(
-                        index,
-                        block_begin,
-                        self.tmp_data[block_begin..block_begin + block_length].to_vec(),
-                    ))
-                    .await?;
+                self.send_piece(index, block_begin, block_length).await?;
             }
             RequestCmd::Ignore => (),
         }
@@ -691,6 +682,22 @@ impl Handler {
             }
         }
 
+        Ok(())
+    }
+
+    async fn send_piece(
+        &mut self,
+        index: usize,
+        block_begin: usize,
+        block_length: usize,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.connection
+            .send_msg(&Piece::new(
+                index,
+                block_begin,
+                self.tmp_data[block_begin..block_begin + block_length].to_vec(),
+            ))
+            .await?;
         Ok(())
     }
 
