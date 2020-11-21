@@ -80,7 +80,7 @@ pub enum BitfieldCmd {
 
 #[derive(Debug)]
 pub enum RequestCmd {
-    SendPiece {
+    LoadAndSendPiece {
         index: usize,
         block_begin: usize,
         block_length: usize,
@@ -598,18 +598,13 @@ impl Handler {
             .await?;
 
         match resp_rx.await? {
-            RequestCmd::SendPiece {
+            RequestCmd::LoadAndSendPiece {
                 index,
                 block_begin,
                 block_length,
                 piece_hash,
             } => {
-                if let Some(piece_send) = &self.piece_send {
-                    if piece_send.index != index {
-                        self.load_piece_from_file(index, &piece_hash)?;
-                    }
-                }
-
+                self.load_piece_from_file(index, &piece_hash)?;
                 self.send_piece(index, block_begin, block_length).await?;
             }
             RequestCmd::Ignore => (),
