@@ -427,7 +427,21 @@ impl Handler {
         request: Request,
     ) -> Result<bool, Box<dyn std::error::Error>> {
         request.validate(self.pieces_count)?;
-        self.cmd_recv_request(request).await?;
+
+        if self.tmp_index == Some(request.index()) {
+            self.connection
+                .send_msg(&Piece::new(
+                    request.index(),
+                    request.block_begin(),
+                    self.tmp_data
+                        [request.block_begin()..request.block_begin() + request.block_len()]
+                        .to_vec(),
+                ))
+                .await?;
+        } else {
+            self.cmd_recv_request(request).await?;
+        }
+
         Ok(true)
     }
 
@@ -582,8 +596,10 @@ impl Handler {
                 block_len,
                 hash,
             } => {
-                self.tmp_index = Some(index);
-                self.load_piece_from_file(&hash)?;
+                if self.tmp_index != Some(index) {
+                    self.tmp_index = Some(index);
+                    self.load_piece_from_file(&hash)?;
+                }
 
                 self.connection
                     .send_msg(&Piece::new(
