@@ -281,21 +281,8 @@ impl Handler {
 
         loop {
             tokio::select! {
-                _ = keep_alive_timer.tick() => {
-                    if !self.peer_status.keep_alive {
-                        println!("Close connection, no messages from peer");
-                        break;
-                    }
-                    self.send_keep_alive().await?;
-                    self.peer_status.keep_alive = false;
-                }
-                _ = sync_stats_timer.tick() =>
-                {
-                    if self.stats.downloaded.len() == MAX_STATS_QUEUE_SIZE {
-                        self.cmd_sync_stats().await?;
-                    }
-                    self.stats.shift();
-                }
+                _ = keep_alive_timer.tick() => self.handle_keep_alive_timer().await?,
+                _ = sync_stats_timer.tick() => self.handle_sync_stats_timer().await?,
                 cmd = self.broad_ch.recv() => self.send_have(cmd?).await?,
                 frame = self.connection.recv_frame() => {
                     if self.handle_frame(frame?).await? == false {
@@ -316,6 +303,23 @@ impl Handler {
     fn start_sync_stats_timer(&self) -> Interval {
         let start = Instant::now() + Duration::from_secs(STATS_INTERVAL_SEC);
         time::interval_at(start, Duration::from_secs(STATS_INTERVAL_SEC))
+    }
+
+    async fn handle_keep_alive_timer(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        if !self.peer_status.keep_alive {
+            Err(Error::KeepAliveTimeout)?
+        }
+        self.send_keep_alive().await?;
+        self.peer_status.keep_alive = false;
+        Ok(())
+    }
+
+    async fn handle_sync_stats_timer(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        if self.stats.downloaded.len() == MAX_STATS_QUEUE_SIZE {
+            self.cmd_sync_stats().await?;
+        }
+        self.stats.shift();
+        Ok(())
     }
 
     async fn handle_frame(
