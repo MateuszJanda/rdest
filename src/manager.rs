@@ -158,6 +158,10 @@ impl Manager {
     }
 
     fn handle_choke(&mut self, addr: &String) -> bool {
+        match self.peers.get_mut(addr) {
+            Some(peer) => peer.choke = true,
+            None => (),
+        }
         true
     }
 
@@ -169,7 +173,6 @@ impl Manager {
     ) -> bool {
         let pieces = &self.peers[addr].pieces;
         let cmd = match self.choose_piece(pieces) {
-            Err(_) => UnchokeCmd::SendNotInterested,
             Ok(idx) => {
                 self.pieces_status[idx] = Status::Reserved;
                 self.peers.get_mut(addr).unwrap().index = Some(idx);
@@ -180,6 +183,7 @@ impl Manager {
                     piece_hash: self.metainfo.pieces()[idx],
                 }
             }
+            Err(_) => UnchokeCmd::SendNotInterested,
         };
 
         let _ = &resp_ch.send(cmd);
@@ -187,15 +191,17 @@ impl Manager {
     }
 
     fn handle_interested(&mut self, addr: &String) -> bool {
-        for (_, peer) in self.peers.iter_mut().filter(|(key, peer)| *key == addr) {
-            peer.interested = true
+        match self.peers.get_mut(addr) {
+            Some(peer) => peer.interested = true,
+            None => (),
         }
         true
     }
 
     fn handle_not_interested(&mut self, addr: &String) -> bool {
-        for (_, peer) in self.peers.iter_mut().filter(|(key, peer)| *key == addr) {
-            peer.interested = false
+        match self.peers.get_mut(addr) {
+            Some(peer) => peer.interested = false,
+            None => (),
         }
         true
     }
@@ -254,8 +260,8 @@ impl Manager {
     }
 
     fn handle_piece_done(&mut self, addr: &String, resp_ch: oneshot::Sender<PieceDoneCmd>) -> bool {
-        for index in self.peers.iter().filter_map(|(k, p)| match k == addr {
-            true => p.index,
+        for index in self.peers.iter().filter_map(|(key, peer)| match key == addr {
+            true => peer.index,
             false => None,
         }) {
             self.pieces_status[index] = Status::Have;
