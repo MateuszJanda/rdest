@@ -23,10 +23,10 @@ pub struct Manager {
     peers: HashMap<String, Peer>,
     metainfo: Metainfo,
     tracker: TrackerResp,
+    view: Option<View>,
     job_tx_ch: mpsc::Sender<JobCmd>,
     job_rx_ch: mpsc::Receiver<JobCmd>,
     broad_ch: broadcast::Sender<BroadCmd>,
-    view: Option<View>,
 }
 
 #[derive(Debug)]
@@ -34,6 +34,10 @@ struct Peer {
     pieces: Vec<bool>,
     job: Option<JoinHandle<()>>,
     index: Option<usize>,
+    self_interested: bool,
+    self_choke: bool,
+    interested: bool,
+    choke: bool,
 }
 
 #[derive(Debug)]
@@ -60,10 +64,10 @@ impl Manager {
             peers: HashMap::new(),
             metainfo,
             tracker,
+            view: None,
             job_tx_ch,
             job_rx_ch,
             broad_ch,
-            view: None,
         }
     }
 
@@ -88,12 +92,10 @@ impl Manager {
 
     fn spawn_jobs(&mut self) {
         let (addr, peer_id) = self.tracker.peers()[2].clone();
-        let a = addr.clone();
         let info_hash = *self.metainfo.info_hash();
         let own_id = self.own_id.clone();
         let pieces_num = self.metainfo.pieces().len();
         let job_ch = self.job_tx_ch.clone();
-
         let broad_ch = self.broad_ch.subscribe();
 
         let job = tokio::spawn(async move {
@@ -107,9 +109,14 @@ impl Manager {
             pieces: vec![false; self.metainfo.pieces().len()],
             job: Some(job),
             index: None,
+            self_interested: false,
+            self_choke: true,
+            interested: false,
+            choke: true,
         };
 
-        self.peers.insert(a, peer);
+        let (addr, _) = self.tracker.peers()[2].clone();
+        self.peers.insert(addr, peer);
     }
 
     async fn event_loop(&mut self, cmd: JobCmd) -> bool {
@@ -180,15 +187,23 @@ impl Manager {
     }
 
     fn handle_interested(&mut self, addr: &String) -> bool {
+        for (_, peer) in self.peers.iter_mut().filter(|(key, peer)| *key == addr) {
+            peer.interested = true
+        }
         true
     }
 
     fn handle_not_interested(&mut self, addr: &String) -> bool {
+        for (_, peer) in self.peers.iter_mut().filter(|(key, peer)| *key == addr) {
+            peer.interested = false
+        }
         true
     }
 
     fn handle_have(&mut self, addr: &String, index: usize) -> bool {
-        self.peers.get_mut(addr).unwrap().pieces[index] = true;
+        for (_, peer) in self.peers.iter_mut().filter(|(key, peer)| *key == addr) {
+            peer.pieces[index] = true
+        }
         true
     }
 
