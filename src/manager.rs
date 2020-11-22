@@ -4,7 +4,7 @@ use crate::handler::{
     BitfieldCmd, BroadCmd, Handler, JobCmd, PieceDoneCmd, RequestCmd, UnchokeCmd,
 };
 use crate::progress::{Progress, ViewCmd};
-use crate::{utils, Error, Metainfo, TrackerResp};
+use crate::{utils, Metainfo, TrackerResp};
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
 use std::fs;
@@ -34,8 +34,8 @@ struct Peer {
     pieces: Vec<bool>,
     job: Option<JoinHandle<()>>,
     index: Option<usize>,
-    self_interested: bool,
-    self_choke: bool,
+    am_interested: bool,
+    am_choke: bool,
     interested: bool,
     choke: bool,
 }
@@ -109,8 +109,8 @@ impl Manager {
             pieces: vec![false; self.metainfo.pieces().len()],
             job: Some(job),
             index: None,
-            self_interested: false,
-            self_choke: true,
+            am_interested: false,
+            am_choke: true,
             interested: false,
             choke: true,
         };
@@ -186,7 +186,10 @@ impl Manager {
         };
 
         match self.peers.get_mut(addr) {
-            Some(peer) => peer.index = index,
+            Some(peer) => {
+                peer.index = index;
+                peer.am_interested = index.is_some();
+            }
             None => (),
         }
 
