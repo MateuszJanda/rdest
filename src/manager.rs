@@ -14,17 +14,18 @@ use std::path::Path;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::task::JoinHandle;
 
+const JOB_CHANNEL_SIZE: usize = 64;
+const BORADCAST_CHANNEL_SIZE: usize = 32;
+
 pub struct Manager {
     own_id: [u8; HASH_SIZE],
     pieces_status: Vec<Status>,
     peers: HashMap<String, Peer>,
-
     metainfo: Metainfo,
     tracker: TrackerResp,
-    cmd_tx: mpsc::Sender<JobCmd>,
-    cmd_rx: mpsc::Receiver<JobCmd>,
-
-    b_tx: broadcast::Sender<BroadCmd>,
+    job_tx_ch: mpsc::Sender<JobCmd>,
+    jobroad_ch_ch: mpsc::Receiver<JobCmd>,
+    broad_ch: broadcast::Sender<BroadCmd>,
     view: Option<View>,
 }
 
@@ -50,36 +51,34 @@ pub enum Status {
 
 impl Manager {
     pub fn new(metainfo: Metainfo, tracker: TrackerResp, own_id: [u8; HASH_SIZE]) -> Manager {
-        let (cmd_tx, cmd_rx) = mpsc::channel(64);
-        let (b_tx, _) = broadcast::channel(32);
+        let (job_tx_ch, jobroad_ch_ch) = mpsc::channel(JOB_CHANNEL_SIZE);
+        let (broad_ch, _) = broadcast::channel(BORADCAST_CHANNEL_SIZE);
 
         Manager {
             own_id,
             pieces_status: vec![Status::Missing; metainfo.pieces().len()],
             peers: HashMap::new(),
-
             metainfo,
             tracker,
-            cmd_tx,
-            cmd_rx,
-
-            b_tx,
+            job_tx_ch,
+            jobroad_ch_ch,
+            broad_ch,
             view: None,
         }
     }
 
     pub async fn run(&mut self) {
-        self.spawn_progress_view();
+        self.spawn_view();
         self.spawn_jobs();
 
-        while let Some(cmd) = self.cmd_rx.recv().await {
+        while let Some(cmd) = self.jobroad_ch_ch.recv().await {
             if self.event_loop(cmd).await == false {
                 break;
             }
         }
     }
 
-    fn spawn_progress_view(&mut self) {
+    fn spawn_view(&mut self) {
         let (mut view, channel) = Progress::new();
         self.view = Some(View {
             channel,
@@ -92,22 +91,25 @@ impl Manager {
         let a = addr.clone();
         let info_hash = *self.metainfo.info_hash();
         let own_id = self.own_id.clone();
-        let pieces_count = self.metainfo.pieces().len();
-        let cmd_tx = self.cmd_tx.clone();
+        let pieces_num = self.metainfo.pieces().len();
+        let job_ch = self.job_tx_ch.clone();
 
-        let b_rx = self.b_tx.subscribe();
+        let broad_ch = self.broad_ch.subscribe();
 
         let job = tokio::spawn(async move {
-            Handler::run(addr, own_id, peer_id, info_hash, pieces_count, cmd_tx, b_rx).await
+            Handler::run(
+                addr, own_id, peer_id, info_hash, pieces_num, job_ch, broad_ch,
+            )
+            .await
         });
 
-        let p = Peer {
+        let peer = Peer {
             pieces: vec![],
             job: Some(job),
             index: 0,
         };
 
-        self.peers.insert(a, p);
+        self.peers.insert(a, peer);
     }
 
     async fn event_loop(&mut self, cmd: JobCmd) -> bool {
@@ -244,7 +246,7 @@ impl Manager {
             if key == addr {
                 self.pieces_status[peer.index] = Status::Have;
 
-                let _ = self.b_tx.send(BroadCmd::SendHave { index: peer.index });
+                let _ = self.broad_ch.send(BroadCmd::SendHave { index: peer.index });
 
                 break;
             }

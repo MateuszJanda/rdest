@@ -637,11 +637,11 @@ impl Cancel {
     const LENGTH_SIZE: usize = 4;
     const FULL_SIZE: usize = Cancel::LEN_SIZE + Cancel::LEN as usize;
 
-    pub fn new(index: usize, begin: usize, length: usize) -> Cancel {
+    pub fn new(index: usize, block_begin: usize, block_length: usize) -> Cancel {
         Cancel {
             index: index as u32,
-            block_begin: begin as u32,
-            block_length: length as u32,
+            block_begin: block_begin as u32,
+            block_length: block_length as u32,
         }
     }
 

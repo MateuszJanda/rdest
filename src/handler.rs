@@ -115,7 +115,7 @@ pub struct Handler {
     own_id: [u8; HASH_SIZE],
     peer_id: [u8; HASH_SIZE],
     info_hash: [u8; HASH_SIZE],
-    pieces_count: usize,
+    pieces_num: usize,
     piece_send: Option<PieceSend>,
     piece_recv: Option<PieceRecv>,
     peer_status: Status,
@@ -217,7 +217,7 @@ impl Handler {
         own_id: [u8; HASH_SIZE],
         peer_id: [u8; HASH_SIZE],
         info_hash: [u8; HASH_SIZE],
-        pieces_count: usize,
+        pieces_num: usize,
         mut job_ch: mpsc::Sender<JobCmd>,
         broad_ch: broadcast::Receiver<BroadCmd>,
     ) {
@@ -231,7 +231,7 @@ impl Handler {
                     own_id,
                     peer_id,
                     info_hash,
-                    pieces_count,
+                    pieces_num,
                     piece_send: None,
                     piece_recv: None,
                     peer_status: Status {
@@ -406,7 +406,7 @@ impl Handler {
     }
 
     async fn handle_have(&mut self, have: &Have) -> Result<bool, Box<dyn std::error::Error>> {
-        have.validate(self.pieces_count)?;
+        have.validate(self.pieces_num)?;
 
         let cmd = JobCmd::RecvHave {
             addr: self.connection.addr.clone(),
@@ -421,7 +421,7 @@ impl Handler {
         &mut self,
         bitfield: Bitfield,
     ) -> Result<bool, Box<dyn std::error::Error>> {
-        bitfield.validate(self.pieces_count)?;
+        bitfield.validate(self.pieces_num)?;
         self.cmd_recv_bitfield(bitfield).await
     }
 
@@ -430,8 +430,8 @@ impl Handler {
         request: Request,
     ) -> Result<bool, Box<dyn std::error::Error>> {
         match &self.piece_send {
-            Some(piece_send) => request.validate(Some(piece_send.buff.len()), self.pieces_count)?,
-            None => request.validate(None, self.pieces_count)?,
+            Some(piece_send) => request.validate(Some(piece_send.buff.len()), self.pieces_num)?,
+            None => request.validate(None, self.pieces_num)?,
         }
 
         match &self.piece_send {
