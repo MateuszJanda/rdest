@@ -92,8 +92,8 @@ impl Manager {
 
     fn spawn_jobs(&mut self) {
         let (addr, peer_id) = self.tracker.peers()[2].clone();
-        let info_hash = *self.metainfo.info_hash();
         let own_id = self.own_id.clone();
+        let info_hash = *self.metainfo.info_hash();
         let pieces_num = self.metainfo.pieces().len();
         let job_ch = self.job_tx_ch.clone();
         let broad_ch = self.broad_ch.subscribe();
@@ -211,8 +211,9 @@ impl Manager {
     }
 
     fn handle_have(&mut self, addr: &String, index: usize) -> bool {
-        for (_, peer) in self.peers.iter_mut().filter(|(key, peer)| *key == addr) {
-            peer.pieces[index] = true
+        match self.peers.get_mut(addr) {
+            Some(peer) => peer.pieces[index] = true,
+            None => (),
         }
         true
     }
