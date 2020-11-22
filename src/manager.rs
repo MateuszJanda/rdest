@@ -24,7 +24,7 @@ pub struct Manager {
     metainfo: Metainfo,
     tracker: TrackerResp,
     job_tx_ch: mpsc::Sender<JobCmd>,
-    jobroad_ch_ch: mpsc::Receiver<JobCmd>,
+    job_rx_ch: mpsc::Receiver<JobCmd>,
     broad_ch: broadcast::Sender<BroadCmd>,
     view: Option<View>,
 }
@@ -33,7 +33,7 @@ pub struct Manager {
 struct Peer {
     pieces: Vec<bool>,
     job: Option<JoinHandle<()>>,
-    index: usize,
+    index: Option<usize>,
 }
 
 #[derive(Debug)]
@@ -51,7 +51,7 @@ pub enum Status {
 
 impl Manager {
     pub fn new(metainfo: Metainfo, tracker: TrackerResp, own_id: [u8; HASH_SIZE]) -> Manager {
-        let (job_tx_ch, jobroad_ch_ch) = mpsc::channel(JOB_CHANNEL_SIZE);
+        let (job_tx_ch, job_rx_ch) = mpsc::channel(JOB_CHANNEL_SIZE);
         let (broad_ch, _) = broadcast::channel(BORADCAST_CHANNEL_SIZE);
 
         Manager {
@@ -61,7 +61,7 @@ impl Manager {
             metainfo,
             tracker,
             job_tx_ch,
-            jobroad_ch_ch,
+            job_rx_ch,
             broad_ch,
             view: None,
         }
@@ -71,7 +71,7 @@ impl Manager {
         self.spawn_view();
         self.spawn_jobs();
 
-        while let Some(cmd) = self.jobroad_ch_ch.recv().await {
+        while let Some(cmd) = self.job_rx_ch.recv().await {
             if self.event_loop(cmd).await == false {
                 break;
             }
@@ -104,9 +104,9 @@ impl Manager {
         });
 
         let peer = Peer {
-            pieces: vec![],
+            pieces: vec![false; self.metainfo.pieces().len()],
             job: Some(job),
-            index: 0,
+            index: None,
         };
 
         self.peers.insert(a, peer);
@@ -165,7 +165,7 @@ impl Manager {
             Err(_) => UnchokeCmd::SendNotInterested,
             Ok(idx) => {
                 self.pieces_status[idx] = Status::Reserved;
-                self.peers.get_mut(addr).unwrap().index = idx;
+                self.peers.get_mut(addr).unwrap().index = Some(idx);
 
                 UnchokeCmd::SendRequest {
                     index: idx,
@@ -198,14 +198,11 @@ impl Manager {
         bitfield: &Bitfield,
         resp_ch: oneshot::Sender<BitfieldCmd>,
     ) -> bool {
-        let p = bitfield.to_vec();
         self.peers
             .get_mut(addr)
             .unwrap()
             .pieces
-            .resize(p.len(), false);
-
-        self.peers.get_mut(addr).unwrap().pieces.copy_from_slice(&p);
+            .copy_from_slice(&bitfield.to_vec());
 
         let pieces = &self.peers[addr].pieces;
 
@@ -242,14 +239,12 @@ impl Manager {
     }
 
     fn handle_piece_done(&mut self, addr: &String, resp_ch: oneshot::Sender<PieceDoneCmd>) -> bool {
-        for (key, peer) in self.peers.iter() {
-            if key == addr {
-                self.pieces_status[peer.index] = Status::Have;
-
-                let _ = self.broad_ch.send(BroadCmd::SendHave { index: peer.index });
-
-                break;
-            }
+        for index in self.peers.iter().filter_map(|(k, p)| match k == addr {
+            true => p.index,
+            false => None,
+        }) {
+            self.pieces_status[index] = Status::Have;
+            let _ = self.broad_ch.send(BroadCmd::SendHave { index });
         }
 
         let _ = resp_ch.send(PieceDoneCmd::PrepareKill);
@@ -266,7 +261,7 @@ impl Manager {
         self.kill_job(&addr, &index).await;
 
         if self.peers.is_empty() {
-            self.kill_progress_view().await;
+            self.kill_view().await;
             if let Err(_) = self.extract_files() {
                 ()
             }
@@ -330,7 +325,7 @@ impl Manager {
         println!("Job killed");
     }
 
-    async fn kill_progress_view(&mut self) {
+    async fn kill_view(&mut self) {
         match &mut self.view.take() {
             Some(view) => {
                 let _ = view.channel.send(ViewCmd::Kill {}).await;
