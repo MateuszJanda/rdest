@@ -172,19 +172,23 @@ impl Manager {
         resp_ch: oneshot::Sender<UnchokeCmd>,
     ) -> bool {
         let pieces = &self.peers[addr].pieces;
-        let cmd = match self.choose_piece(pieces) {
-            Ok(idx) => {
-                self.pieces_status[idx] = Status::Reserved;
-                self.peers.get_mut(addr).unwrap().index = Some(idx);
-
+        let index = self.choose_piece(pieces);
+        let cmd = match index {
+            Some(index) => {
+                self.pieces_status[index] = Status::Reserved;
                 UnchokeCmd::SendRequest {
-                    index: idx,
-                    piece_length: self.piece_length(idx),
-                    piece_hash: self.metainfo.pieces()[idx],
+                    index,
+                    piece_length: self.piece_length(index),
+                    piece_hash: self.metainfo.pieces()[index],
                 }
             }
-            Err(_) => UnchokeCmd::SendNotInterested,
+            None => UnchokeCmd::SendNotInterested,
         };
+
+        match self.peers.get_mut(addr) {
+            Some(peer) => peer.index = index,
+            None => (),
+        }
 
         let _ = &resp_ch.send(cmd);
         true
@@ -228,8 +232,8 @@ impl Manager {
         let pieces = &self.peers[addr].pieces;
 
         let interested = match self.choose_piece(pieces) {
-            Err(_) => false,
-            Ok(_) => true,
+            Some(_) => true,
+            None => false,
         };
 
         let bitfield = Bitfield::from_vec(
@@ -260,10 +264,14 @@ impl Manager {
     }
 
     fn handle_piece_done(&mut self, addr: &String, resp_ch: oneshot::Sender<PieceDoneCmd>) -> bool {
-        for index in self.peers.iter().filter_map(|(key, peer)| match key == addr {
-            true => peer.index,
-            false => None,
-        }) {
+        for index in self
+            .peers
+            .iter()
+            .filter_map(|(key, peer)| match key == addr {
+                true => peer.index,
+                false => None,
+            })
+        {
             self.pieces_status[index] = Status::Have;
             let _ = self.broad_ch.send(BroadCmd::SendHave { index });
         }
@@ -292,13 +300,13 @@ impl Manager {
         true
     }
 
-    fn choose_piece(&self, pieces: &Vec<bool>) -> Result<usize, Error> {
+    fn choose_piece(&self, pieces: &Vec<bool>) -> Option<usize> {
         let mut v: Vec<u32> = vec![0; self.metainfo.pieces().len()];
 
         for (_, peer) in self.peers.iter() {
-            for (idx, have) in peer.pieces.iter().enumerate() {
+            for (index, have) in peer.pieces.iter().enumerate() {
                 if *have {
-                    v[idx] += 1;
+                    v[index] += 1;
                 }
             }
         }
@@ -316,13 +324,13 @@ impl Manager {
         // Sort by rarest
         rarest.sort_by(|(_, a_count), (_, b_count)| a_count.cmp(&b_count));
 
-        for (idx, count) in rarest.iter() {
-            if count > &0 && pieces[*idx] == true {
-                return Ok(*idx);
+        for (index, count) in rarest.iter() {
+            if count > &0 && pieces[*index] == true {
+                return Some(*index);
             }
         }
 
-        Err(Error::NotFound)
+        None
     }
 
     fn piece_length(&self, index: usize) -> usize {
