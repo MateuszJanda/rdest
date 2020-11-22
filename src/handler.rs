@@ -71,10 +71,8 @@ pub enum JobCmd {
 
 #[derive(Debug)]
 pub enum BitfieldCmd {
-    SendBitfield {
-        bitfield: Bitfield,
-        interested: bool,
-    },
+    SendBitfield { bitfield: Bitfield },
+    SendBitfieldAndNotInterested { bitfield: Bitfield },
     PrepareKill,
 }
 
@@ -520,12 +518,15 @@ impl Handler {
                 piece_hash,
             } => {
                 self.piece_recv = Some(PieceRecv::new(index, piece_length, &piece_hash));
+                self.connection.send_msg(&Interested::new()).await?;
 
                 // BEP3 suggests send more than one request to get good better TCP performance (pipeline)
                 self.send_request().await?;
                 self.send_request().await?;
             }
-            UnchokeCmd::SendNotInterested => (), // TODO
+            UnchokeCmd::SendNotInterested => {
+                self.connection.send_msg(&NotInterested::new()).await?
+            }
             UnchokeCmd::Ignore => (),
         }
 
@@ -566,15 +567,12 @@ impl Handler {
             .await?;
 
         match resp_rx.await? {
-            BitfieldCmd::SendBitfield {
-                bitfield,
-                interested,
-            } => {
+            BitfieldCmd::SendBitfield { bitfield } => {
                 self.connection.send_msg(&bitfield).await?;
-                match interested {
-                    true => self.connection.send_msg(&Interested::new()).await?,
-                    false => self.connection.send_msg(&NotInterested::new()).await?,
-                }
+            }
+            BitfieldCmd::SendBitfieldAndNotInterested { bitfield } => {
+                self.connection.send_msg(&bitfield).await?;
+                self.connection.send_msg(&NotInterested::new()).await?;
             }
             BitfieldCmd::PrepareKill => return Ok(false),
         }

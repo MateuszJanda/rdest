@@ -233,13 +233,6 @@ impl Manager {
             .pieces
             .copy_from_slice(&bitfield.to_vec());
 
-        let pieces = &self.peers[addr].pieces;
-
-        let interested = match self.choose_piece(pieces) {
-            Some(_) => true,
-            None => false,
-        };
-
         let bitfield = Bitfield::from_vec(
             &self
                 .pieces_status
@@ -247,10 +240,13 @@ impl Manager {
                 .map(|status| *status == Status::Have)
                 .collect(),
         );
-        let _ = resp_ch.send(BitfieldCmd::SendBitfield {
-            bitfield,
-            interested,
-        });
+
+        let pieces = &self.peers[addr].pieces;
+        let cmd = match self.choose_piece(pieces) {
+            Some(_) => BitfieldCmd::SendBitfieldAndNotInterested { bitfield }, // TODO am_interested = false
+            None => BitfieldCmd::SendBitfield { bitfield },
+        };
+        let _ = resp_ch.send(cmd);
 
         true
     }
