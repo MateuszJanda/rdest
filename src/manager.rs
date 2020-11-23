@@ -155,6 +155,11 @@ impl Manager {
     fn handle_choke(&mut self, addr: &String) -> Result<bool, Error> {
         let peer = self.peers.get_mut(addr).ok_or(Error::NotFound)?;
         peer.choke = true;
+
+        match peer.index {
+            Some(index) => self.pieces_status[index] = Status::Missing,
+            None => (),
+        }
         Ok(true)
     }
 
