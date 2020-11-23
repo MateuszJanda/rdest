@@ -4,7 +4,7 @@ use crate::handler::{
     BitfieldCmd, BroadCmd, Handler, JobCmd, PieceDoneCmd, RequestCmd, UnchokeCmd,
 };
 use crate::progress::{Progress, ViewCmd};
-use crate::{utils, Metainfo, TrackerResp};
+use crate::{utils, Error, Metainfo, TrackerResp};
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
 use std::fs;
@@ -76,7 +76,7 @@ impl Manager {
         self.spawn_jobs();
 
         while let Some(cmd) = self.job_rx_ch.recv().await {
-            if self.event_loop(cmd).await == false {
+            if self.event_loop(cmd).await.expect("Can't handle event") == false {
                 break;
             }
         }
@@ -119,7 +119,7 @@ impl Manager {
         self.peers.insert(addr, peer);
     }
 
-    async fn event_loop(&mut self, cmd: JobCmd) -> bool {
+    async fn event_loop(&mut self, cmd: JobCmd) -> Result<bool, Error> {
         match cmd {
             JobCmd::RecvChoke { addr } => self.handle_choke(&addr),
             JobCmd::RecvUnchoke {
@@ -148,7 +148,7 @@ impl Manager {
                 downloaded_rate,
                 unexpected_piece,
                 rejected_piece,
-            } => true,
+            } => Ok(true),
             JobCmd::KillReq {
                 addr,
                 index,
@@ -157,12 +157,10 @@ impl Manager {
         }
     }
 
-    fn handle_choke(&mut self, addr: &String) -> bool {
-        match self.peers.get_mut(addr) {
-            Some(peer) => peer.choke = true,
-            None => (),
-        }
-        true
+    fn handle_choke(&mut self, addr: &String) -> Result<bool, Error> {
+        let peer = self.peers.get_mut(addr).ok_or(Error::NotFound)?;
+        peer.choke = true;
+        Ok(true)
     }
 
     fn handle_unchoke(
@@ -170,7 +168,7 @@ impl Manager {
         addr: &String,
         buffered_req: bool,
         resp_ch: oneshot::Sender<UnchokeCmd>,
-    ) -> bool {
+    ) -> Result<bool, Error> {
         let pieces = &self.peers[addr].pieces;
         let index = self.choose_piece(pieces);
         let cmd = match index {
@@ -185,40 +183,30 @@ impl Manager {
             None => UnchokeCmd::SendNotInterested,
         };
 
-        match self.peers.get_mut(addr) {
-            Some(peer) => {
-                peer.index = index;
-                peer.am_interested = index.is_some();
-            }
-            None => (),
-        }
+        let peer = self.peers.get_mut(addr).ok_or(Error::NotFound)?;
+        peer.index = index;
+        peer.am_interested = index.is_some();
 
         let _ = &resp_ch.send(cmd);
-        true
+        Ok(true)
     }
 
-    fn handle_interested(&mut self, addr: &String) -> bool {
-        match self.peers.get_mut(addr) {
-            Some(peer) => peer.interested = true,
-            None => (),
-        }
-        true
+    fn handle_interested(&mut self, addr: &String) -> Result<bool, Error> {
+        let peer = self.peers.get_mut(addr).ok_or(Error::NotFound)?;
+        peer.interested = true;
+        Ok(true)
     }
 
-    fn handle_not_interested(&mut self, addr: &String) -> bool {
-        match self.peers.get_mut(addr) {
-            Some(peer) => peer.interested = false,
-            None => (),
-        }
-        true
+    fn handle_not_interested(&mut self, addr: &String) -> Result<bool, Error> {
+        let peer = self.peers.get_mut(addr).ok_or(Error::NotFound)?;
+        peer.interested = false;
+        Ok(true)
     }
 
-    fn handle_have(&mut self, addr: &String, index: usize) -> bool {
-        match self.peers.get_mut(addr) {
-            Some(peer) => peer.pieces[index] = true,
-            None => (),
-        }
-        true
+    fn handle_have(&mut self, addr: &String, index: usize) -> Result<bool, Error> {
+        let peer = self.peers.get_mut(addr).ok_or(Error::NotFound)?;
+        peer.pieces[index] = true;
+        Ok(true)
     }
 
     fn handle_bitfield(
@@ -226,7 +214,7 @@ impl Manager {
         addr: &String,
         bitfield: &Bitfield,
         resp_ch: oneshot::Sender<BitfieldCmd>,
-    ) -> bool {
+    ) -> Result<bool, Error> {
         self.peers
             .get_mut(addr)
             .unwrap()
@@ -248,7 +236,7 @@ impl Manager {
         };
         let _ = resp_ch.send(cmd);
 
-        true
+        Ok(true)
     }
 
     fn handle_request(
@@ -258,12 +246,16 @@ impl Manager {
         block_begin: usize,
         block_length: usize,
         resp_ch: oneshot::Sender<RequestCmd>,
-    ) -> bool {
+    ) -> Result<bool, Error> {
         let _ = resp_ch.send(RequestCmd::Ignore);
-        true
+        Ok(true)
     }
 
-    fn handle_piece_done(&mut self, addr: &String, resp_ch: oneshot::Sender<PieceDoneCmd>) -> bool {
+    fn handle_piece_done(
+        &mut self,
+        addr: &String,
+        resp_ch: oneshot::Sender<PieceDoneCmd>,
+    ) -> Result<bool, Error> {
         for index in self
             .peers
             .iter()
@@ -277,7 +269,7 @@ impl Manager {
         }
 
         let _ = resp_ch.send(PieceDoneCmd::PrepareKill);
-        true
+        Ok(true)
     }
 
     async fn handle_kill_req(
@@ -285,7 +277,7 @@ impl Manager {
         addr: &String,
         index: &Option<usize>,
         reason: &String,
-    ) -> bool {
+    ) -> Result<bool, Error> {
         println!("Kill reason: {}", reason);
         self.kill_job(&addr, &index).await;
 
@@ -294,10 +286,10 @@ impl Manager {
             if let Err(_) = self.extract_files() {
                 ()
             }
-            return false;
+            return Ok(false);
         }
 
-        true
+        Ok(true)
     }
 
     fn choose_piece(&self, pieces: &Vec<bool>) -> Option<usize> {
