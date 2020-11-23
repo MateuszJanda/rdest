@@ -157,8 +157,10 @@ impl Manager {
         peer.choke = true;
 
         match peer.index {
-            Some(index) => self.pieces_status[index] = Status::Missing,
-            None => (),
+            Some(index) if self.pieces_status[index] == Status::Reserved => {
+                self.pieces_status[index] = Status::Missing
+            }
+            _   => (),
         }
         Ok(true)
     }
