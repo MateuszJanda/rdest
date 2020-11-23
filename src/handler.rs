@@ -58,7 +58,6 @@ pub enum JobCmd {
     SyncStats {
         addr: String,
         downloaded_rate: f32,
-        unexpected_piece: u32,
         rejected_piece: u32,
     },
     KillReq {
@@ -140,7 +139,6 @@ struct Status {
 
 struct Stats {
     downloaded: VecDeque<usize>,
-    unexpected_piece: u32,
     rejected_piece: u32,
 }
 
@@ -174,7 +172,6 @@ impl Stats {
     fn new() -> Stats {
         Stats {
             downloaded: VecDeque::from(vec![0]),
-            unexpected_piece: 0,
             rejected_piece: 0,
         }
     }
@@ -183,11 +180,7 @@ impl Stats {
         self.downloaded[0] += amount;
     }
 
-    fn update_unexpected(&mut self) {
-        self.unexpected_piece += 1;
-    }
-
-    fn update_rejected(&mut self) {
+    fn update_rejected_piece(&mut self) {
         self.rejected_piece += 1;
     }
 
@@ -196,7 +189,6 @@ impl Stats {
             self.downloaded.pop_back();
         }
         self.downloaded.push_front(0);
-        self.unexpected_piece = 0;
         self.rejected_piece = 0;
     }
 
@@ -470,7 +462,7 @@ impl Handler {
         // Send new request or call manager to decide
         if piece_recv.left.is_empty() && piece_recv.requested.is_empty() {
             if !self.verify_piece_hash() {
-                self.stats.update_rejected();
+                self.stats.update_rejected_piece();
                 return Ok(true);
             }
 
@@ -625,7 +617,6 @@ impl Handler {
             .send(JobCmd::SyncStats {
                 addr: self.connection.addr.clone(),
                 downloaded_rate: self.stats.downloaded_rate(),
-                unexpected_piece: self.stats.unexpected_piece,
                 rejected_piece: self.stats.rejected_piece,
             })
             .await?;

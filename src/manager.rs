@@ -142,7 +142,6 @@ impl Manager {
             JobCmd::SyncStats {
                 addr,
                 downloaded_rate,
-                unexpected_piece,
                 rejected_piece,
             } => Ok(true),
             JobCmd::KillReq {
