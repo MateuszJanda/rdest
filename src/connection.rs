@@ -63,6 +63,7 @@ impl Connection {
 
             if n == 0 {
                 return if self.buffer.is_empty() {
+                    println!("Peer zamknął połączenie");
                     Ok(None)
                 } else {
                     Err(Error::ConnectionReset)

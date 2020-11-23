@@ -244,8 +244,15 @@ impl Handler {
                 };
 
                 let reason = match handler.event_loop().await {
-                    Ok(_) => "".to_string(),
-                    Err(e) => e.to_string(),
+                    Ok(_) => {
+                        println!("Normal end");
+                        "".to_string()
+                    },
+                    Err(e) =>
+                        {
+                            println!("{:?}", e);
+                            e.to_string()
+                        },
                 };
 
                 let index = handler.piece_recv.map_or(None, |p| Some(p.index));
@@ -297,6 +304,7 @@ impl Handler {
                 cmd = self.broad_ch.recv() => self.handle_manager_cmd(cmd?).await?,
                 frame = self.connection.recv_frame() => {
                     if self.handle_frame(frame?).await? == false {
+                        println!("handle_frame - koncze normalnie");
                         break;
                     }
                 }
@@ -355,10 +363,14 @@ impl Handler {
                 };
 
                 if handled == false {
+                    println!("Not handled");
                     return Ok(false);
                 }
             }
-            None => return Ok(false),
+            None => {
+                println!("tutaj kurwa?");
+                return Ok(false)
+            },
         }
 
         return Ok(true);
@@ -470,6 +482,7 @@ impl Handler {
                     .is_ok()
             })
         {
+            println!("handle_piece {:?}", piece_recv.requested);
             Err(Error::NotFound)?;
         }
 
