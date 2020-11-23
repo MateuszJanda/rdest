@@ -86,13 +86,12 @@ pub enum RequestCmd {
 
 #[derive(Debug)]
 pub enum UnchokeCmd {
-    SendRequest {
+    SendInterestedAndRequest {
         index: usize,
         piece_length: usize,
         piece_hash: [u8; HASH_SIZE],
     },
     SendNotInterested,
-    Ignore,
 }
 
 #[derive(Debug)]
@@ -504,7 +503,7 @@ impl Handler {
             .await?;
 
         match resp_rx.await? {
-            UnchokeCmd::SendRequest {
+            UnchokeCmd::SendInterestedAndRequest {
                 index,
                 piece_length,
                 piece_hash,
@@ -519,7 +518,6 @@ impl Handler {
             UnchokeCmd::SendNotInterested => {
                 self.connection.send_msg(&NotInterested::new()).await?
             }
-            UnchokeCmd::Ignore => (),
         }
 
         Ok(())

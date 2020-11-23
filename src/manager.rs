@@ -169,7 +169,7 @@ impl Manager {
         let cmd = match index {
             Some(index) => {
                 self.pieces_status[index] = Status::Reserved;
-                UnchokeCmd::SendRequest {
+                UnchokeCmd::SendInterestedAndRequest {
                     index,
                     piece_length: self.piece_length(index),
                     piece_hash: self.metainfo.pieces()[index],
