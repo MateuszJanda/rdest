@@ -215,11 +215,8 @@ impl Manager {
         bitfield: &Bitfield,
         resp_ch: oneshot::Sender<BitfieldCmd>,
     ) -> Result<bool, Error> {
-        self.peers
-            .get_mut(addr)
-            .unwrap()
-            .pieces
-            .copy_from_slice(&bitfield.to_vec());
+        let peer = self.peers.get_mut(addr).ok_or(Error::NotFound)?;
+        peer.pieces.copy_from_slice(&bitfield.to_vec());
 
         let bitfield = Bitfield::from_vec(
             &self
@@ -256,16 +253,12 @@ impl Manager {
         addr: &String,
         resp_ch: oneshot::Sender<PieceDoneCmd>,
     ) -> Result<bool, Error> {
-        for index in self
-            .peers
-            .iter()
-            .filter_map(|(key, peer)| match key == addr {
-                true => peer.index,
-                false => None,
-            })
-        {
-            self.pieces_status[index] = Status::Have;
-            let _ = self.broad_ch.send(BroadCmd::SendHave { index });
+        match self.peers.get(addr).ok_or(Error::NotFound)?.index {
+            Some(index) => {
+                self.pieces_status[index] = Status::Have;
+                let _ = self.broad_ch.send(BroadCmd::SendHave { index });
+            }
+            None => (),
         }
 
         let _ = resp_ch.send(PieceDoneCmd::PrepareKill);
