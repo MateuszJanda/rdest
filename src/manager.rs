@@ -15,7 +15,7 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::task::JoinHandle;
 
 const JOB_CHANNEL_SIZE: usize = 64;
-const BORADCAST_CHANNEL_SIZE: usize = 32;
+const BROADCAST_CHANNEL_SIZE: usize = 32;
 
 pub struct Manager {
     own_id: [u8; HASH_SIZE],
@@ -56,7 +56,7 @@ pub enum Status {
 impl Manager {
     pub fn new(metainfo: Metainfo, tracker: TrackerResp, own_id: [u8; HASH_SIZE]) -> Manager {
         let (job_tx_ch, job_rx_ch) = mpsc::channel(JOB_CHANNEL_SIZE);
-        let (broad_ch, _) = broadcast::channel(BORADCAST_CHANNEL_SIZE);
+        let (broad_ch, _) = broadcast::channel(BROADCAST_CHANNEL_SIZE);
 
         Manager {
             own_id,
