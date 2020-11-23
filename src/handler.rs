@@ -71,8 +71,6 @@ pub enum JobCmd {
 #[derive(Debug)]
 pub enum BitfieldCmd {
     SendBitfield { bitfield: Bitfield },
-    SendBitfieldAndNotInterested { bitfield: Bitfield },
-    PrepareKill,
 }
 
 #[derive(Debug)]
@@ -564,11 +562,6 @@ impl Handler {
             BitfieldCmd::SendBitfield { bitfield } => {
                 self.connection.send_msg(&bitfield).await?;
             }
-            BitfieldCmd::SendBitfieldAndNotInterested { bitfield } => {
-                self.connection.send_msg(&bitfield).await?;
-                self.connection.send_msg(&NotInterested::new()).await?;
-            }
-            BitfieldCmd::PrepareKill => return Ok(false),
         }
 
         Ok(true)

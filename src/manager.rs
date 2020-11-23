@@ -221,12 +221,7 @@ impl Manager {
                 .collect(),
         );
 
-        let pieces = &self.peers[addr].pieces;
-        let cmd = match self.choose_piece(pieces) {
-            Some(_) => BitfieldCmd::SendBitfieldAndNotInterested { bitfield }, // TODO am_interested = false
-            None => BitfieldCmd::SendBitfield { bitfield },
-        };
-        let _ = resp_ch.send(cmd);
+        let _ = resp_ch.send(BitfieldCmd::SendBitfield { bitfield });
 
         Ok(true)
     }
