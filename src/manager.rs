@@ -1,7 +1,7 @@
 use crate::constant::HASH_SIZE;
-use crate::frame::Bitfield;
+use crate::frame::{Bitfield, Handshake};
 use crate::handler::{
-    BitfieldCmd, BroadCmd, Handler, JobCmd, PieceDoneCmd, RequestCmd, UnchokeCmd,
+    BroadCmd, Handler, HandshakeCmd, JobCmd, PieceDoneCmd, RequestCmd, UnchokeCmd,
 };
 use crate::progress::{Progress, ViewCmd};
 use crate::{utils, Error, Metainfo, TrackerResp};
@@ -92,6 +92,7 @@ impl Manager {
 
     fn spawn_jobs(&mut self) {
         let (addr, peer_id) = self.tracker.peers()[2].clone();
+        let peer_start = false;
         let own_id = self.own_id.clone();
         let info_hash = *self.metainfo.info_hash();
         let pieces_num = self.metainfo.pieces().len();
@@ -100,7 +101,14 @@ impl Manager {
 
         let job = tokio::spawn(async move {
             Handler::run(
-                addr, own_id, peer_id, info_hash, pieces_num, job_ch, broad_ch,
+                addr,
+                peer_start,
+                own_id,
+                Some(peer_id),
+                info_hash,
+                pieces_num,
+                job_ch,
+                broad_ch,
             )
             .await
         });
@@ -121,6 +129,7 @@ impl Manager {
 
     async fn event_loop(&mut self, cmd: JobCmd) -> Result<bool, Error> {
         match cmd {
+            JobCmd::RecvHandshake { addr, resp_ch } => self.handle_handshake(&addr, resp_ch),
             JobCmd::RecvChoke { addr } => self.handle_choke(&addr),
             JobCmd::RecvUnchoke { addr, resp_ch } => self.handle_unchoke(&addr, resp_ch),
             JobCmd::RecvInterested { addr } => self.handle_interested(&addr),
@@ -129,8 +138,8 @@ impl Manager {
             JobCmd::RecvBitfield {
                 addr,
                 bitfield,
-                resp_ch,
-            } => self.handle_bitfield(&addr, &bitfield, resp_ch),
+                // resp_ch,
+            } => self.handle_bitfield(&addr, &bitfield),
             JobCmd::RecvRequest {
                 addr,
                 index,
@@ -152,6 +161,27 @@ impl Manager {
         }
     }
 
+    fn handle_handshake(
+        &mut self,
+        addr: &String,
+        resp_ch: oneshot::Sender<HandshakeCmd>,
+    ) -> Result<bool, Error> {
+        // let peer = self.peers.get_mut(addr).ok_or(Error::NotFound)?;
+        // peer.pieces.copy_from_slice(&bitfield.to_vec());
+
+        let bitfield = Bitfield::from_vec(
+            &self
+                .pieces_status
+                .iter()
+                .map(|status| *status == Status::Have)
+                .collect(),
+        );
+
+        let _ = resp_ch.send(HandshakeCmd::SendBitfield { bitfield });
+
+        Ok(true)
+    }
+
     fn handle_choke(&mut self, addr: &String) -> Result<bool, Error> {
         let peer = self.peers.get_mut(addr).ok_or(Error::NotFound)?;
         peer.choke = true;
@@ -160,7 +190,7 @@ impl Manager {
             Some(index) if self.pieces_status[index] == Status::Reserved => {
                 self.pieces_status[index] = Status::Missing
             }
-            _   => (),
+            _ => (),
         }
         Ok(true)
     }
@@ -214,20 +244,20 @@ impl Manager {
         &mut self,
         addr: &String,
         bitfield: &Bitfield,
-        resp_ch: oneshot::Sender<BitfieldCmd>,
+        // resp_ch: oneshot::Sender<BitfieldCmd>,
     ) -> Result<bool, Error> {
         let peer = self.peers.get_mut(addr).ok_or(Error::NotFound)?;
         peer.pieces.copy_from_slice(&bitfield.to_vec());
 
-        let bitfield = Bitfield::from_vec(
-            &self
-                .pieces_status
-                .iter()
-                .map(|status| *status == Status::Have)
-                .collect(),
-        );
-
-        let _ = resp_ch.send(BitfieldCmd::SendBitfield { bitfield });
+        // let bitfield = Bitfield::from_vec(
+        //     &self
+        //         .pieces_status
+        //         .iter()
+        //         .map(|status| *status == Status::Have)
+        //         .collect(),
+        // );
+        //
+        // let _ = resp_ch.send(BitfieldCmd::SendBitfield { bitfield });
 
         Ok(true)
     }

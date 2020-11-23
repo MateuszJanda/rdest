@@ -90,10 +90,14 @@ impl Handshake {
         return Err(Error::InvalidProtocolId);
     }
 
+    pub fn peer_id(&self) -> &[u8; HASH_SIZE] {
+        &self.peer_id
+    }
+
     pub fn validate(
         &self,
         info_hash: &[u8; HASH_SIZE],
-        peer_id: &[u8; HASH_SIZE],
+        peer_id: &Option<[u8; HASH_SIZE]>,
     ) -> Result<(), Error> {
         if self
             .info_hash
@@ -104,13 +108,18 @@ impl Handshake {
             return Err(Error::InvalidInfoHash);
         }
 
-        if self
-            .peer_id
-            .iter()
-            .enumerate()
-            .any(|(idx, b)| *b != peer_id[idx])
-        {
-            return Err(Error::InvalidInfoHash);
+        match peer_id {
+            Some(peer_id) => {
+                if self
+                    .peer_id
+                    .iter()
+                    .enumerate()
+                    .any(|(idx, b)| *b != peer_id[idx])
+                {
+                    return Err(Error::InvalidInfoHash);
+                }
+            }
+            None => (),
         }
 
         Ok(())
