@@ -27,7 +27,6 @@ pub enum JobCmd {
     },
     RecvUnchoke {
         addr: String,
-        buffered_req: bool,
         resp_ch: oneshot::Sender<UnchokeCmd>,
     },
     RecvInterested {
@@ -378,7 +377,6 @@ impl Handler {
     async fn handle_unchoke(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
         self.peer_status.choked = false;
 
-        let buffered_req = self.any_request_in_msg_buff();
         if !self.msg_buff.is_empty() {
             for frame in self.msg_buff.iter() {
                 self.connection.send_frame(frame).await?;
@@ -386,7 +384,7 @@ impl Handler {
             self.msg_buff.clear();
         }
 
-        self.cmd_recv_unchoke(buffered_req).await?;
+        self.cmd_recv_unchoke().await?;
 
         Ok(true)
     }
@@ -498,15 +496,11 @@ impl Handler {
         Ok(())
     }
 
-    async fn cmd_recv_unchoke(
-        &mut self,
-        buffered_req: bool,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    async fn cmd_recv_unchoke(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let (resp_tx, resp_rx) = oneshot::channel();
         self.job_ch
             .send(JobCmd::RecvUnchoke {
                 addr: self.connection.addr.clone(),
-                buffered_req,
                 resp_ch: resp_tx,
             })
             .await?;
@@ -670,12 +664,9 @@ impl Handler {
             if let Some((block_begin, block_len)) = piece_recv.left.pop_front() {
                 piece_recv.requested.push_back((block_begin, block_len));
 
-                let msg = Request::new(piece_recv.index, block_begin, block_len);
                 println!("Wysyłam kolejny request");
-                match self.peer_status.choked {
-                    true => self.msg_buff.push(Frame::Request(msg)),
-                    false => self.connection.send_msg(&msg).await?,
-                }
+                let msg = Request::new(piece_recv.index, block_begin, block_len);
+                self.connection.send_msg(&msg).await?;
             }
         }
 
@@ -701,13 +692,6 @@ impl Handler {
             }
             None => Err(Error::NotFound)?,
         }
-    }
-
-    fn any_request_in_msg_buff(&self) -> bool {
-        self.msg_buff.iter().any(|f| match f {
-            Frame::Request(_) => true,
-            _ => false,
-        })
     }
 
     fn verify_piece_hash(&self) -> bool {

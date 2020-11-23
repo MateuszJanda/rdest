@@ -122,11 +122,7 @@ impl Manager {
     async fn event_loop(&mut self, cmd: JobCmd) -> Result<bool, Error> {
         match cmd {
             JobCmd::RecvChoke { addr } => self.handle_choke(&addr),
-            JobCmd::RecvUnchoke {
-                addr,
-                buffered_req,
-                resp_ch,
-            } => self.handle_unchoke(&addr, buffered_req, resp_ch),
+            JobCmd::RecvUnchoke { addr, resp_ch } => self.handle_unchoke(&addr, resp_ch),
             JobCmd::RecvInterested { addr } => self.handle_interested(&addr),
             JobCmd::RecvNotInterested { addr } => self.handle_not_interested(&addr),
             JobCmd::RecvHave { addr, index } => self.handle_have(&addr, index),
@@ -166,7 +162,6 @@ impl Manager {
     fn handle_unchoke(
         &mut self,
         addr: &String,
-        buffered_req: bool,
         resp_ch: oneshot::Sender<UnchokeCmd>,
     ) -> Result<bool, Error> {
         let pieces = &self.peers[addr].pieces;
