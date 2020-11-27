@@ -278,13 +278,8 @@ impl Handler {
     }
 
     async fn event_loop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let job_start_handshake = self.peer_id.is_some();
-        if job_start_handshake {
-            println!("wysyłam handshake");
-            self.connection
-                .send_msg(&Handshake::new(&self.info_hash, &self.own_id))
-                .await?;
-            self.cmd_init().await?;
+        if self.peer_id.is_some() {
+            self.init_handshake().await?;
         }
 
         let mut keep_alive_timer = self.start_keep_alive_timer();
@@ -375,14 +370,11 @@ impl Handler {
     ) -> Result<bool, Box<dyn std::error::Error>> {
         handshake.validate(&self.info_hash, &self.peer_id)?;
 
-        let peer_star_handshake = self.peer_id.is_none();
+        let peer_init_handshake = self.peer_id.is_none();
         self.peer_id = Some(*handshake.peer_id());
 
-        if peer_star_handshake {
-            self.connection
-                .send_msg(&Handshake::new(&self.info_hash, &self.own_id))
-                .await?;
-            self.cmd_init().await?;
+        if peer_init_handshake {
+            self.init_handshake().await?;
         }
 
         Ok(true)
@@ -508,7 +500,12 @@ impl Handler {
         Ok(true)
     }
 
-    async fn cmd_init(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn init_handshake(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        println!("wysyłam handshake");
+        self.connection
+            .send_msg(&Handshake::new(&self.info_hash, &self.own_id))
+            .await?;
+
         let (resp_tx, resp_rx) = oneshot::channel();
         self.job_ch
             .send(JobCmd::Init {
