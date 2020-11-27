@@ -131,11 +131,7 @@ impl Manager {
             JobCmd::RecvInterested { addr } => self.handle_interested(&addr),
             JobCmd::RecvNotInterested { addr } => self.handle_not_interested(&addr),
             JobCmd::RecvHave { addr, index } => self.handle_have(&addr, index),
-            JobCmd::RecvBitfield {
-                addr,
-                bitfield,
-                // resp_ch,
-            } => self.handle_bitfield(&addr, &bitfield),
+            JobCmd::RecvBitfield { addr, bitfield } => self.handle_bitfield(&addr, &bitfield),
             JobCmd::RecvRequest {
                 addr,
                 index,

@@ -235,14 +235,8 @@ impl Handler {
                 };
 
                 let reason = match handler.event_loop().await {
-                    Ok(_) => {
-                        println!("Normal end");
-                        "".to_string()
-                    }
-                    Err(e) => {
-                        println!("{:?}", e);
-                        e.to_string()
-                    }
+                    Ok(_) => "End job normally".to_string(),
+                    Err(e) => e.to_string(),
                 };
 
                 let index = handler.piece_recv.map_or(None, |p| Some(p.index));
@@ -313,7 +307,7 @@ impl Handler {
 
     async fn timeout_keep_alive(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if !self.peer_status.keep_alive {
-            Err(Error::KeepAliveTimeout)?
+            return Err(Error::KeepAliveTimeout.into());
         }
         self.send_keep_alive().await?;
         self.peer_status.keep_alive = false;
@@ -350,13 +344,11 @@ impl Handler {
                 };
 
                 if handled == false {
-                    println!("Not handled");
                     return Ok(false);
                 }
             }
             None => {
-                println!("tutaj kurwa?");
-                return Ok(false);
+                return Err(Error::ConnectionClosed.into());
             }
         }
 
@@ -470,7 +462,7 @@ impl Handler {
             })
         {
             println!("handle_piece {:?}", piece_recv.requested);
-            Err(Error::BlockNotRequested)?;
+            return Err(Error::BlockNotRequested.into());
         }
 
         // Removed piece from "requested" queue
@@ -715,7 +707,7 @@ impl Handler {
                     .await?;
                 Ok(())
             }
-            None => Err(Error::PieceNotLoaded)?,
+            None => Err(Error::PieceNotLoaded.into()),
         }
     }
 
