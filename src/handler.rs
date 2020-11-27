@@ -22,9 +22,9 @@ pub enum BroadCmd {
 }
 #[derive(Debug)]
 pub enum JobCmd {
-    RecvHandshake {
+    Init {
         addr: String,
-        resp_ch: oneshot::Sender<HandshakeCmd>,
+        resp_ch: oneshot::Sender<InitCmd>,
     },
     RecvChoke {
         addr: String,
@@ -72,14 +72,9 @@ pub enum JobCmd {
 }
 
 #[derive(Debug)]
-pub enum HandshakeCmd {
+pub enum InitCmd {
     SendBitfield { bitfield: Bitfield },
 }
-
-// #[derive(Debug)]
-// pub enum BitfieldCmd {
-//     SendBitfield { bitfield: Bitfield },
-// }
 
 #[derive(Debug)]
 pub enum RequestCmd {
@@ -114,7 +109,6 @@ pub enum PieceDoneCmd {
 
 pub struct Handler {
     connection: Connection,
-    peer_start: bool,
     own_id: [u8; HASH_SIZE],
     peer_id: Option<[u8; HASH_SIZE]>,
     info_hash: [u8; HASH_SIZE],
@@ -210,7 +204,6 @@ impl Stats {
 impl Handler {
     pub async fn run(
         addr: String,
-        peer_start: bool,
         own_id: [u8; HASH_SIZE],
         peer_id: Option<[u8; HASH_SIZE]>,
         info_hash: [u8; HASH_SIZE],
@@ -225,7 +218,6 @@ impl Handler {
 
                 let mut handler = Handler {
                     connection: Connection::new(addr, stream),
-                    peer_start,
                     own_id,
                     peer_id,
                     info_hash,
@@ -247,12 +239,11 @@ impl Handler {
                     Ok(_) => {
                         println!("Normal end");
                         "".to_string()
-                    },
-                    Err(e) =>
-                        {
-                            println!("{:?}", e);
-                            e.to_string()
-                        },
+                    }
+                    Err(e) => {
+                        println!("{:?}", e);
+                        e.to_string()
+                    }
                 };
 
                 let index = handler.piece_recv.map_or(None, |p| Some(p.index));
@@ -287,11 +278,13 @@ impl Handler {
     }
 
     async fn event_loop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if !self.peer_start {
+        let job_start_handshake = self.peer_id.is_some();
+        if job_start_handshake {
             println!("wysyłam handshake");
             self.connection
                 .send_msg(&Handshake::new(&self.info_hash, &self.own_id))
                 .await?;
+            self.cmd_init().await?;
         }
 
         let mut keep_alive_timer = self.start_keep_alive_timer();
@@ -369,8 +362,8 @@ impl Handler {
             }
             None => {
                 println!("tutaj kurwa?");
-                return Ok(false)
-            },
+                return Ok(false);
+            }
         }
 
         return Ok(true);
@@ -381,12 +374,15 @@ impl Handler {
         handshake: &Handshake,
     ) -> Result<bool, Box<dyn std::error::Error>> {
         handshake.validate(&self.info_hash, &self.peer_id)?;
+
+        let peer_star_handshake = self.peer_id.is_none();
         self.peer_id = Some(*handshake.peer_id());
 
-        if self.peer_start {
-            // TODO - get bitfields from manager
-        } else {
-            self.cmd_recv_handshake().await?;
+        if peer_star_handshake {
+            self.connection
+                .send_msg(&Handshake::new(&self.info_hash, &self.own_id))
+                .await?;
+            self.cmd_init().await?;
         }
 
         Ok(true)
@@ -512,17 +508,17 @@ impl Handler {
         Ok(true)
     }
 
-    async fn cmd_recv_handshake(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn cmd_init(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let (resp_tx, resp_rx) = oneshot::channel();
         self.job_ch
-            .send(JobCmd::RecvHandshake {
+            .send(JobCmd::Init {
                 addr: self.connection.addr.clone(),
                 resp_ch: resp_tx,
             })
             .await?;
 
         match resp_rx.await? {
-            HandshakeCmd::SendBitfield { bitfield } => {
+            InitCmd::SendBitfield { bitfield } => {
                 println!("wysyłam bitfield");
                 self.connection.send_msg(&bitfield).await?;
             }
@@ -595,22 +591,13 @@ impl Handler {
         &mut self,
         bitfield: Bitfield,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        // let (resp_tx, resp_rx) = oneshot::channel();
         self.job_ch
             .send(JobCmd::RecvBitfield {
                 addr: self.connection.addr.clone(),
                 bitfield,
-                // resp_ch: resp_tx,
             })
             .await?;
 
-        // match resp_rx.await? {
-        //     BitfieldCmd::SendBitfield { bitfield } => {
-        //         self.connection.send_msg(&bitfield).await?;
-        //     }
-        // }
-
-        // Ok(true)
         Ok(())
     }
 

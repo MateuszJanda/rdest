@@ -1,8 +1,6 @@
 use crate::constant::HASH_SIZE;
-use crate::frame::{Bitfield, Handshake};
-use crate::handler::{
-    BroadCmd, Handler, HandshakeCmd, JobCmd, PieceDoneCmd, RequestCmd, UnchokeCmd,
-};
+use crate::frame::Bitfield;
+use crate::handler::{BroadCmd, Handler, InitCmd, JobCmd, PieceDoneCmd, RequestCmd, UnchokeCmd};
 use crate::progress::{Progress, ViewCmd};
 use crate::{utils, Error, Metainfo, TrackerResp};
 use rand::seq::SliceRandom;
@@ -92,7 +90,6 @@ impl Manager {
 
     fn spawn_jobs(&mut self) {
         let (addr, peer_id) = self.tracker.peers()[2].clone();
-        let peer_start = false;
         let own_id = self.own_id.clone();
         let info_hash = *self.metainfo.info_hash();
         let pieces_num = self.metainfo.pieces().len();
@@ -102,7 +99,6 @@ impl Manager {
         let job = tokio::spawn(async move {
             Handler::run(
                 addr,
-                peer_start,
                 own_id,
                 Some(peer_id),
                 info_hash,
@@ -129,7 +125,7 @@ impl Manager {
 
     async fn event_loop(&mut self, cmd: JobCmd) -> Result<bool, Error> {
         match cmd {
-            JobCmd::RecvHandshake { addr, resp_ch } => self.handle_handshake(&addr, resp_ch),
+            JobCmd::Init { addr, resp_ch } => self.handle_init(&addr, resp_ch),
             JobCmd::RecvChoke { addr } => self.handle_choke(&addr),
             JobCmd::RecvUnchoke { addr, resp_ch } => self.handle_unchoke(&addr, resp_ch),
             JobCmd::RecvInterested { addr } => self.handle_interested(&addr),
@@ -161,14 +157,11 @@ impl Manager {
         }
     }
 
-    fn handle_handshake(
+    fn handle_init(
         &mut self,
         addr: &String,
-        resp_ch: oneshot::Sender<HandshakeCmd>,
+        resp_ch: oneshot::Sender<InitCmd>,
     ) -> Result<bool, Error> {
-        // let peer = self.peers.get_mut(addr).ok_or(Error::NotFound)?;
-        // peer.pieces.copy_from_slice(&bitfield.to_vec());
-
         let bitfield = Bitfield::from_vec(
             &self
                 .pieces_status
@@ -177,7 +170,7 @@ impl Manager {
                 .collect(),
         );
 
-        let _ = resp_ch.send(HandshakeCmd::SendBitfield { bitfield });
+        let _ = resp_ch.send(InitCmd::SendBitfield { bitfield });
 
         Ok(true)
     }
@@ -240,24 +233,9 @@ impl Manager {
         Ok(true)
     }
 
-    fn handle_bitfield(
-        &mut self,
-        addr: &String,
-        bitfield: &Bitfield,
-        // resp_ch: oneshot::Sender<BitfieldCmd>,
-    ) -> Result<bool, Error> {
+    fn handle_bitfield(&mut self, addr: &String, bitfield: &Bitfield) -> Result<bool, Error> {
         let peer = self.peers.get_mut(addr).ok_or(Error::NotFound)?;
         peer.pieces.copy_from_slice(&bitfield.to_vec());
-
-        // let bitfield = Bitfield::from_vec(
-        //     &self
-        //         .pieces_status
-        //         .iter()
-        //         .map(|status| *status == Status::Have)
-        //         .collect(),
-        // );
-        //
-        // let _ = resp_ch.send(BitfieldCmd::SendBitfield { bitfield });
 
         Ok(true)
     }
