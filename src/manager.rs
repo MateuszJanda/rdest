@@ -129,7 +129,7 @@ impl Manager {
 
     async fn event_loop(&mut self, cmd: JobCmd) -> Result<bool, Error> {
         match cmd {
-            JobCmd::Init { addr, resp_ch } => self.handle_init(&addr, resp_ch),
+            JobCmd::Init { addr, resp_ch } => self.handle_init(&addr, resp_ch).await,
             JobCmd::RecvChoke { addr } => self.handle_choke(&addr),
             JobCmd::RecvUnchoke { addr, resp_ch } => self.handle_unchoke(&addr, resp_ch),
             JobCmd::RecvInterested { addr } => self.handle_interested(&addr),
@@ -157,7 +157,7 @@ impl Manager {
         }
     }
 
-    fn handle_init(
+    async fn handle_init(
         &mut self,
         addr: &String,
         resp_ch: oneshot::Sender<InitCmd>,
@@ -171,6 +171,7 @@ impl Manager {
         );
 
         let _ = resp_ch.send(InitCmd::SendBitfield { bitfield });
+        self.send_log(&format!("Handshake with peer: {}", addr)).await;
 
         Ok(true)
     }
@@ -358,9 +359,18 @@ impl Manager {
     async fn kill_view(&mut self) {
         match &mut self.view.take() {
             Some(view) => {
-                let _ = view.channel.send(ViewCmd::Kill {}).await;
+                let _ = view.channel.send(ViewCmd::Kill).await;
                 let job = &mut view.job;
                 job.await.unwrap();
+            }
+            _ => (),
+        }
+    }
+
+    async fn send_log(&mut self, text: &String) {
+        match &mut self.view {
+            Some(view) => {
+                let _ = view.channel.send(ViewCmd::Log(text.clone())).await;
             }
             _ => (),
         }

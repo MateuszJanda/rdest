@@ -4,6 +4,7 @@ use tokio::sync::mpsc;
 use tokio::time::{interval_at, Duration, Instant};
 
 pub enum ViewCmd {
+    Log(String),
     Kill,
 }
 
@@ -35,6 +36,7 @@ impl Progress {
                  _ = interval.tick() => self.animation().await,
                  cmd = self.cmd_rx.recv() => {
                      match cmd {
+                        Some(ViewCmd::Log(text)) => self.log(&text),
                         Some(ViewCmd::Kill) => break,
                         _ => (),
                     }
@@ -60,5 +62,9 @@ impl Progress {
         } else {
             self.pos -= 1;
         }
+    }
+
+    fn log(&self, text: &String) {
+        println!("[+] {}", text);
     }
 }
