@@ -32,7 +32,7 @@ impl Metainfo {
     pub fn from_file(path: String) -> Result<Metainfo, Error> {
         match &fs::read(path) {
             Ok(val) => Self::from_bencode(val),
-            Err(_) => Err(Error::Meta("File not found".into())),
+            Err(_) => Err(Error::MetaFileNotFound),
         }
     }
 
@@ -40,10 +40,10 @@ impl Metainfo {
         let bvalues = BDecoder::from_array(data)?;
 
         if bvalues.is_empty() {
-            return Err(Error::Meta("Empty bencode".into()));
+            return Err(Error::MetaBEncodeMissing);
         }
 
-        let mut err = Err(Error::Meta("Missing data".into()));
+        let mut err = Err(Error::MetaDataMissing);
         for val in bvalues {
             match val {
                 BValue::Dict(dict) => match Self::parse(data, &dict) {
@@ -62,11 +62,9 @@ impl Metainfo {
         let multi_files = Self::find_files(dict);
 
         if length.is_some() && multi_files.is_some() {
-            return Err(Error::Meta(
-                "Conflicting 'length' and 'files' values present. Only one is allowed".into(),
-            ));
+            return Err(Error::MetaLenAndFilesConflict);
         } else if length.is_none() && multi_files.is_none() {
-            return Err(Error::Meta("Missing 'length' or 'files'".into()));
+            return Err(Error::MetaLenOrFilesMissing);
         }
 
         let name = Self::find_name(dict)?;
@@ -94,34 +92,34 @@ impl Metainfo {
 
     pub fn find_announce(dict: &HashMap<Vec<u8>, BValue>) -> Result<String, Error> {
         match dict.get(&b"announce".to_vec()) {
-            Some(BValue::ByteStr(val)) => String::from_utf8(val.to_vec())
-                .or(Err(Error::Meta("Can't convert 'announce' to UTF-8".into()))),
-            _ => Err(Error::Meta("Incorrect or missing 'announce' value".into())),
+            Some(BValue::ByteStr(val)) => {
+                String::from_utf8(val.to_vec()).or(Err(Error::MetaInvalidUtf8("announce".into())))
+            }
+            _ => Err(Error::MetaIncorrectOrMissing("announce".into())),
         }
     }
 
     pub fn find_name(dict: &HashMap<Vec<u8>, BValue>) -> Result<String, Error> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"name".to_vec()) {
-                Some(BValue::ByteStr(val)) => String::from_utf8(val.to_vec())
-                    .or(Err(Error::Meta("Can't convert 'name' to UTF-8".into()))),
-                _ => Err(Error::Meta("Incorrect or missing 'name' value".into())),
+                Some(BValue::ByteStr(val)) => {
+                    String::from_utf8(val.to_vec()).or(Err(Error::MetaInvalidUtf8("name".into())))
+                }
+                _ => Err(Error::MetaIncorrectOrMissing("name".into())),
             },
-            _ => Err(Error::Meta("Incorrect or missing 'info' value".into())),
+            _ => Err(Error::MetaIncorrectOrMissing("info".into())),
         }
     }
 
     pub fn find_piece_length(dict: &HashMap<Vec<u8>, BValue>) -> Result<u64, Error> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"piece length".to_vec()) {
-                Some(BValue::Int(length)) => u64::try_from(*length).or(Err(Error::Meta(
-                    "Can't convert 'piece length' to u64".into(),
-                ))),
-                _ => Err(Error::Meta(
-                    "Incorrect or missing 'piece length' value".into(),
-                )),
+                Some(BValue::Int(length)) => {
+                    u64::try_from(*length).or(Err(Error::MetaInvalidU64("piece length".into())))
+                }
+                _ => Err(Error::MetaIncorrectOrMissing("piece length".into())),
             },
-            _ => Err(Error::Meta("Incorrect or missing 'info' value".into())),
+            _ => Err(Error::MetaIncorrectOrMissing("info".into())),
         }
     }
 
@@ -130,16 +128,16 @@ impl Metainfo {
             Some(BValue::Dict(info)) => match info.get(&b"pieces".to_vec()) {
                 Some(BValue::ByteStr(pieces)) => {
                     if pieces.len() % HASH_SIZE != 0 {
-                        return Err(Error::Meta("'pieces' not divisible by 20".into()));
+                        return Err(Error::MetaNotDivisible("pieces".into()));
                     }
                     Ok(pieces
                         .chunks(HASH_SIZE)
                         .map(|chunk| chunk.try_into().unwrap())
                         .collect())
                 }
-                _ => Err(Error::Meta("Incorrect or missing 'pieces' value".into())),
+                _ => Err(Error::MetaIncorrectOrMissing("pieces".into())),
             },
-            _ => Err(Error::Meta("Incorrect or missing 'info' value".into())),
+            _ => Err(Error::MetaIncorrectOrMissing("info".into())),
         }
     }
 
@@ -193,7 +191,7 @@ impl Metainfo {
             return Ok(m.digest().bytes());
         }
 
-        Err(Error::HashCalculation)
+        Err(Error::InfoMissing)
     }
 
     pub fn tracker_url(&self) -> &String {

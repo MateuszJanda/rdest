@@ -176,7 +176,7 @@ impl Manager {
     }
 
     fn handle_choke(&mut self, addr: &String) -> Result<bool, Error> {
-        let peer = self.peers.get_mut(addr).ok_or(Error::NotFound)?;
+        let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.choke = true;
 
         match peer.index {
@@ -207,7 +207,7 @@ impl Manager {
             None => UnchokeCmd::SendNotInterested,
         };
 
-        let peer = self.peers.get_mut(addr).ok_or(Error::NotFound)?;
+        let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.index = index;
         peer.am_interested = index.is_some();
 
@@ -216,25 +216,25 @@ impl Manager {
     }
 
     fn handle_interested(&mut self, addr: &String) -> Result<bool, Error> {
-        let peer = self.peers.get_mut(addr).ok_or(Error::NotFound)?;
+        let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.interested = true;
         Ok(true)
     }
 
     fn handle_not_interested(&mut self, addr: &String) -> Result<bool, Error> {
-        let peer = self.peers.get_mut(addr).ok_or(Error::NotFound)?;
+        let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.interested = false;
         Ok(true)
     }
 
     fn handle_have(&mut self, addr: &String, index: usize) -> Result<bool, Error> {
-        let peer = self.peers.get_mut(addr).ok_or(Error::NotFound)?;
+        let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.pieces[index] = true;
         Ok(true)
     }
 
     fn handle_bitfield(&mut self, addr: &String, bitfield: &Bitfield) -> Result<bool, Error> {
-        let peer = self.peers.get_mut(addr).ok_or(Error::NotFound)?;
+        let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.pieces.copy_from_slice(&bitfield.to_vec());
 
         Ok(true)
@@ -257,7 +257,7 @@ impl Manager {
         addr: &String,
         resp_ch: oneshot::Sender<PieceDoneCmd>,
     ) -> Result<bool, Error> {
-        match self.peers.get(addr).ok_or(Error::NotFound)?.index {
+        match self.peers.get(addr).ok_or(Error::PeerNotFound)?.index {
             Some(index) => {
                 self.pieces_status[index] = Status::Have;
                 let _ = self.broad_ch.send(BroadCmd::SendHave { index });

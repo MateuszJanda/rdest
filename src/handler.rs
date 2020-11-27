@@ -46,7 +46,6 @@ pub enum JobCmd {
     RecvBitfield {
         addr: String,
         bitfield: Bitfield,
-        // resp_ch: oneshot::Sender<BitfieldCmd>,
     },
     RecvRequest {
         addr: String,
@@ -460,7 +459,7 @@ impl Handler {
 
     async fn handle_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
         // Verify message
-        let piece_recv = self.piece_recv.as_mut().ok_or(Error::NotFound)?;
+        let piece_recv = self.piece_recv.as_mut().ok_or(Error::PieceNotRequested)?;
         if !piece_recv
             .requested
             .iter()
@@ -471,7 +470,7 @@ impl Handler {
             })
         {
             println!("handle_piece {:?}", piece_recv.requested);
-            Err(Error::NotFound)?;
+            Err(Error::BlockNotRequested)?;
         }
 
         // Removed piece from "requested" queue
@@ -716,7 +715,7 @@ impl Handler {
                     .await?;
                 Ok(())
             }
-            None => Err(Error::NotFound)?,
+            None => Err(Error::PieceNotLoaded)?,
         }
     }
 
@@ -752,7 +751,7 @@ impl Handler {
         let piece_recv = self
             .piece_recv
             .take()
-            .ok_or(Error::NotFound)
+            .ok_or(Error::PieceBuffMissing)
             .expect("Saving to file: piece data not exist after validation");
         let name = utils::hash_to_string(&piece_recv.hash) + ".piece";
         fs::write(name, &piece_recv.buff).unwrap();

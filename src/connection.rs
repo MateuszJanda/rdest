@@ -57,7 +57,7 @@ impl Connection {
             }
 
             let n = match self.stream.read_buf(&mut self.buffer).await {
-                Err(_) => return Err(Error::SocketWrite),
+                Err(_) => return Err(Error::CantReadFromSocket),
                 Ok(n) => n,
             };
 

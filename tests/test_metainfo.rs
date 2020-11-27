@@ -5,7 +5,7 @@ use rdest::{BValue, Error, File, Metainfo};
 fn find_announce_incorrect() {
     assert_eq!(
         Metainfo::find_announce(&hashmap![b"announce".to_vec() => BValue::Int(5)]),
-        Err(Error::Meta("Incorrect or missing 'announce' value".into()))
+        Err(Error::MetaIncorrectOrMissing("announce".into()))
     );
 }
 
@@ -25,7 +25,7 @@ fn find_name_incorrect() {
         Metainfo::find_name(
             &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"name".to_vec() => BValue::Int(12)])]
         ),
-        Err(Error::Meta("Incorrect or missing 'name' value".into()))
+        Err(Error::MetaIncorrectOrMissing("name".into()))
     );
 }
 
@@ -33,7 +33,7 @@ fn find_name_incorrect() {
 fn find_name_incorrect_info() {
     assert_eq!(
         Metainfo::find_name(&hashmap![b"info".to_vec() => BValue::Int(12)]),
-        Err(Error::Meta("Incorrect or missing 'info' value".into()))
+        Err(Error::MetaIncorrectOrMissing("info".into()))
     );
 }
 
@@ -53,9 +53,7 @@ fn find_piece_length_incorrect() {
         Metainfo::find_piece_length(
             &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"piece length".to_vec() => BValue::ByteStr(b"BAD".to_vec())])]
         ),
-        Err(Error::Meta(
-            "Incorrect or missing 'piece length' value".into()
-        ))
+        Err(Error::MetaIncorrectOrMissing("piece length".into()))
     );
 }
 
@@ -65,7 +63,7 @@ fn find_piece_length_negative() {
         Metainfo::find_piece_length(
             &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"piece length".to_vec() => BValue::Int(-12)])]
         ),
-        Err(Error::Meta("Can't convert 'piece length' to u64".into()))
+        Err(Error::MetaInvalidU64("piece length".into()))
     );
 }
 
@@ -73,7 +71,7 @@ fn find_piece_length_negative() {
 fn find_piece_length_incorrect_info() {
     assert_eq!(
         Metainfo::find_piece_length(&hashmap![b"info".to_vec() => BValue::Int(12)]),
-        Err(Error::Meta("Incorrect or missing 'info' value".into()))
+        Err(Error::MetaIncorrectOrMissing("info".into()))
     );
 }
 
@@ -93,7 +91,7 @@ fn find_pieces_incorrect() {
         Metainfo::find_pieces(
             &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"pieces".to_vec() => BValue::Int(12)])]
         ),
-        Err(Error::Meta("Incorrect or missing 'pieces' value".into()))
+        Err(Error::MetaIncorrectOrMissing("pieces".into()))
     );
 }
 
@@ -103,7 +101,7 @@ fn find_pieces_not_divisible() {
         Metainfo::find_pieces(
             &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"pieces".to_vec() => BValue::ByteStr(b"aaa".to_vec())])]
         ),
-        Err(Error::Meta("'pieces' not divisible by 20".into()))
+        Err(Error::MetaNotDivisible("pieces".into()))
     );
 }
 
@@ -111,7 +109,7 @@ fn find_pieces_not_divisible() {
 fn find_pieces_incorrect_info() {
     assert_eq!(
         Metainfo::find_pieces(&hashmap![b"info".to_vec() => BValue::Int(12)]),
-        Err(Error::Meta("Incorrect or missing 'info' value".into()))
+        Err(Error::MetaIncorrectOrMissing("info".into()))
     );
 }
 
@@ -250,10 +248,7 @@ fn find_files_valid_and_invalid_dict() {
 
 #[test]
 fn empty_input_incorrect() {
-    assert_eq!(
-        Metainfo::from_bencode(b""),
-        Err(Error::Meta("Empty bencode".into()))
-    );
+    assert_eq!(Metainfo::from_bencode(b""), Err(Error::MetaBEncodeMissing));
 }
 
 #[test]
@@ -268,23 +263,20 @@ fn incorrect_bencode() {
 fn missing_announce() {
     assert_eq!(
         Metainfo::from_bencode(b"d8:announcei1e4:infod4:name4:NAME6:lengthi111ee"),
-        Err(Error::Meta("Incorrect or missing 'announce' value".into()))
+        Err(Error::MetaIncorrectOrMissing("announce".into()))
     );
 }
 
 #[test]
 fn torrent_incorrect() {
-    assert_eq!(
-        Metainfo::from_bencode(b"i12e"),
-        Err(Error::Meta("Missing data".into()))
-    );
+    assert_eq!(Metainfo::from_bencode(b"i12e"), Err(Error::MetaDataMissing));
 }
 
 #[test]
 fn torrent_missing_length_and_files() {
     assert_eq!(
         Metainfo::from_bencode(b"d8:announce3:URL4:infod4:name4:NAME12:piece lengthi999e6:pieces20:AAAAABBBBBCCCCCDDDDDee"),
-        Err(Error::Meta("Missing 'length' or 'files'".into()))
+        Err(Error::MetaLenOrFilesMissing)
     );
 }
 
@@ -292,7 +284,7 @@ fn torrent_missing_length_and_files() {
 fn torrent_with_both_length_and_files() {
     assert_eq!(
         Metainfo::from_bencode(b"d8:announce3:URL4:infod4:name4:NAME12:piece lengthi999e6:pieces20:AAAAABBBBBCCCCCDDDDD6:lengthi1e5:filesleee"),
-        Err(Error::Meta("Conflicting 'length' and 'files' values present. Only one is allowed".into()))
+        Err(Error::MetaLenAndFilesConflict)
     );
 }
 
