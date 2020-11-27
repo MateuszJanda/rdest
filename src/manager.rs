@@ -36,6 +36,8 @@ struct Peer {
     am_choke: bool,
     interested: bool,
     choke: bool,
+    download_rate: f32,
+    rejected_piece: u32,
 }
 
 #[derive(Debug)]
@@ -117,6 +119,8 @@ impl Manager {
             am_choke: true,
             interested: false,
             choke: true,
+            download_rate: 0.0,
+            rejected_piece: 0,
         };
 
         let (addr, _) = self.tracker.peers()[2].clone();
@@ -144,7 +148,7 @@ impl Manager {
                 addr,
                 downloaded_rate,
                 rejected_piece,
-            } => Ok(true),
+            } => self.handle_sync_stats(&addr, downloaded_rate, rejected_piece),
             JobCmd::KillReq {
                 addr,
                 index,
@@ -262,6 +266,18 @@ impl Manager {
         }
 
         let _ = resp_ch.send(PieceDoneCmd::PrepareKill);
+        Ok(true)
+    }
+
+    fn handle_sync_stats(
+        &mut self,
+        addr: &String,
+        downloaded_rate: f32,
+        rejected_piece: u32,
+    ) -> Result<bool, Error> {
+        let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
+        peer.download_rate = downloaded_rate;
+        peer.rejected_piece = rejected_piece;
         Ok(true)
     }
 
