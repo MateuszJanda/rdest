@@ -75,7 +75,7 @@ impl Handshake {
     ) -> Result<usize, Error> {
         if protocol_id_length == Handshake::PROTOCOL_ID.len() {
             if available_data < Handshake::FULL_SIZE {
-                return Err(Error::Incomplete);
+                return Err(Error::Incomplete("Handshake".into()));
             }
 
             for idx in 0..Handshake::PROTOCOL_ID.len() {
@@ -176,7 +176,7 @@ impl Choke {
             return Ok(Choke::FULL_SIZE);
         }
 
-        Err(Error::Incomplete)
+        Err(Error::Incomplete("Choke".into()))
     }
 }
 
@@ -208,7 +208,7 @@ impl Unchoke {
             return Ok(Unchoke::FULL_SIZE);
         }
 
-        Err(Error::Incomplete)
+        Err(Error::Incomplete("Unchoke".into()))
     }
 }
 
@@ -240,7 +240,7 @@ impl Interested {
             return Ok(Interested::FULL_SIZE);
         }
 
-        Err(Error::Incomplete)
+        Err(Error::Incomplete("Interested".into()))
     }
 }
 
@@ -272,7 +272,7 @@ impl NotInterested {
             return Ok(NotInterested::FULL_SIZE);
         }
 
-        Err(Error::Incomplete)
+        Err(Error::Incomplete("NotInterested".into()))
     }
 }
 
@@ -320,7 +320,7 @@ impl Have {
             return Ok(Have::FULL_SIZE);
         }
 
-        Err(Error::Incomplete)
+        Err(Error::Incomplete("Have".into()))
     }
 
     pub fn index(&self) -> usize {
@@ -329,7 +329,7 @@ impl Have {
 
     pub fn validate(&self, pieces_num: usize) -> Result<(), Error> {
         if self.index as usize >= pieces_num {
-            return Err(Error::InvalidIndex);
+            return Err(Error::InvalidIndex("Have".into()));
         }
 
         Ok(())
@@ -406,12 +406,12 @@ impl Bitfield {
             return Ok(Bitfield::LEN_SIZE + length);
         }
 
-        Err(Error::Incomplete)
+        Err(Error::Incomplete("Bitfield".into()))
     }
 
     pub fn validate(&self, pieces_num: usize) -> Result<(), Error> {
         if self.to_vec().len() != pieces_num {
-            return Err(Error::InvalidSize);
+            return Err(Error::InvalidLength("Bitfield".into()));
         }
 
         Ok(())
@@ -479,7 +479,7 @@ impl Request {
             return Ok(Request::FULL_SIZE);
         }
 
-        Err(Error::Incomplete)
+        Err(Error::Incomplete("Request".into()))
     }
 
     pub fn index(&self) -> usize {
@@ -496,16 +496,16 @@ impl Request {
 
     pub fn validate(&self, piece_length: Option<usize>, pieces_num: usize) -> Result<(), Error> {
         if self.index >= pieces_num as u32 {
-            return Err(Error::InvalidIndex);
+            return Err(Error::InvalidIndex("Request".into()));
         }
 
         if self.block_length >= PIECE_BLOCK_SIZE as u32 {
-            return Err(Error::InvalidSize);
+            return Err(Error::InvalidLength("Request".into()));
         }
 
         if let Some(piece_length) = piece_length {
             if self.block_begin + self.block_length > piece_length as u32 {
-                return Err(Error::InvalidSize);
+                return Err(Error::InvalidLength("Request".into()));
             }
         }
 
@@ -575,7 +575,7 @@ impl Piece {
             return Ok(Piece::LEN_SIZE + length);
         }
 
-        Err(Error::Incomplete)
+        Err(Error::Incomplete("Piece".into()))
     }
 
     pub fn index(&self) -> usize {
@@ -601,15 +601,15 @@ impl Piece {
         block_length: usize,
     ) -> Result<(), Error> {
         if self.index as usize != index {
-            return Err(Error::InvalidIndex);
+            return Err(Error::InvalidIndex("Piece".into()));
         }
 
         if self.block_begin as usize != block_begin {
-            return Err(Error::InvalidIndex);
+            return Err(Error::InvalidIndex("Piece".into()));
         }
 
         if self.block.len() as usize != block_length {
-            return Err(Error::InvalidSize);
+            return Err(Error::InvalidLength("Piece".into()));
         }
 
         Ok(())
@@ -679,7 +679,7 @@ impl Cancel {
             return Ok(Cancel::FULL_SIZE);
         }
 
-        Err(Error::Incomplete)
+        Err(Error::Incomplete("Cancel".into()))
     }
 }
 
@@ -787,7 +787,7 @@ impl Frame {
             return Ok(crs.get_ref()[0] as usize);
         }
 
-        Err(Error::Incomplete)
+        Err(Error::Incomplete("Protocol ID getter".into()))
     }
 
     fn get_message_length(crs: &Cursor<&[u8]>) -> Result<usize, Error> {
@@ -800,7 +800,7 @@ impl Frame {
             return Ok(u32::from_be_bytes(b) as usize);
         }
 
-        Err(Error::Incomplete)
+        Err(Error::Incomplete("Message length getter".into()))
     }
 
     fn get_message_id(crs: &Cursor<&[u8]>) -> Result<u8, Error> {
@@ -811,7 +811,7 @@ impl Frame {
             return Ok(crs.get_ref()[ID_POS]);
         }
 
-        Err(Error::Incomplete)
+        Err(Error::Incomplete("Message ID getter".into()))
     }
 
     fn available_data(crs: &Cursor<&[u8]>) -> usize {

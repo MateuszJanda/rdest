@@ -2,12 +2,12 @@ use std::fmt;
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum Error {
-    Incomplete,
+    Incomplete(String),
     InvalidProtocolId,
     InvalidInfoHash,
     InvalidPeerId,
-    InvalidSize,
-    InvalidIndex,
+    InvalidLength(String),
+    InvalidIndex(String),
     FileNotFound,
     NotFound,
     KeepAliveTimeout,
@@ -24,12 +24,12 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Error::Incomplete => write!(f, "Incomplete"),
+            Error::Incomplete(msg) => write!(f, "Incomplete {}", msg),
             Error::InvalidProtocolId => write!(f, "Invalid protocol Id"),
             Error::InvalidInfoHash => write!(f, "Invalid info hash"),
             Error::InvalidPeerId => write!(f, "Invalid peer ID"),
-            Error::InvalidSize => write!(f, "Invalid size"),
-            Error::InvalidIndex => write!(f, "Invalid index"),
+            Error::InvalidLength(msg) => write!(f, "Invalid length in {}", msg),
+            Error::InvalidIndex(msg) => write!(f, "Invalid index in {}", msg),
             Error::FileNotFound => write!(f, "File not found"),
             Error::NotFound => write!(f, "Not found"),
             Error::KeepAliveTimeout => write!(f, "Keep alive timeout"),

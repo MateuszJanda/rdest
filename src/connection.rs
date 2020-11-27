@@ -91,7 +91,7 @@ impl Connection {
 
                 Ok(None)
             }
-            Err(Error::Incomplete) => {
+            Err(Error::Incomplete(_)) => {
                 // Not enough data has been buffered
                 Ok(None)
             }
