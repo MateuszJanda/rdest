@@ -250,12 +250,23 @@ impl Manager {
         block_length: usize,
         resp_ch: oneshot::Sender<RequestCmd>,
     ) -> Result<bool, Error> {
+        let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
+        if peer.am_choke {
+            let _ = resp_ch.send(RequestCmd::Ignore);
+            return Ok(true);
+        }
+
         if index >= self.metainfo.pieces_num() {
             let _ = resp_ch.send(RequestCmd::Ignore);
             return Ok(true);
         }
 
         if block_begin + block_length >= self.metainfo.piece_length(index) {
+            let _ = resp_ch.send(RequestCmd::Ignore);
+            return Ok(true);
+        }
+
+        if self.pieces_status[index] != Status::Have {
             let _ = resp_ch.send(RequestCmd::Ignore);
             return Ok(true);
         }
