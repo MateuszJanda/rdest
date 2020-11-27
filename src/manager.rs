@@ -250,7 +250,23 @@ impl Manager {
         block_length: usize,
         resp_ch: oneshot::Sender<RequestCmd>,
     ) -> Result<bool, Error> {
-        let _ = resp_ch.send(RequestCmd::Ignore);
+        if index >= self.metainfo.pieces_num() {
+            let _ = resp_ch.send(RequestCmd::Ignore);
+            return Ok(true);
+        }
+
+        if block_begin + block_length >= self.metainfo.piece_length(index) {
+            let _ = resp_ch.send(RequestCmd::Ignore);
+            return Ok(true);
+        }
+
+        let _ = resp_ch.send(RequestCmd::LoadAndSendPiece {
+            index,
+            block_begin,
+            block_length,
+            piece_hash: *self.metainfo.piece(index),
+        });
+
         Ok(true)
     }
 
