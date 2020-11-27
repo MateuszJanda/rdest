@@ -202,7 +202,7 @@ impl Manager {
                 self.pieces_status[index] = Status::Reserved;
                 UnchokeCmd::SendInterestedAndRequest {
                     index,
-                    piece_length: self.piece_length(index),
+                    piece_length: self.metainfo.piece_length(index),
                     piece_hash: *self.metainfo.piece(index),
                 }
             }
@@ -334,14 +334,6 @@ impl Manager {
         }
 
         None
-    }
-
-    fn piece_length(&self, index: usize) -> usize {
-        if index < self.metainfo.pieces_num() - 1 {
-            return self.metainfo.piece_length();
-        }
-
-        self.metainfo.total_length() as usize % self.metainfo.piece_length()
     }
 
     async fn kill_job(&mut self, addr: &String, index: &Option<usize>) {

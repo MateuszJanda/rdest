@@ -206,8 +206,17 @@ impl Metainfo {
         self.pieces.len()
     }
 
-    pub fn piece_length(&self) -> usize {
-        self.piece_length as usize
+    pub fn piece_length(&self, index: usize) -> usize {
+        if index < self.pieces.len() - 1 {
+            return self.piece_length as usize;
+        }
+
+        let last = self.total_length() as usize % self.piece_length as usize;
+        if last != 0 {
+            return last;
+        }
+
+        return self.piece_length as usize;
     }
 
     pub fn total_length(&self) -> u64 {

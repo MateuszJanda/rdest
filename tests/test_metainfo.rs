@@ -290,16 +290,16 @@ fn torrent_with_both_length_and_files() {
 
 #[test]
 fn torrent_with_one_file() {
-    let m = Metainfo::from_bencode(b"d8:announce3:URL4:infod4:name4:NAME12:piece lengthi999e6:pieces20:AAAAABBBBBCCCCCDDDDD6:lengthi111eee").unwrap();
+    let m = Metainfo::from_bencode(b"d8:announce3:URL4:infod4:name4:NAME12:piece lengthi111e6:pieces20:AAAAABBBBBCCCCCDDDDD6:lengthi222eee").unwrap();
     assert_eq!(m.tracker_url(), &"URL".to_string());
-    assert_eq!(m.total_length(), 111);
-    assert_eq!(m.piece_length(), 999);
+    assert_eq!(m.total_length(), 222);
+    assert_eq!(m.piece_length(0), 111);
     assert_eq!(m.piece(0), &*b"AAAAABBBBBCCCCCDDDDD");
     assert_eq!(
         m.info_hash(),
         &[
-            0xaf, 0xee, 0xde, 0xee, 0x6c, 0x1a, 0xb8, 0x35, 0x6b, 0x8e, 0x2a, 0xf, 0x7d, 0xa7,
-            0x4d, 0x8c, 0x33, 0xe3, 0x68, 0x6a
+            0xdd, 0x95, 0xec, 0x87, 0x7c, 0x96, 0x6, 0x49, 0xef, 0x7d, 0x2f, 0xd5, 0xcc, 0x95,
+            0x56, 0x59, 0x17, 0xaf, 0x35, 0x7c
         ],
         "Hash mismatch"
     );
@@ -307,16 +307,16 @@ fn torrent_with_one_file() {
 
 #[test]
 fn torrent_with_multi_files() {
-    let m = Metainfo::from_bencode(b"d8:announce3:URL4:infod4:name4:NAME12:piece lengthi999e6:pieces20:AAAAABBBBBCCCCCDDDDD5:filesld6:lengthi777e4:path4:PATHeeee").unwrap();
+    let m = Metainfo::from_bencode(b"d8:announce3:URL4:infod4:name4:NAME12:piece lengthi333e6:pieces20:AAAAABBBBBCCCCCDDDDD5:filesld6:lengthi777e4:path4:PATHeeee").unwrap();
     assert_eq!(m.tracker_url(), &"URL".to_string());
     assert_eq!(m.total_length(), 777);
-    assert_eq!(m.piece_length(), 999);
+    assert_eq!(m.piece_length(0), 111);
     assert_eq!(m.piece(0), b"AAAAABBBBBCCCCCDDDDD");
     assert_eq!(
         m.info_hash(),
         &[
-            0x69, 0xc7, 0xa3, 0x43, 0xb4, 0x22, 0x68, 0xaa, 0x00, 0x94, 0xcf, 0x3e, 0x95, 0xa6,
-            0xfd, 0x48, 0xc4, 0x1f, 0x08, 0xa7
+            0xeb, 0xa1, 0xf6, 0xa6, 0xd8, 0x7b, 0x44, 0x56, 0xf4, 0xff, 0x6e, 0xfd, 0x3f, 0xe3,
+            0xe0, 0xef, 0x41, 0xe9, 0xd, 0xb3
         ],
         "Hash mismatch"
     );
