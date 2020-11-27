@@ -294,7 +294,7 @@ fn torrent_with_one_file() {
     assert_eq!(m.tracker_url(), &"URL".to_string());
     assert_eq!(m.total_length(), 111);
     assert_eq!(m.piece_length(), 999);
-    assert_eq!(m.pieces(), &vec![*b"AAAAABBBBBCCCCCDDDDD"]);
+    assert_eq!(m.piece(0), &*b"AAAAABBBBBCCCCCDDDDD");
     assert_eq!(
         m.info_hash(),
         &[
@@ -311,7 +311,7 @@ fn torrent_with_multi_files() {
     assert_eq!(m.tracker_url(), &"URL".to_string());
     assert_eq!(m.total_length(), 777);
     assert_eq!(m.piece_length(), 999);
-    assert_eq!(m.pieces(), &vec![*b"AAAAABBBBBCCCCCDDDDD"]);
+    assert_eq!(m.piece(0), b"AAAAABBBBBCCCCCDDDDD");
     assert_eq!(
         m.info_hash(),
         &[

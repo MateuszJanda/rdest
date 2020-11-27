@@ -198,8 +198,12 @@ impl Metainfo {
         &self.announce
     }
 
-    pub fn pieces(&self) -> &Vec<[u8; HASH_SIZE]> {
-        &self.pieces
+    pub fn piece(&self, index: usize) -> &[u8; HASH_SIZE] {
+        &self.pieces[index]
+    }
+
+    pub fn pieces_num(&self) -> usize {
+        self.pieces.len()
     }
 
     pub fn piece_length(&self) -> usize {

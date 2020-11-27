@@ -60,7 +60,7 @@ impl Manager {
 
         Manager {
             own_id,
-            pieces_status: vec![Status::Missing; metainfo.pieces().len()],
+            pieces_status: vec![Status::Missing; metainfo.pieces_num()],
             peers: HashMap::new(),
             metainfo,
             tracker,
@@ -94,7 +94,7 @@ impl Manager {
         let (addr, peer_id) = self.tracker.peers()[2].clone();
         let own_id = self.own_id.clone();
         let info_hash = *self.metainfo.info_hash();
-        let pieces_num = self.metainfo.pieces().len();
+        let pieces_num = self.metainfo.pieces_num();
         let job_ch = self.job_tx_ch.clone();
         let broad_ch = self.broad_ch.subscribe();
 
@@ -112,7 +112,7 @@ impl Manager {
         });
 
         let peer = Peer {
-            pieces: vec![false; self.metainfo.pieces().len()],
+            pieces: vec![false; self.metainfo.pieces_num()],
             job: Some(job),
             index: None,
             am_interested: false,
@@ -171,7 +171,8 @@ impl Manager {
         );
 
         let _ = resp_ch.send(InitCmd::SendBitfield { bitfield });
-        self.send_log(&format!("Handshake with peer: {}", addr)).await;
+        self.send_log(&format!("Handshake with peer: {}", addr))
+            .await;
 
         Ok(true)
     }
@@ -202,7 +203,7 @@ impl Manager {
                 UnchokeCmd::SendInterestedAndRequest {
                     index,
                     piece_length: self.piece_length(index),
-                    piece_hash: self.metainfo.pieces()[index],
+                    piece_hash: *self.metainfo.piece(index),
                 }
             }
             None => UnchokeCmd::SendNotInterested,
@@ -303,7 +304,7 @@ impl Manager {
     }
 
     fn choose_piece(&self, pieces: &Vec<bool>) -> Option<usize> {
-        let mut v: Vec<u32> = vec![0; self.metainfo.pieces().len()];
+        let mut v: Vec<u32> = vec![0; self.metainfo.pieces_num()];
 
         for (_, peer) in self.peers.iter() {
             for (index, have) in peer.pieces.iter().enumerate() {
@@ -336,7 +337,7 @@ impl Manager {
     }
 
     fn piece_length(&self, index: usize) -> usize {
-        if index < self.metainfo.pieces().len() - 1 {
+        if index < self.metainfo.pieces_num() - 1 {
             return self.metainfo.piece_length();
         }
 
@@ -386,7 +387,7 @@ impl Manager {
 
             // Write pieces/chunks
             for idx in start.file_index..end.file_index {
-                let name = utils::hash_to_string(&self.metainfo.pieces()[idx]) + ".piece";
+                let name = utils::hash_to_string(&self.metainfo.piece(idx)) + ".piece";
                 let reader = &mut BufReader::new(File::open(name)?);
 
                 if idx == start.file_index {
@@ -399,7 +400,7 @@ impl Manager {
             }
 
             // Write last chunk
-            let name = utils::hash_to_string(&self.metainfo.pieces()[end.file_index]) + ".piece";
+            let name = utils::hash_to_string(&self.metainfo.piece(end.file_index)) + ".piece";
             let reader = &mut BufReader::new(File::open(name)?);
 
             let mut buffer = vec![0; end.byte_index];
