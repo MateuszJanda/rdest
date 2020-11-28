@@ -161,46 +161,48 @@ impl Manager {
             return Ok(());
         }
 
-        // let is_seed_mode = self.is_seed_mode(); // TODO
+        if !self.is_seeder_mode() {
+            let mut a: Vec<(String, f32)> = self
+                .peers
+                .iter()
+                .map(|(addr, peer)| (addr.clone(), peer.download_rate.unwrap()))
+                .collect();
 
-        let mut a: Vec<(String, f32)> = self
-            .peers
-            .iter()
-            .map(|(addr, peer)| (addr.clone(), peer.download_rate.unwrap()))
-            .collect();
+            // In descending order
+            a.sort_by(|(_, dr1), (_, dr2)| dr2.partial_cmp(&dr1).unwrap());
 
-        // In descending order
-        a.sort_by(|(_, dr1), (_, dr2)| dr2.partial_cmp(&dr1).unwrap());
+            let mut hhh: HashMap<String, bool> = HashMap::new();
 
-        let mut hhh: HashMap<String, bool> = HashMap::new();
+            let mut count = 0;
+            for (addr, _) in a.iter() {
+                let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
 
-        let mut count = 0;
-        for (addr, _) in a.iter() {
-            let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-
-            if peer.am_choked == false && !peer.optimistic_unchoke {
-                if count >= MAX_UNCHOKED {
-                    hhh.insert(addr.clone(), true);
-                    peer.am_choked = true;
-                }
-                count += 1;
-            } else if peer.am_choked == true {
-                if count < MAX_UNCHOKED {
-                    hhh.insert(addr.clone(), false);
-                    peer.am_choked = false;
+                if peer.am_choked == false && !peer.optimistic_unchoke {
+                    if count >= MAX_UNCHOKED {
+                        hhh.insert(addr.clone(), true);
+                        peer.am_choked = true;
+                    }
                     count += 1;
+                } else if peer.am_choked == true && peer.interested {
+                    if count < MAX_UNCHOKED {
+                        hhh.insert(addr.clone(), false);
+                        peer.am_choked = false;
+                        count += 1;
+                    }
                 }
             }
-        }
 
-        let _ = self
-            .broad_ch
-            .send(BroadCmd::ChangeOwnStatus { am_choked_map: hhh });
+            let _ = self
+                .broad_ch
+                .send(BroadCmd::ChangeOwnStatus { am_choked_map: hhh });
+        } else {
+            // TODO
+        }
 
         Ok(())
     }
 
-    fn is_seed_mode(&self) -> bool {
+    fn is_seeder_mode(&self) -> bool {
         self.pieces_status
             .iter()
             .all(|status| *status == Status::Have)
