@@ -112,8 +112,8 @@ pub struct Handler {
     peer_id: Option<[u8; HASH_SIZE]>,
     info_hash: [u8; HASH_SIZE],
     pieces_num: usize,
-    piece_send: Option<PieceSend>,
-    piece_recv: Option<PieceRecv>,
+    piece_tx: Option<PieceTx>,
+    piece_rx: Option<PieceRx>,
     peer_status: Status,
     stats: Stats,
     msg_buff: Vec<Frame>,
@@ -121,12 +121,12 @@ pub struct Handler {
     broad_ch: broadcast::Receiver<BroadCmd>,
 }
 
-struct PieceSend {
+struct PieceTx {
     index: usize,
     buff: Vec<u8>,
 }
 
-struct PieceRecv {
+struct PieceRx {
     index: usize,
     hash: [u8; HASH_SIZE],
     buff: Vec<u8>,
@@ -145,9 +145,9 @@ struct Stats {
     rejected_piece: u32,
 }
 
-impl PieceRecv {
-    fn new(index: usize, piece_length: usize, piece_hash: &[u8; HASH_SIZE]) -> PieceRecv {
-        PieceRecv {
+impl PieceRx {
+    fn new(index: usize, piece_length: usize, piece_hash: &[u8; HASH_SIZE]) -> PieceRx {
+        PieceRx {
             index,
             hash: *piece_hash,
             buff: vec![0; piece_length],
@@ -221,8 +221,8 @@ impl Handler {
                     peer_id,
                     info_hash,
                     pieces_num,
-                    piece_send: None,
-                    piece_recv: None,
+                    piece_tx: None,
+                    piece_rx: None,
                     peer_status: Status {
                         choked: true,
                         interested: false,
@@ -239,7 +239,7 @@ impl Handler {
                     Err(e) => e.to_string(),
                 };
 
-                let index = handler.piece_recv.map_or(None, |p| Some(p.index));
+                let index = handler.piece_rx.map_or(None, |p| Some(p.index));
                 Self::kill_req(
                     &handler.connection.addr,
                     &index,
@@ -429,13 +429,13 @@ impl Handler {
         &mut self,
         request: Request,
     ) -> Result<bool, Box<dyn std::error::Error>> {
-        match &self.piece_send {
-            Some(piece_send) => request.validate(Some(piece_send.buff.len()), self.pieces_num)?,
+        match &self.piece_tx {
+            Some(piece_tx) => request.validate(Some(piece_tx.buff.len()), self.pieces_num)?,
             None => request.validate(None, self.pieces_num)?,
         }
 
-        match &self.piece_send {
-            Some(piece_send) if piece_send.index == request.index() => {
+        match &self.piece_tx {
+            Some(piece_tx) if piece_tx.index == request.index() => {
                 self.send_piece(
                     request.index(),
                     request.block_begin(),
@@ -451,32 +451,32 @@ impl Handler {
 
     async fn handle_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
         // Verify message
-        let piece_recv = self.piece_recv.as_mut().ok_or(Error::PieceNotRequested)?;
-        if !piece_recv
+        let piece_rx = self.piece_rx.as_mut().ok_or(Error::PieceNotRequested)?;
+        if !piece_rx
             .requested
             .iter()
             .any(|(block_begin, block_length)| {
                 piece
-                    .validate(piece_recv.index, *block_begin, *block_length)
+                    .validate(piece_rx.index, *block_begin, *block_length)
                     .is_ok()
             })
         {
-            println!("handle_piece {:?}", piece_recv.requested);
+            println!("handle_piece {:?}", piece_rx.requested);
             return Err(Error::BlockNotRequested.into());
         }
 
         // Removed piece from "requested" queue
-        piece_recv.requested.retain(|(block_begin, block_length)| {
+        piece_rx.requested.retain(|(block_begin, block_length)| {
             !(*block_begin == piece.block_begin() && *block_length == piece.block_length())
         });
 
         // Save piece block
         self.stats.update_downloaded(piece.block_length());
-        piece_recv.buff[piece.block_begin()..piece.block_begin() + piece.block_length()]
+        piece_rx.buff[piece.block_begin()..piece.block_begin() + piece.block_length()]
             .copy_from_slice(&piece.block());
 
         // Send new request or call manager to decide
-        if piece_recv.left.is_empty() && piece_recv.requested.is_empty() {
+        if piece_rx.left.is_empty() && piece_rx.requested.is_empty() {
             if !self.verify_piece_hash() {
                 self.stats.update_rejected_piece();
                 return Ok(true);
@@ -540,7 +540,7 @@ impl Handler {
                 piece_length,
                 piece_hash,
             } => {
-                self.piece_recv = Some(PieceRecv::new(index, piece_length, &piece_hash));
+                self.piece_rx = Some(PieceRx::new(index, piece_length, &piece_hash));
                 self.connection.send_msg(&Interested::new()).await?;
 
                 // BEP3 suggests send more than one request to get good better TCP performance (pipeline)
@@ -635,7 +635,7 @@ impl Handler {
                 piece_length,
                 piece_hash,
             } => {
-                self.piece_recv = Some(PieceRecv::new(index, piece_length, &piece_hash));
+                self.piece_rx = Some(PieceRx::new(index, piece_length, &piece_hash));
                 self.send_request().await?;
             }
             PieceDoneCmd::PrepareKill => return Ok(false),
@@ -677,12 +677,12 @@ impl Handler {
     }
 
     async fn send_request(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if let Some(piece_recv) = self.piece_recv.as_mut() {
-            if let Some((block_begin, block_len)) = piece_recv.left.pop_front() {
-                piece_recv.requested.push_back((block_begin, block_len));
+        if let Some(piece_rx) = self.piece_rx.as_mut() {
+            if let Some((block_begin, block_len)) = piece_rx.left.pop_front() {
+                piece_rx.requested.push_back((block_begin, block_len));
 
                 println!("Wysyłam kolejny request");
-                let msg = Request::new(piece_recv.index, block_begin, block_len);
+                let msg = Request::new(piece_rx.index, block_begin, block_len);
                 self.connection.send_msg(&msg).await?;
             }
         }
@@ -696,13 +696,13 @@ impl Handler {
         block_begin: usize,
         block_length: usize,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        match &self.piece_send {
-            Some(piece_send) => {
+        match &self.piece_tx {
+            Some(piece_tx) => {
                 self.connection
                     .send_msg(&Piece::new(
                         index,
                         block_begin,
-                        piece_send.buff[block_begin..block_begin + block_length].to_vec(),
+                        piece_tx.buff[block_begin..block_begin + block_length].to_vec(),
                     ))
                     .await?;
                 Ok(())
@@ -712,13 +712,13 @@ impl Handler {
     }
 
     fn verify_piece_hash(&self) -> bool {
-        match self.piece_recv.as_ref() {
-            Some(piece_recv) => {
+        match self.piece_rx.as_ref() {
+            Some(piece_rx) => {
                 let mut m = sha1::Sha1::new();
-                m.update(piece_recv.buff.as_ref());
-                println!("Checksum: {:?} {:?}", m.digest().bytes(), piece_recv.hash);
+                m.update(piece_rx.buff.as_ref());
+                println!("Checksum: {:?} {:?}", m.digest().bytes(), piece_rx.hash);
 
-                return m.digest().bytes() == piece_recv.hash;
+                return m.digest().bytes() == piece_rx.hash;
             }
             None => false,
         }
@@ -732,7 +732,7 @@ impl Handler {
         let name = utils::hash_to_string(piece_hash) + ".piece";
         match fs::read(name) {
             Ok(data) => {
-                self.piece_send = Some(PieceSend { index, buff: data });
+                self.piece_tx = Some(PieceTx { index, buff: data });
                 Ok(())
             }
             Err(_) => Err(Error::FileNotFound),
@@ -740,12 +740,12 @@ impl Handler {
     }
 
     fn save_piece_to_file(&mut self) {
-        let piece_recv = self
-            .piece_recv
+        let piece_rx = self
+            .piece_rx
             .take()
             .ok_or(Error::PieceBuffMissing)
             .expect("Saving to file: piece data not exist after validation");
-        let name = utils::hash_to_string(&piece_recv.hash) + ".piece";
-        fs::write(name, &piece_recv.buff).unwrap();
+        let name = utils::hash_to_string(&piece_rx.hash) + ".piece";
+        fs::write(name, &piece_rx.buff).unwrap();
     }
 }
