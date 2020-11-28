@@ -129,7 +129,7 @@ impl Manager {
         loop {
             tokio::select! {
                 Some(cmd) = self.job_rx_ch.recv() => {
-                    if self.handle_job_command(cmd).await.expect("Can't handle command") == false {
+                    if self.handle_job_cmd(cmd).await.expect("Can't handle command") == false {
                         break;
                     }
                 }
@@ -137,7 +137,7 @@ impl Manager {
         }
     }
 
-    async fn handle_job_command(&mut self, cmd: JobCmd) -> Result<bool, Error> {
+    async fn handle_job_cmd(&mut self, cmd: JobCmd) -> Result<bool, Error> {
         match cmd {
             JobCmd::Init { addr, resp_ch } => self.handle_init(&addr, resp_ch).await,
             JobCmd::RecvChoke { addr } => self.handle_choke(&addr),
@@ -271,7 +271,7 @@ impl Manager {
             None => false,
         };
 
-        let am_choked = false;
+        let am_choked = false; // TODO
 
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.am_interested = am_interested;

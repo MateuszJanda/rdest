@@ -19,7 +19,7 @@ const MAX_STATS_QUEUE_SIZE: usize = 2;
 #[derive(Debug, Clone)]
 pub enum BroadCmd {
     SendHave { index: usize },
-    Change, // TODO
+    ChangeState { am_choked: Option<bool> },
 }
 #[derive(Debug)]
 pub enum JobCmd {
@@ -700,7 +700,11 @@ impl Handler {
                 true => self.msg_buff.push(Frame::Have(Have::new(index))),
                 false => self.connection.send_msg(&Have::new(index)).await?,
             },
-            BroadCmd::Change => (),
+            BroadCmd::ChangeState { am_choked } => match am_choked {
+                Some(true) => self.connection.send_msg(&Choke::new()).await?,
+                Some(false) => self.connection.send_msg(&Unchoke::new()).await?,
+                None => (),
+            },
         }
 
         Ok(())
