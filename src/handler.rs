@@ -282,9 +282,9 @@ impl Handler {
             tokio::select! {
                 _ = keep_alive_timer.tick() => self.timeout_keep_alive().await?,
                 _ = sync_stats_timer.tick() => self.timeout_sync_stats().await?,
-                cmd = self.broad_ch.recv() => self.handle_manager_cmd(cmd?).await?,
-                frame = self.connection.recv_frame() => {
-                    if self.handle_frame(frame?).await? == false {
+                Ok(cmd) = self.broad_ch.recv() => self.handle_manager_cmd(cmd).await?,
+                Ok(frame) = self.connection.recv_frame() => {
+                    if self.handle_frame(frame).await? == false {
                         println!("handle_frame - koncze normalnie");
                         break;
                     }

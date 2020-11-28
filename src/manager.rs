@@ -75,11 +75,7 @@ impl Manager {
         self.spawn_view();
         self.spawn_jobs();
 
-        while let Some(cmd) = self.job_rx_ch.recv().await {
-            if self.event_loop(cmd).await.expect("Can't handle event") == false {
-                break;
-            }
-        }
+        self.event_loop().await;
     }
 
     fn spawn_view(&mut self) {
@@ -127,7 +123,19 @@ impl Manager {
         self.peers.insert(addr, peer);
     }
 
-    async fn event_loop(&mut self, cmd: JobCmd) -> Result<bool, Error> {
+    async fn event_loop(&mut self) {
+        loop {
+            tokio::select! {
+                Some(cmd) = self.job_rx_ch.recv() => {
+                    if self.handle_job_command(cmd).await.expect("Can't handle command") == false {
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    async fn handle_job_command(&mut self, cmd: JobCmd) -> Result<bool, Error> {
         match cmd {
             JobCmd::Init { addr, resp_ch } => self.handle_init(&addr, resp_ch).await,
             JobCmd::RecvChoke { addr } => self.handle_choke(&addr),
