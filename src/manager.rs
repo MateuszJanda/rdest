@@ -233,6 +233,7 @@ impl Manager {
     }
 
     fn timeout_optimistic_unchoke(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        // TODO: possible fibrillation when in same second change state and optimistic unchoke happen
         let x = self
             .peers
             .iter()
@@ -400,20 +401,40 @@ impl Manager {
             None => false,
         };
 
-        let am_choked = false; // TODO
+        let peer = self.peers.get(addr).ok_or(Error::PeerNotFound)?;
+        let am_choked = if self.all_unchoked() < MAX_UNCHOKED {
+            if peer.am_choked {
+                Some(false)
+            } else {
+                None
+            }
+        } else {
+            None
+        };
 
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.am_interested = am_interested;
-        peer.am_choked = am_choked;
+
+        match am_choked {
+            Some(v) => peer.am_choked = v,
+            None => (),
+        }
 
         let cmd = BitfieldCmd::SendState {
-            am_choked: Some(am_choked),
+            am_choked,
             am_interested,
         };
 
         let _ = &resp_ch.send(cmd);
 
         Ok(true)
+    }
+
+    fn all_unchoked(&self) -> u32 {
+        self.peers
+            .iter()
+            .filter(|(_, peer)| peer.am_choked == false && peer.optimistic_unchoke == true)
+            .count() as u32
     }
 
     fn handle_request(
