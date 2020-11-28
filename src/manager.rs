@@ -163,45 +163,58 @@ impl Manager {
             return Ok(());
         }
 
-        if !self.is_seeder_mode() {
-            let mut a: Vec<(String, f32)> = self
-                .peers
-                .iter()
-                .map(|(addr, peer)| (addr.clone(), peer.download_rate.unwrap()))
-                .collect();
+        let cmd = match self.is_seeder_mode() {
+            true => {
+                let mut a: Vec<(String, f32)> = self
+                    .peers
+                    .iter()
+                    .map(|(addr, peer)| (addr.clone(), peer.download_rate.unwrap()))
+                    .collect();
 
-            // In descending order
-            a.sort_by(|(_, dr1), (_, dr2)| dr2.partial_cmp(&dr1).unwrap());
-
-            let mut hhh: HashMap<String, bool> = HashMap::new();
-
-            let mut count = 0;
-            for (addr, _) in a.iter() {
-                let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-
-                if peer.am_choked == false && !peer.optimistic_unchoke {
-                    if count >= MAX_UNCHOKED {
-                        hhh.insert(addr.clone(), true);
-                        peer.am_choked = true;
-                    }
-                    count += 1;
-                } else if peer.am_choked == true && peer.interested {
-                    if count < MAX_UNCHOKED {
-                        hhh.insert(addr.clone(), false);
-                        peer.am_choked = false;
-                        count += 1;
-                    }
-                }
+                self.fff(&mut a)?
             }
+            false => {
+                let mut a: Vec<(String, f32)> = self
+                    .peers
+                    .iter()
+                    .map(|(addr, peer)| (addr.clone(), peer.uploaded_rate.unwrap()))
+                    .collect();
 
-            let _ = self
-                .broad_ch
-                .send(BroadCmd::ChangeOwnStatus { am_choked_map: hhh });
-        } else {
-            // TODO
-        }
+                self.fff(&mut a)?
+            }
+        };
+
+        let _ = self.broad_ch.send(cmd);
 
         Ok(())
+    }
+
+    fn fff(&mut self, a: &mut Vec<(String, f32)>) -> Result<BroadCmd, Box<dyn std::error::Error>> {
+        // In descending order
+        a.sort_by(|(_, dr1), (_, dr2)| dr2.partial_cmp(&dr1).unwrap());
+
+        let mut hhh: HashMap<String, bool> = HashMap::new();
+
+        let mut count = 0;
+        for (addr, _) in a.iter() {
+            let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
+
+            if peer.am_choked == false && !peer.optimistic_unchoke {
+                if count >= MAX_UNCHOKED {
+                    hhh.insert(addr.clone(), true);
+                    peer.am_choked = true;
+                }
+                count += 1;
+            } else if peer.am_choked == true && peer.interested {
+                if count < MAX_UNCHOKED {
+                    hhh.insert(addr.clone(), false);
+                    peer.am_choked = false;
+                    count += 1;
+                }
+            }
+        }
+
+        Ok(BroadCmd::ChangeOwnStatus { am_choked_map: hhh })
     }
 
     fn is_seeder_mode(&self) -> bool {
