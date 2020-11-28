@@ -13,9 +13,13 @@ use std::io::{BufReader, BufWriter, Read, Seek, Write};
 use std::path::Path;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::task::JoinHandle;
+use tokio::time;
+use tokio::time::{Duration, Instant, Interval};
 
 const JOB_CHANNEL_SIZE: usize = 64;
 const BROADCAST_CHANNEL_SIZE: usize = 32;
+const CHANGE_STATE_INTERVAL_SEC: u64 = 10;
+const MAX_UNCHOKED: u32 = 3;
 
 pub struct Manager {
     own_id: [u8; HASH_SIZE],
@@ -38,7 +42,8 @@ struct Peer {
     am_choked: bool,
     interested: bool,
     choked: bool,
-    download_rate: f32,
+    optimistic_unchoke: bool,
+    download_rate: Option<f32>,
     rejected_piece: u32,
 }
 
@@ -117,7 +122,8 @@ impl Manager {
             am_choked: true,
             interested: false,
             choked: true,
-            download_rate: 0.0,
+            optimistic_unchoke: false,
+            download_rate: None,
             rejected_piece: 0,
         };
 
@@ -126,8 +132,11 @@ impl Manager {
     }
 
     async fn event_loop(&mut self) {
+        let mut change_state_timer = self.start_change_state_timer();
+
         loop {
             tokio::select! {
+                _ = change_state_timer.tick() => self.timeout_change_state().expect("Can't update state"),
                 Some(cmd) = self.job_rx_ch.recv() => {
                     if self.handle_job_cmd(cmd).await.expect("Can't handle command") == false {
                         break;
@@ -135,6 +144,66 @@ impl Manager {
                 }
             }
         }
+    }
+
+    fn start_change_state_timer(&self) -> Interval {
+        let start = Instant::now() + Duration::from_secs(CHANGE_STATE_INTERVAL_SEC);
+        time::interval_at(start, Duration::from_secs(CHANGE_STATE_INTERVAL_SEC))
+    }
+
+    fn timeout_change_state(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        // If not all peers report their stats do nothing
+        if !self
+            .peers
+            .iter()
+            .all(|(_, peer)| peer.download_rate.is_some())
+        {
+            return Ok(());
+        }
+
+        // let is_seed_mode = self.is_seed_mode(); // TODO
+
+        let mut a: Vec<(String, f32)> = self
+            .peers
+            .iter()
+            .map(|(addr, peer)| (addr.clone(), peer.download_rate.unwrap()))
+            .collect();
+
+        // In descending order
+        a.sort_by(|(_, dr1), (_, dr2)| dr2.partial_cmp(&dr1).unwrap());
+
+        let mut hhh: HashMap<String, bool> = HashMap::new();
+
+        let mut count = 0;
+        for (addr, _) in a.iter() {
+            let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
+
+            if peer.am_choked == false && !peer.optimistic_unchoke {
+                if count >= MAX_UNCHOKED {
+                    hhh.insert(addr.clone(), true);
+                    peer.am_choked = true;
+                }
+                count += 1;
+            } else if peer.am_choked == true {
+                if count < MAX_UNCHOKED {
+                    hhh.insert(addr.clone(), false);
+                    peer.am_choked = false;
+                    count += 1;
+                }
+            }
+        }
+
+        let _ = self
+            .broad_ch
+            .send(BroadCmd::ChangeOwnStatus { am_choked_map: hhh });
+
+        Ok(())
+    }
+
+    fn is_seed_mode(&self) -> bool {
+        self.pieces_status
+            .iter()
+            .all(|status| *status == Status::Have)
     }
 
     async fn handle_job_cmd(&mut self, cmd: JobCmd) -> Result<bool, Error> {
@@ -162,7 +231,7 @@ impl Manager {
                 addr,
                 downloaded_rate,
                 rejected_piece,
-            } => self.handle_sync_stats(&addr, downloaded_rate, rejected_piece),
+            } => self.handle_sync_stats(&addr, &downloaded_rate, rejected_piece),
             JobCmd::KillReq {
                 addr,
                 index,
@@ -346,11 +415,11 @@ impl Manager {
     fn handle_sync_stats(
         &mut self,
         addr: &String,
-        downloaded_rate: f32,
+        downloaded_rate: &Option<f32>,
         rejected_piece: u32,
     ) -> Result<bool, Error> {
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-        peer.download_rate = downloaded_rate;
+        peer.download_rate = *downloaded_rate;
         peer.rejected_piece = rejected_piece;
         Ok(true)
     }

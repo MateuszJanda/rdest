@@ -5,7 +5,7 @@ use crate::frame::{
     Unchoke,
 };
 use crate::{utils, Error};
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::fs;
 use tokio::net::TcpStream;
 use tokio::sync::{broadcast, mpsc, oneshot};
@@ -18,8 +18,12 @@ const MAX_STATS_QUEUE_SIZE: usize = 2;
 
 #[derive(Debug, Clone)]
 pub enum BroadCmd {
-    SendHave { index: usize },
-    ChangeOwnStatus { am_choked: Option<bool> },
+    SendHave {
+        index: usize,
+    },
+    ChangeOwnStatus {
+        am_choked_map: HashMap<String, bool>,
+    },
 }
 #[derive(Debug)]
 pub enum JobCmd {
@@ -62,7 +66,7 @@ pub enum JobCmd {
     },
     SyncStats {
         addr: String,
-        downloaded_rate: f32,
+        downloaded_rate: Option<f32>,
         rejected_piece: u32,
     },
     KillReq {
@@ -205,8 +209,15 @@ impl Stats {
         self.rejected_piece = 0;
     }
 
-    fn downloaded_rate(&self) -> f32 {
-        self.downloaded.iter().map(|d| *d as u32).sum::<u32>() as f32 / self.downloaded.len() as f32
+    fn downloaded_rate(&self) -> Option<f32> {
+        if self.downloaded.len() != MAX_STATS_QUEUE_SIZE {
+            return None;
+        }
+
+        Some(
+            self.downloaded.iter().map(|d| *d as u32).sum::<u32>() as f32
+                / self.downloaded.len() as f32,
+        )
     }
 }
 
@@ -700,11 +711,13 @@ impl Handler {
                 true => self.msg_buff.push(Frame::Have(Have::new(index))),
                 false => self.connection.send_msg(&Have::new(index)).await?,
             },
-            BroadCmd::ChangeOwnStatus { am_choked } => match am_choked {
-                Some(true) => self.connection.send_msg(&Choke::new()).await?,
-                Some(false) => self.connection.send_msg(&Unchoke::new()).await?,
-                None => (),
-            },
+            BroadCmd::ChangeOwnStatus { am_choked_map } => {
+                match am_choked_map.get(&self.connection.addr) {
+                    Some(true) => self.connection.send_msg(&Choke::new()).await?,
+                    Some(false) => self.connection.send_msg(&Unchoke::new()).await?,
+                    None => (),
+                }
+            }
         }
 
         Ok(())
