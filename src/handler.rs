@@ -1,7 +1,8 @@
 use crate::connection::Connection;
 use crate::constant::{HASH_SIZE, PIECE_BLOCK_SIZE};
 use crate::frame::{
-    Bitfield, Frame, Handshake, Have, Interested, KeepAlive, NotInterested, Piece, Request,
+    Bitfield, Choke, Frame, Handshake, Have, Interested, KeepAlive, NotInterested, Piece, Request,
+    Unchoke,
 };
 use crate::{utils, Error};
 use std::collections::VecDeque;
@@ -46,6 +47,7 @@ pub enum JobCmd {
     RecvBitfield {
         addr: String,
         bitfield: Bitfield,
+        resp_ch: oneshot::Sender<BitfieldCmd>,
     },
     RecvRequest {
         addr: String,
@@ -76,6 +78,24 @@ pub enum InitCmd {
 }
 
 #[derive(Debug)]
+pub enum UnchokeCmd {
+    SendInterestedAndRequest {
+        index: usize,
+        piece_length: usize,
+        piece_hash: [u8; HASH_SIZE],
+    },
+    SendNotInterested,
+}
+
+#[derive(Debug)]
+pub enum BitfieldCmd {
+    SendState {
+        am_choked: Option<bool>,
+        am_interested: bool,
+    },
+}
+
+#[derive(Debug)]
 pub enum RequestCmd {
     LoadAndSendPiece {
         index: usize,
@@ -84,16 +104,6 @@ pub enum RequestCmd {
         piece_hash: [u8; HASH_SIZE],
     },
     Ignore,
-}
-
-#[derive(Debug)]
-pub enum UnchokeCmd {
-    SendInterestedAndRequest {
-        index: usize,
-        piece_length: usize,
-        piece_hash: [u8; HASH_SIZE],
-    },
-    SendNotInterested,
 }
 
 #[derive(Debug)]
@@ -579,12 +589,32 @@ impl Handler {
         &mut self,
         bitfield: Bitfield,
     ) -> Result<(), Box<dyn std::error::Error>> {
+        let (resp_tx, resp_rx) = oneshot::channel();
         self.job_ch
             .send(JobCmd::RecvBitfield {
                 addr: self.connection.addr.clone(),
                 bitfield,
+                resp_ch: resp_tx,
             })
             .await?;
+
+        match resp_rx.await? {
+            BitfieldCmd::SendState {
+                am_choked,
+                am_interested,
+            } => {
+                match am_choked {
+                    Some(true) => self.connection.send_msg(&Choke::new()).await?,
+                    Some(false) => self.connection.send_msg(&Unchoke::new()).await?,
+                    None => (),
+                }
+
+                match am_interested {
+                    true => self.connection.send_msg(&Interested::new()).await?,
+                    false => self.connection.send_msg(&NotInterested::new()).await?,
+                }
+            }
+        }
 
         Ok(())
     }

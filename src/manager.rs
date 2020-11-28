@@ -1,6 +1,8 @@
 use crate::constant::HASH_SIZE;
 use crate::frame::Bitfield;
-use crate::handler::{BroadCmd, Handler, InitCmd, JobCmd, PieceDoneCmd, RequestCmd, UnchokeCmd};
+use crate::handler::{
+    BitfieldCmd, BroadCmd, Handler, InitCmd, JobCmd, PieceDoneCmd, RequestCmd, UnchokeCmd,
+};
 use crate::progress::{Progress, ViewCmd};
 use crate::{utils, Error, Metainfo, TrackerResp};
 use rand::seq::SliceRandom;
@@ -33,9 +35,9 @@ struct Peer {
     job: Option<JoinHandle<()>>,
     index: Option<usize>,
     am_interested: bool,
-    am_choke: bool,
+    am_choked: bool,
     interested: bool,
-    choke: bool,
+    choked: bool,
     download_rate: f32,
     rejected_piece: u32,
 }
@@ -112,9 +114,9 @@ impl Manager {
             job: Some(job),
             index: None,
             am_interested: false,
-            am_choke: true,
+            am_choked: true,
             interested: false,
-            choke: true,
+            choked: true,
             download_rate: 0.0,
             rejected_piece: 0,
         };
@@ -143,7 +145,11 @@ impl Manager {
             JobCmd::RecvInterested { addr } => self.handle_interested(&addr),
             JobCmd::RecvNotInterested { addr } => self.handle_not_interested(&addr),
             JobCmd::RecvHave { addr, index } => self.handle_have(&addr, index),
-            JobCmd::RecvBitfield { addr, bitfield } => self.handle_bitfield(&addr, &bitfield),
+            JobCmd::RecvBitfield {
+                addr,
+                bitfield,
+                resp_ch,
+            } => self.handle_bitfield(&addr, &bitfield, resp_ch),
             JobCmd::RecvRequest {
                 addr,
                 index,
@@ -187,7 +193,7 @@ impl Manager {
 
     fn handle_choke(&mut self, addr: &String) -> Result<bool, Error> {
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-        peer.choke = true;
+        peer.choked = true;
 
         match peer.index {
             Some(index) if self.pieces_status[index] == Status::Reserved => {
@@ -243,9 +249,37 @@ impl Manager {
         Ok(true)
     }
 
-    fn handle_bitfield(&mut self, addr: &String, bitfield: &Bitfield) -> Result<bool, Error> {
+    fn handle_bitfield(
+        &mut self,
+        addr: &String,
+        bitfield: &Bitfield,
+        resp_ch: oneshot::Sender<BitfieldCmd>,
+    ) -> Result<bool, Error> {
+        {
+            let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
+            peer.pieces.copy_from_slice(&bitfield.to_vec());
+        }
+
+        // BEP3 "whenever a downloader doesn't have something they currently would ask a peer for in
+        // unchoked, they must express lack of interest, despite being choked"
+        let index = self.choose_piece(&bitfield.to_vec());
+        let am_interested = match index {
+            Some(_) => true,
+            None => false,
+        };
+
+        let am_choked = false;
+
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-        peer.pieces.copy_from_slice(&bitfield.to_vec());
+        peer.am_interested = am_interested;
+        peer.am_choked = am_choked;
+
+        let cmd = BitfieldCmd::SendState {
+            am_choked: Some(am_choked),
+            am_interested,
+        };
+
+        let _ = &resp_ch.send(cmd);
 
         Ok(true)
     }
@@ -259,7 +293,7 @@ impl Manager {
         resp_ch: oneshot::Sender<RequestCmd>,
     ) -> Result<bool, Error> {
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-        if peer.am_choke {
+        if peer.am_choked {
             let _ = resp_ch.send(RequestCmd::Ignore);
             return Ok(true);
         }
