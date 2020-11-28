@@ -67,6 +67,7 @@ pub enum JobCmd {
     SyncStats {
         addr: String,
         downloaded_rate: Option<f32>,
+        uploaded_rate: Option<f32>,
         rejected_piece: u32,
     },
     KillReq {
@@ -156,6 +157,7 @@ struct Status {
 
 struct Stats {
     downloaded: VecDeque<usize>,
+    uploaded: VecDeque<usize>,
     rejected_piece: u32,
 }
 
@@ -189,12 +191,17 @@ impl Stats {
     fn new() -> Stats {
         Stats {
             downloaded: VecDeque::from(vec![0]),
+            uploaded: VecDeque::from(vec![0]),
             rejected_piece: 0,
         }
     }
 
     fn update_downloaded(&mut self, amount: usize) {
         self.downloaded[0] += amount;
+    }
+
+    fn update_uploaded(&mut self, amount: usize) {
+        self.uploaded[0] += amount;
     }
 
     fn update_rejected_piece(&mut self) {
@@ -204,8 +211,10 @@ impl Stats {
     fn shift(&mut self) {
         if self.downloaded.len() == MAX_STATS_QUEUE_SIZE {
             self.downloaded.pop_back();
+            self.uploaded.pop_back();
         }
         self.downloaded.push_front(0);
+        self.uploaded.push_front(0);
         self.rejected_piece = 0;
     }
 
@@ -217,6 +226,17 @@ impl Stats {
         Some(
             self.downloaded.iter().map(|d| *d as u32).sum::<u32>() as f32
                 / self.downloaded.len() as f32,
+        )
+    }
+
+    fn uploaded_rate(&self) -> Option<f32> {
+        if self.uploaded.len() != MAX_STATS_QUEUE_SIZE {
+            return None;
+        }
+
+        Some(
+            self.uploaded.iter().map(|d| *d as u32).sum::<u32>() as f32
+                / self.uploaded.len() as f32,
         )
     }
 }
@@ -491,8 +511,8 @@ impl Handler {
             !(*block_begin == piece.block_begin() && *block_length == piece.block_length())
         });
 
-        // Save piece block
         self.stats.update_downloaded(piece.block_length());
+        // Save piece block
         piece_rx.buff[piece.block_begin()..piece.block_begin() + piece.block_length()]
             .copy_from_slice(&piece.block());
 
@@ -690,6 +710,7 @@ impl Handler {
             .send(JobCmd::SyncStats {
                 addr: self.connection.addr.clone(),
                 downloaded_rate: self.stats.downloaded_rate(),
+                uploaded_rate: self.stats.uploaded_rate(),
                 rejected_piece: self.stats.rejected_piece,
             })
             .await?;
@@ -745,6 +766,7 @@ impl Handler {
     ) -> Result<(), Box<dyn std::error::Error>> {
         match &self.piece_tx {
             Some(piece_tx) => {
+                self.stats.update_uploaded(block_length);
                 self.connection
                     .send_msg(&Piece::new(
                         index,

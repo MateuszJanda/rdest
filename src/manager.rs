@@ -44,6 +44,7 @@ struct Peer {
     choked: bool,
     optimistic_unchoke: bool,
     download_rate: Option<f32>,
+    uploaded_rate: Option<f32>,
     rejected_piece: u32,
 }
 
@@ -124,6 +125,7 @@ impl Manager {
             choked: true,
             optimistic_unchoke: false,
             download_rate: None,
+            uploaded_rate: None,
             rejected_piece: 0,
         };
 
@@ -153,10 +155,10 @@ impl Manager {
 
     fn timeout_change_state(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // If not all peers report their stats do nothing
-        if !self
+        if self
             .peers
             .iter()
-            .all(|(_, peer)| peer.download_rate.is_some())
+            .any(|(_, peer)| peer.download_rate.is_none() || peer.uploaded_rate.is_none())
         {
             return Ok(());
         }
@@ -232,8 +234,9 @@ impl Manager {
             JobCmd::SyncStats {
                 addr,
                 downloaded_rate,
+                uploaded_rate,
                 rejected_piece,
-            } => self.handle_sync_stats(&addr, &downloaded_rate, rejected_piece),
+            } => self.handle_sync_stats(&addr, &downloaded_rate, &uploaded_rate, rejected_piece),
             JobCmd::KillReq {
                 addr,
                 index,
@@ -418,10 +421,12 @@ impl Manager {
         &mut self,
         addr: &String,
         downloaded_rate: &Option<f32>,
+        uploaded_rate: &Option<f32>,
         rejected_piece: u32,
     ) -> Result<bool, Error> {
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.download_rate = *downloaded_rate;
+        peer.uploaded_rate = *uploaded_rate;
         peer.rejected_piece = rejected_piece;
         Ok(true)
     }
