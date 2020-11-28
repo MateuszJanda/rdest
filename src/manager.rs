@@ -249,6 +249,9 @@ impl Manager {
         Ok(true)
     }
 
+    // Sending NotInterested explicitly (this is default state) is mandatory according BEP3, but
+    // Interested should be send only after Unchoke. It appears that many clients unfortunately
+    // wait for this message (doesn't send Unchoke and send KeepAlive instead).
     fn handle_bitfield(
         &mut self,
         addr: &String,
