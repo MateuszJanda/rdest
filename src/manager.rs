@@ -97,6 +97,7 @@ impl Manager {
     }
 
     fn spawn_jobs(&mut self) {
+        // TODO: spwan MAX_UNCHOKED + 1 + 1 jobs
         let (addr, peer_id) = self.tracker.peers()[2].clone();
         let own_id = self.own_id.clone();
         let info_hash = *self.metainfo.info_hash();
@@ -139,6 +140,9 @@ impl Manager {
         let mut change_state_timer = self.start_change_state_timer();
         let mut optimistic_unchoke_timer = self.start_optimistic_unchoke_timer();
 
+        // TODO: add listen
+        // TODO: add tracker req
+        // TODO: add file extractor job
         loop {
             tokio::select! {
                 _ = change_state_timer.tick() => self.timeout_change_state().expect("Can't update state"),
@@ -341,6 +345,7 @@ impl Manager {
     ) -> Result<bool, Error> {
         let pieces = &self.peers[addr].pieces;
         let index = self.choose_piece(pieces);
+        // TODO: doesn't send interested twice
         let cmd = match index {
             Some(index) => {
                 self.pieces_status[index] = Status::Reserved;
@@ -368,6 +373,7 @@ impl Manager {
     }
 
     fn handle_not_interested(&mut self, addr: &String) -> Result<bool, Error> {
+        // TODO: if peer not interested and I'm not interested then can be killed
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.interested = false;
         Ok(true)
@@ -393,8 +399,8 @@ impl Manager {
             peer.pieces.copy_from_slice(&bitfield.to_vec());
         }
 
-        // BEP3 "whenever a downloader doesn't have something they currently would ask a peer for in
-        // unchoked, they must express lack of interest, despite being choked"
+        // BEP3 "whenever a downloader doesn't have something they currently would ask a peer for
+        // in unchoked, they must express lack of interest, despite being choked"
         let index = self.choose_piece(&bitfield.to_vec());
         let am_interested = match index {
             Some(_) => true,
@@ -503,6 +509,7 @@ impl Manager {
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.download_rate = *downloaded_rate;
         peer.uploaded_rate = *uploaded_rate;
+        // TODO: log this
         peer.rejected_piece = rejected_piece;
         Ok(true)
     }
