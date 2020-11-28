@@ -3,6 +3,7 @@ use crate::frame::Bitfield;
 use crate::handler::{
     BitfieldCmd, BroadCmd, Handler, InitCmd, JobCmd, PieceDoneCmd, RequestCmd, UnchokeCmd,
 };
+use crate::hashmap;
 use crate::progress::{Progress, ViewCmd};
 use crate::{utils, Error, Metainfo, TrackerResp};
 use rand::seq::SliceRandom;
@@ -19,6 +20,7 @@ use tokio::time::{Duration, Instant, Interval};
 const JOB_CHANNEL_SIZE: usize = 64;
 const BROADCAST_CHANNEL_SIZE: usize = 32;
 const CHANGE_STATE_INTERVAL_SEC: u64 = 10;
+const OPTIMISTIC_UNCHOKE_INTERVAL_SEC: u64 = 30;
 const MAX_UNCHOKED: u32 = 3;
 
 pub struct Manager {
@@ -135,10 +137,12 @@ impl Manager {
 
     async fn event_loop(&mut self) {
         let mut change_state_timer = self.start_change_state_timer();
+        let mut optimistic_unchoke_timer = self.start_optimistic_unchoke_timer();
 
         loop {
             tokio::select! {
                 _ = change_state_timer.tick() => self.timeout_change_state().expect("Can't update state"),
+                _ = optimistic_unchoke_timer.tick() => self.timeout_optimistic_unchoke().expect("Can't set optimistic unchoke"),
                 Some(cmd) = self.job_rx_ch.recv() => {
                     if self.handle_job_cmd(cmd).await.expect("Can't handle command") == false {
                         break;
@@ -151,6 +155,11 @@ impl Manager {
     fn start_change_state_timer(&self) -> Interval {
         let start = Instant::now() + Duration::from_secs(CHANGE_STATE_INTERVAL_SEC);
         time::interval_at(start, Duration::from_secs(CHANGE_STATE_INTERVAL_SEC))
+    }
+
+    fn start_optimistic_unchoke_timer(&self) -> Interval {
+        let start = Instant::now() + Duration::from_secs(OPTIMISTIC_UNCHOKE_INTERVAL_SEC);
+        time::interval_at(start, Duration::from_secs(OPTIMISTIC_UNCHOKE_INTERVAL_SEC))
     }
 
     fn timeout_change_state(&mut self) -> Result<(), Box<dyn std::error::Error>> {
@@ -221,6 +230,39 @@ impl Manager {
         self.pieces_status
             .iter()
             .all(|status| *status == Status::Have)
+    }
+
+    fn timeout_optimistic_unchoke(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let x = self
+            .peers
+            .iter()
+            .filter(|(_, peer)| peer.am_choked)
+            .map(|(addr, _)| addr.clone())
+            .collect::<Vec<String>>();
+
+        for (_, peer) in self
+            .peers
+            .iter_mut()
+            .filter(|(_, peer)| peer.optimistic_unchoke)
+        {
+            peer.optimistic_unchoke = false;
+            peer.am_choked = true;
+        }
+
+        match x.choose(&mut rand::thread_rng()) {
+            Some(addr) => {
+                let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
+                peer.optimistic_unchoke = true;
+                peer.am_choked = false;
+
+                let hhh = hashmap![addr.clone() => false];
+                let cmd = BroadCmd::ChangeOwnStatus { am_choked_map: hhh };
+                let _ = self.broad_ch.send(cmd);
+            }
+            None => (),
+        }
+
+        Ok(())
     }
 
     async fn handle_job_cmd(&mut self, cmd: JobCmd) -> Result<bool, Error> {
