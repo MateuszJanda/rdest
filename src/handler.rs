@@ -66,8 +66,8 @@ pub enum JobCmd {
     },
     SyncStats {
         addr: String,
-        downloaded_rate: Option<f32>,
-        uploaded_rate: Option<f32>,
+        downloaded_rate: Option<u32>,
+        uploaded_rate: Option<u32>,
         rejected_piece: u32,
     },
     KillReq {
@@ -218,26 +218,20 @@ impl Stats {
         self.rejected_piece = 0;
     }
 
-    fn downloaded_rate(&self) -> Option<f32> {
+    fn downloaded_rate(&self) -> Option<u32> {
         if self.downloaded.len() != MAX_STATS_QUEUE_SIZE {
             return None;
         }
 
-        Some(
-            self.downloaded.iter().map(|d| *d as u32).sum::<u32>() as f32
-                / self.downloaded.len() as f32,
-        )
+        Some(self.downloaded.iter().map(|d| *d as u32).sum::<u32>() / self.downloaded.len() as u32)
     }
 
-    fn uploaded_rate(&self) -> Option<f32> {
+    fn uploaded_rate(&self) -> Option<u32> {
         if self.uploaded.len() != MAX_STATS_QUEUE_SIZE {
             return None;
         }
 
-        Some(
-            self.uploaded.iter().map(|d| *d as u32).sum::<u32>() as f32
-                / self.uploaded.len() as f32,
-        )
+        Some(self.uploaded.iter().map(|d| *d as u32).sum::<u32>() / self.uploaded.len() as u32)
     }
 }
 

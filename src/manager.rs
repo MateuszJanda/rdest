@@ -45,8 +45,8 @@ struct Peer {
     interested: bool,
     choked: bool,
     optimistic_unchoke: bool,
-    download_rate: Option<f32>,
-    uploaded_rate: Option<f32>,
+    download_rate: Option<u32>,
+    uploaded_rate: Option<u32>,
     rejected_piece: u32,
 }
 
@@ -178,7 +178,7 @@ impl Manager {
 
         let cmd = match self.is_seeder_mode() {
             true => {
-                let mut a: Vec<(String, f32)> = self
+                let mut a: Vec<(String, u32)> = self
                     .peers
                     .iter()
                     .map(|(addr, peer)| (addr.clone(), peer.download_rate.unwrap()))
@@ -187,7 +187,7 @@ impl Manager {
                 self.fff(&mut a)?
             }
             false => {
-                let mut a: Vec<(String, f32)> = self
+                let mut a: Vec<(String, u32)> = self
                     .peers
                     .iter()
                     .map(|(addr, peer)| (addr.clone(), peer.uploaded_rate.unwrap()))
@@ -202,9 +202,9 @@ impl Manager {
         Ok(())
     }
 
-    fn fff(&mut self, a: &mut Vec<(String, f32)>) -> Result<BroadCmd, Box<dyn std::error::Error>> {
+    fn fff(&mut self, a: &mut Vec<(String, u32)>) -> Result<BroadCmd, Box<dyn std::error::Error>> {
         // In descending order
-        a.sort_by(|(_, dr1), (_, dr2)| dr2.partial_cmp(&dr1).unwrap());
+        a.sort_by(|(_, dr1), (_, dr2)| dr2.cmp(&dr1));
 
         let mut hhh: HashMap<String, bool> = HashMap::new();
 
@@ -380,6 +380,7 @@ impl Manager {
     }
 
     fn handle_have(&mut self, addr: &String, index: usize) -> Result<bool, Error> {
+        // TODO: peer is not obligated to send bitfield, so Interested and Request can be send after Have
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.pieces[index] = true;
         Ok(true)
@@ -502,8 +503,8 @@ impl Manager {
     fn handle_sync_stats(
         &mut self,
         addr: &String,
-        downloaded_rate: &Option<f32>,
-        uploaded_rate: &Option<f32>,
+        downloaded_rate: &Option<u32>,
+        uploaded_rate: &Option<u32>,
         rejected_piece: u32,
     ) -> Result<bool, Error> {
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
