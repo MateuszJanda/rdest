@@ -47,6 +47,7 @@ pub enum JobCmd {
     RecvHave {
         addr: String,
         index: usize,
+        resp_ch: oneshot::Sender<HaveCmd>,
     },
     RecvBitfield {
         addr: String,
@@ -95,6 +96,17 @@ pub enum UnchokeCmd {
         piece_hash: [u8; HASH_SIZE],
     },
     SendNotInterested,
+    Ignore,
+}
+
+#[derive(Debug)]
+pub enum HaveCmd {
+    SendInterestedAndRequest {
+        index: usize,
+        piece_length: usize,
+        piece_hash: [u8; HASH_SIZE],
+    },
+    SendInterested,
     Ignore,
 }
 
@@ -447,13 +459,7 @@ impl Handler {
 
     async fn handle_have(&mut self, have: &Have) -> Result<bool, Box<dyn std::error::Error>> {
         have.validate(self.pieces_num)?;
-
-        let cmd = JobCmd::RecvHave {
-            addr: self.connection.addr.clone(),
-            index: have.index(),
-        };
-
-        self.job_ch.send(cmd).await?;
+        self.cmd_recv_have(have).await?;
         Ok(true)
     }
 
@@ -608,24 +614,54 @@ impl Handler {
         Ok(())
     }
 
-    async fn cmd_recv_interested(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
+    async fn cmd_recv_interested(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.job_ch
             .send(JobCmd::RecvInterested {
                 addr: self.connection.addr.clone(),
             })
             .await?;
 
-        return Ok(true);
+        Ok(())
     }
 
-    async fn cmd_recv_not_interested(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
+    async fn cmd_recv_not_interested(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.job_ch
             .send(JobCmd::RecvNotInterested {
                 addr: self.connection.addr.clone(),
             })
             .await?;
 
-        return Ok(true);
+        Ok(())
+    }
+
+    async fn cmd_recv_have(&mut self, have: &Have) -> Result<(), Box<dyn std::error::Error>> {
+        let (resp_tx, resp_rx) = oneshot::channel();
+        let cmd = JobCmd::RecvHave {
+            addr: self.connection.addr.clone(),
+            index: have.index(),
+            resp_ch: resp_tx,
+        };
+
+        self.job_ch.send(cmd).await?;
+
+        match resp_rx.await? {
+            HaveCmd::SendInterestedAndRequest {
+                index,
+                piece_length,
+                piece_hash,
+            } => {
+                self.piece_rx = Some(PieceRx::new(index, piece_length, &piece_hash));
+                self.connection.send_msg(&Interested::new()).await?;
+
+                // BEP3 suggests send more than one request to get good better TCP performance (pipeline)
+                self.send_request().await?;
+                self.send_request().await?;
+            }
+            HaveCmd::SendInterested => self.connection.send_msg(&Interested::new()).await?,
+            HaveCmd::Ignore => (),
+        }
+
+        Ok(())
     }
 
     async fn cmd_recv_bitfield(

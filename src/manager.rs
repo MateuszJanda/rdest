@@ -1,7 +1,7 @@
 use crate::constant::HASH_SIZE;
 use crate::frame::Bitfield;
 use crate::handler::{
-    BitfieldCmd, BroadCmd, Handler, InitCmd, JobCmd, PieceDoneCmd, RequestCmd, UnchokeCmd,
+    BitfieldCmd, BroadCmd, Handler, HaveCmd, InitCmd, JobCmd, PieceDoneCmd, RequestCmd, UnchokeCmd,
 };
 use crate::progress::{Progress, ViewCmd};
 use crate::{utils, Error, Metainfo, TrackerResp};
@@ -277,7 +277,11 @@ impl Manager {
             JobCmd::RecvUnchoke { addr, resp_ch } => self.handle_unchoke(&addr, resp_ch),
             JobCmd::RecvInterested { addr } => self.handle_interested(&addr),
             JobCmd::RecvNotInterested { addr } => self.handle_not_interested(&addr),
-            JobCmd::RecvHave { addr, index } => self.handle_have(&addr, index),
+            JobCmd::RecvHave {
+                addr,
+                index,
+                resp_ch,
+            } => self.handle_have(&addr, index, resp_ch),
             JobCmd::RecvBitfield {
                 addr,
                 bitfield,
@@ -389,10 +393,35 @@ impl Manager {
         Ok(true)
     }
 
-    fn handle_have(&mut self, addr: &String, index: usize) -> Result<bool, Error> {
-        // TODO: peer is not obligated to send bitfield, so Interested and Request can be send after Have
+    fn handle_have(
+        &mut self,
+        addr: &String,
+        index: usize,
+        resp_ch: oneshot::Sender<HaveCmd>,
+    ) -> Result<bool, Error> {
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.pieces[index] = true;
+
+        let cmd = if self.pieces_status[index] == Status::Missing && !peer.am_interested {
+            if !peer.choked && peer.index.is_none() {
+                self.pieces_status[index] = Status::Reserved;
+                peer.index = Some(index);
+                peer.am_interested = true;
+                HaveCmd::SendInterestedAndRequest {
+                    index,
+                    piece_length: self.metainfo.piece_length(index),
+                    piece_hash: *self.metainfo.piece(index),
+                }
+            } else {
+                peer.am_interested = true;
+                HaveCmd::SendInterested
+            }
+        } else {
+            HaveCmd::Ignore
+        };
+
+        let _ = resp_ch.send(cmd);
+
         Ok(true)
     }
 

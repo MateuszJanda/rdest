@@ -642,14 +642,6 @@ impl Cancel {
     const LENGTH_SIZE: usize = 4;
     const FULL_SIZE: usize = Cancel::LEN_SIZE + Cancel::LEN as usize;
 
-    // pub fn new(index: usize, block_begin: usize, block_length: usize) -> Cancel {
-    //     Cancel {
-    //         index: index as u32,
-    //         block_begin: block_begin as u32,
-    //         block_length: block_length as u32,
-    //     }
-    // }
-
     fn from(crs: &Cursor<&[u8]>) -> Cancel {
         let start = Cancel::LEN_SIZE + Cancel::ID_SIZE;
         let mut index = [0; Cancel::INDEX_SIZE];
