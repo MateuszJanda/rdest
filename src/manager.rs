@@ -533,20 +533,20 @@ impl Manager {
     }
 
     fn choose_piece(&self, pieces: &Vec<bool>) -> Option<usize> {
-        let mut v: Vec<u32> = vec![0; self.metainfo.pieces_num()];
+        let mut vec: Vec<u32> = vec![0; self.metainfo.pieces_num()];
 
         for (_, peer) in self.peers.iter() {
             for (index, have) in peer.pieces.iter().enumerate() {
                 if *have {
-                    v[index] += 1;
+                    vec[index] += 1;
                 }
             }
         }
 
         // Shuffle to get better distribution of pieces from peers
-        v.shuffle(&mut rand::thread_rng());
+        vec.shuffle(&mut rand::thread_rng());
 
-        let mut rarest: Vec<(usize, u32)> = v
+        let mut rarest: Vec<(usize, u32)> = vec
             .iter()
             .enumerate()
             .filter(|(idx, _)| self.pieces_status[*idx] == Status::Missing)
@@ -566,12 +566,20 @@ impl Manager {
     }
 
     async fn kill_job(&mut self, addr: &String, index: &Option<usize>) {
-        if index.is_some() && self.pieces_status[index.unwrap()] != Status::Have {
-            self.pieces_status[index.unwrap()] = Status::Missing;
+        match index {
+            Some(index) if self.pieces_status[index] != Status::Have => {
+                self.pieces_status[index] = Status::Missing
+            }
+            _ => (),
         }
 
-        let j = self.peers.get_mut(addr).unwrap().job.take();
-        j.unwrap().await.unwrap();
+        match self.peers.get_mut(addr) {
+            Some(peer) => match peer.job.take() {
+                Some(job) => job.await.expect("Can't kill job"),
+                None => (),
+            },
+            None => (),
+        }
 
         self.peers.remove(addr);
 
