@@ -21,7 +21,7 @@ pub enum BroadCmd {
     SendHave {
         index: usize,
     },
-    ChangeOwnStatus {
+    ChangeOwnState {
         am_choked_map: HashMap<String, bool>,
     },
 }
@@ -129,7 +129,7 @@ pub struct Handler {
     pieces_num: usize,
     piece_tx: Option<PieceTx>,
     piece_rx: Option<PieceRx>,
-    peer_status: Status,
+    peer_state: State,
     stats: Stats,
     msg_buff: Vec<Frame>,
     job_ch: mpsc::Sender<JobCmd>,
@@ -149,7 +149,7 @@ struct PieceRx {
     left: VecDeque<(usize, usize)>,
 }
 
-struct Status {
+struct State {
     choked: bool,
     interested: bool,
     keep_alive: bool,
@@ -258,7 +258,7 @@ impl Handler {
                     pieces_num,
                     piece_tx: None,
                     piece_rx: None,
-                    peer_status: Status {
+                    peer_state: State {
                         choked: true,
                         interested: false,
                         keep_alive: false,
@@ -341,11 +341,11 @@ impl Handler {
     }
 
     async fn timeout_keep_alive(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if !self.peer_status.keep_alive {
+        if !self.peer_state.keep_alive {
             return Err(Error::KeepAliveTimeout.into());
         }
         self.send_keep_alive().await?;
-        self.peer_status.keep_alive = false;
+        self.peer_state.keep_alive = false;
         Ok(())
     }
 
@@ -363,7 +363,7 @@ impl Handler {
     ) -> Result<bool, Box<dyn std::error::Error>> {
         match opt_frame {
             Some(frame) => {
-                self.peer_status.keep_alive = true;
+                self.peer_state.keep_alive = true;
                 let handled = match frame {
                     Frame::Handshake(handshake) => self.handle_handshake(&handshake).await?,
                     Frame::KeepAlive(_) => true,
@@ -407,13 +407,13 @@ impl Handler {
     }
 
     async fn handle_choke(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
-        self.peer_status.choked = true;
+        self.peer_state.choked = true;
         self.cmd_recv_choke().await?;
         Ok(true)
     }
 
     async fn handle_unchoke(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
-        self.peer_status.choked = false;
+        self.peer_state.choked = false;
 
         if !self.msg_buff.is_empty() {
             for frame in self.msg_buff.iter() {
@@ -428,13 +428,13 @@ impl Handler {
     }
 
     async fn handle_interested(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
-        self.peer_status.interested = true;
+        self.peer_state.interested = true;
         self.cmd_recv_interested().await?;
         Ok(true)
     }
 
     async fn handle_not_interested(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
-        self.peer_status.interested = false;
+        self.peer_state.interested = false;
         self.cmd_recv_not_interested().await?;
         Ok(true)
     }
@@ -722,11 +722,11 @@ impl Handler {
         cmd: BroadCmd,
     ) -> Result<(), Box<dyn std::error::Error>> {
         match cmd {
-            BroadCmd::SendHave { index } => match self.peer_status.choked {
+            BroadCmd::SendHave { index } => match self.peer_state.choked {
                 true => self.msg_buff.push(Frame::Have(Have::new(index))),
                 false => self.connection.send_msg(&Have::new(index)).await?,
             },
-            BroadCmd::ChangeOwnStatus { am_choked_map } => {
+            BroadCmd::ChangeOwnState { am_choked_map } => {
                 match am_choked_map.get(&self.connection.addr) {
                     Some(true) => self.connection.send_msg(&Choke::new()).await?,
                     Some(false) => self.connection.send_msg(&Unchoke::new()).await?,

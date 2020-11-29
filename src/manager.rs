@@ -239,7 +239,7 @@ impl Manager {
             peer.optimistic_unchoke = true;
         }
 
-        Ok(BroadCmd::ChangeOwnStatus { am_choked_map })
+        Ok(BroadCmd::ChangeOwnState { am_choked_map })
     }
 
     fn is_seeder_mode(&self) -> bool {
