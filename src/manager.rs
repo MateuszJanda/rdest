@@ -116,7 +116,7 @@ impl Manager {
     }
 
     fn spawn_jobs(&mut self) {
-        // TODO: spwan MAX_UNCHOKED + 1 + 1 jobs
+        // TODO: spawn MAX_UNCHOKED + 1 + 1 jobs
         let (addr, peer_id) = self.tracker.peers()[2].clone();
         let own_id = self.own_id.clone();
         let info_hash = *self.metainfo.info_hash();
@@ -201,52 +201,6 @@ impl Manager {
         Ok(())
     }
 
-    fn change_state_cmd(
-        &mut self,
-        rates: &mut Vec<(String, u32)>,
-        new_opti: &Vec<String>,
-    ) -> Result<BroadCmd, Box<dyn std::error::Error>> {
-        // Downloaded/uploaded rate in descending order
-        rates.sort_by(|(_, r1), (_, r2)| r2.cmp(&r1));
-
-        let mut am_choked_map: HashMap<String, bool> = HashMap::new();
-
-        // Unchoke peers
-        let mut count = 0;
-        for (addr, _) in rates.iter() {
-            let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-            if count < MAX_UNCHOKED {
-                if peer.am_choked == true && peer.interested && !new_opti.contains(addr) {
-                    // State changed from Choked to Unchoked
-                    peer.am_choked = false;
-                    am_choked_map.insert(addr.clone(), false);
-                    count += 1;
-                } else if peer.am_choked == false {
-                    // State doesn't change
-                    count += 1;
-                }
-            } else if peer.am_choked == false {
-                // State changed from Unchoked to Choked
-                peer.am_choked = true;
-                am_choked_map.insert(addr.clone(), true);
-            }
-
-            if !new_opti.is_empty() {
-                peer.optimistic_unchoke = false;
-            }
-        }
-
-        // Set new optimistic
-        for addr in new_opti.iter() {
-            let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-            peer.am_choked = false;
-            am_choked_map.insert(addr.clone(), false);
-            peer.optimistic_unchoke = true;
-        }
-
-        Ok(BroadCmd::ChangeOwnState { am_choked_map })
-    }
-
     fn is_seeder_mode(&self) -> bool {
         self.pieces_status
             .iter()
@@ -265,6 +219,55 @@ impl Manager {
             Some(addr) => Ok(vec![addr.clone()]),
             None => Ok(vec![]),
         }
+    }
+
+    fn change_state_cmd(
+        &mut self,
+        rates: &mut Vec<(String, u32)>,
+        new_opti: &Vec<String>,
+    ) -> Result<BroadCmd, Box<dyn std::error::Error>> {
+        // Downloaded/uploaded rate in descending order
+        rates.sort_by(|(_, r1), (_, r2)| r2.cmp(&r1));
+
+        let mut am_choked_map: HashMap<String, bool> = HashMap::new();
+        let mut count = 0;
+        for (addr, _) in rates.iter() {
+            let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
+            if count < MAX_UNCHOKED {
+                if peer.am_choked && peer.interested && !new_opti.contains(addr) {
+                    // Choked state changed to Unchoked
+                    peer.am_choked = false;
+                    am_choked_map.insert(addr.clone(), false);
+                    count += 1;
+                } else if !peer.am_choked && peer.interested {
+                    // Unchoked state doesn't change
+                    count += 1;
+                } else if !peer.am_choked && !peer.interested {
+                    // Choke, because peer is not interested
+                    peer.am_choked = true;
+                    am_choked_map.insert(addr.clone(), true);
+                }
+            } else if !peer.am_choked {
+                // Limit reached so change all rest peers states from Unchoked to Choked
+                peer.am_choked = true;
+                am_choked_map.insert(addr.clone(), true);
+            }
+
+            // If some new optimistic then disable "optimistic unchoke"
+            if !new_opti.is_empty() {
+                peer.optimistic_unchoke = false;
+            }
+        }
+
+        // Set new optimistic unchoe
+        for addr in new_opti.iter() {
+            let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
+            peer.am_choked = false;
+            am_choked_map.insert(addr.clone(), false);
+            peer.optimistic_unchoke = true;
+        }
+
+        Ok(BroadCmd::ChangeOwnState { am_choked_map })
     }
 
     async fn handle_job_cmd(&mut self, cmd: JobCmd) -> Result<bool, Error> {
