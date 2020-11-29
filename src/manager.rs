@@ -567,8 +567,8 @@ impl Manager {
 
     async fn kill_job(&mut self, addr: &String, index: &Option<usize>) {
         match index {
-            Some(index) if self.pieces_status[index] != Status::Have => {
-                self.pieces_status[index] = Status::Missing
+            Some(index) if self.pieces_status[*index] != Status::Have => {
+                self.pieces_status[*index] = Status::Missing
             }
             _ => (),
         }
@@ -591,7 +591,7 @@ impl Manager {
             Some(view) => {
                 let _ = view.channel.send(ViewCmd::Kill).await;
                 let job = &mut view.job;
-                job.await.unwrap();
+                job.await.expect("Can't kill view");
             }
             _ => (),
         }
