@@ -89,7 +89,13 @@ pub enum UnchokeCmd {
         piece_length: usize,
         piece_hash: [u8; HASH_SIZE],
     },
+    SendRequest {
+        index: usize,
+        piece_length: usize,
+        piece_hash: [u8; HASH_SIZE],
+    },
     SendNotInterested,
+    Ignore,
 }
 
 #[derive(Debug)]
@@ -582,9 +588,21 @@ impl Handler {
                 self.send_request().await?;
                 self.send_request().await?;
             }
+            UnchokeCmd::SendRequest {
+                index,
+                piece_length,
+                piece_hash,
+            } => {
+                self.piece_rx = Some(PieceRx::new(index, piece_length, &piece_hash));
+
+                // BEP3 suggests send more than one request to get good better TCP performance (pipeline)
+                self.send_request().await?;
+                self.send_request().await?;
+            }
             UnchokeCmd::SendNotInterested => {
                 self.connection.send_msg(&NotInterested::new()).await?
             }
+            UnchokeCmd::Ignore => (),
         }
 
         Ok(())

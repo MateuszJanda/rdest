@@ -345,9 +345,10 @@ impl Manager {
     ) -> Result<bool, Error> {
         let pieces = &self.peers[addr].pieces;
         let index = self.choose_piece(pieces);
-        // TODO: doesn't send interested twice
+
+        let peer = self.peers.get(addr).ok_or(Error::PeerNotFound)?;
         let cmd = match index {
-            Some(index) => {
+            Some(index) if !peer.am_interested => {
                 self.pieces_status[index] = Status::Reserved;
                 UnchokeCmd::SendInterestedAndRequest {
                     index,
@@ -355,7 +356,16 @@ impl Manager {
                     piece_hash: *self.metainfo.piece(index),
                 }
             }
-            None => UnchokeCmd::SendNotInterested,
+            Some(index) => {
+                self.pieces_status[index] = Status::Reserved;
+                UnchokeCmd::SendRequest {
+                    index,
+                    piece_length: self.metainfo.piece_length(index),
+                    piece_hash: *self.metainfo.piece(index),
+                }
+            }
+            None if peer.am_interested => UnchokeCmd::SendNotInterested,
+            None => UnchokeCmd::Ignore,
         };
 
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
