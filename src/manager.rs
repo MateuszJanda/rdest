@@ -260,7 +260,7 @@ impl Manager {
             }
         }
 
-        // Set new optimistic unchoe
+        // Set new optimistic unchoke
         for addr in new_opti.iter() {
             let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
             peer.am_choked = false;
@@ -268,7 +268,7 @@ impl Manager {
             peer.optimistic_unchoke = true;
         }
 
-        Ok(BroadCmd::ChangeOwnState { am_choked_map })
+        Ok(BroadCmd::SendOwnState { am_choked_map })
     }
 
     async fn handle_job_cmd(&mut self, cmd: JobCmd) -> Result<bool, Error> {

@@ -21,7 +21,7 @@ pub enum BroadCmd {
     SendHave {
         index: usize,
     },
-    ChangeOwnState {
+    SendOwnState {
         am_choked_map: HashMap<String, bool>,
     },
 }
@@ -371,7 +371,7 @@ impl Handler {
         if !self.peer_state.keep_alive {
             return Err(Error::KeepAliveTimeout.into());
         }
-        self.send_keep_alive().await?;
+        self.connection.send_msg(&KeepAlive::new()).await?;
         self.peer_state.keep_alive = false;
         Ok(())
     }
@@ -381,6 +381,27 @@ impl Handler {
             self.cmd_sync_stats().await?;
         }
         self.stats.shift();
+        Ok(())
+    }
+
+    async fn handle_manager_cmd(
+        &mut self,
+        cmd: BroadCmd,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        match cmd {
+            BroadCmd::SendHave { index } => match self.peer_state.choked {
+                true => self.msg_buff.push(Frame::Have(Have::new(index))),
+                false => self.connection.send_msg(&Have::new(index)).await?,
+            },
+            BroadCmd::SendOwnState { am_choked_map } => {
+                match am_choked_map.get(&self.connection.addr) {
+                    Some(true) => self.connection.send_msg(&Choke::new()).await?,
+                    Some(false) => self.connection.send_msg(&Unchoke::new()).await?,
+                    None => (),
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -757,6 +778,9 @@ impl Handler {
                 piece_hash,
             } => {
                 self.piece_rx = Some(PieceRx::new(index, piece_length, &piece_hash));
+
+                // BEP3 suggests send more than one request to get good better TCP performance (pipeline)
+                self.send_request().await?;
                 self.send_request().await?;
             }
             PieceDoneCmd::SendNotInterested => {
@@ -778,32 +802,6 @@ impl Handler {
                 rejected_piece: self.stats.rejected_piece,
             })
             .await?;
-
-        Ok(())
-    }
-
-    async fn send_keep_alive(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.connection.send_msg(&KeepAlive::new()).await?;
-        Ok(())
-    }
-
-    async fn handle_manager_cmd(
-        &mut self,
-        cmd: BroadCmd,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        match cmd {
-            BroadCmd::SendHave { index } => match self.peer_state.choked {
-                true => self.msg_buff.push(Frame::Have(Have::new(index))),
-                false => self.connection.send_msg(&Have::new(index)).await?,
-            },
-            BroadCmd::ChangeOwnState { am_choked_map } => {
-                match am_choked_map.get(&self.connection.addr) {
-                    Some(true) => self.connection.send_msg(&Choke::new()).await?,
-                    Some(false) => self.connection.send_msg(&Unchoke::new()).await?,
-                    None => (),
-                }
-            }
-        }
 
         Ok(())
     }
