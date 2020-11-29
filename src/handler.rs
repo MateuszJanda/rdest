@@ -143,7 +143,9 @@ pub enum PieceDoneCmd {
         piece_length: usize,
         piece_hash: [u8; HASH_SIZE],
     },
+    SendNotInterested,
     PrepareKill,
+    Ignore,
 }
 
 pub struct Handler {
@@ -757,7 +759,11 @@ impl Handler {
                 self.piece_rx = Some(PieceRx::new(index, piece_length, &piece_hash));
                 self.send_request().await?;
             }
+            PieceDoneCmd::SendNotInterested => {
+                self.connection.send_msg(&NotInterested::new()).await?
+            }
             PieceDoneCmd::PrepareKill => return Ok(false),
+            PieceDoneCmd::Ignore => (),
         }
 
         Ok(true)

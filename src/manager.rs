@@ -548,10 +548,37 @@ impl Manager {
                 self.pieces_status[index] = Status::Have;
                 let _ = self.broad_ch.send(BroadCmd::SendHave { index });
             }
-            None => (),
+            None => panic!("Piece downloaded but not requested"),
         }
 
-        let _ = resp_ch.send(PieceDoneCmd::PrepareKill);
+        let pieces = &self.peers[addr].pieces;
+        let index = self.choose_piece(pieces);
+
+        let cmd = match index {
+            Some(index) => {
+                let peer = self.peers.get(addr).ok_or(Error::PeerNotFound)?;
+                if !peer.choked {
+                    PieceDoneCmd::SendRequest {
+                        index,
+                        piece_length: self.metainfo.piece_length(index),
+                        piece_hash: *self.metainfo.piece(index),
+                    }
+                } else {
+                    PieceDoneCmd::Ignore
+                }
+            }
+            None => {
+                let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
+                peer.am_interested = false;
+                if peer.interested {
+                    PieceDoneCmd::SendNotInterested
+                } else {
+                    PieceDoneCmd::PrepareKill
+                }
+            }
+        };
+
+        let _ = resp_ch.send(cmd);
         Ok(true)
     }
 
