@@ -549,8 +549,8 @@ impl Manager {
         let mut rarest: Vec<(usize, u32)> = vec
             .iter()
             .enumerate()
-            .filter(|(idx, _)| self.pieces_status[*idx] == Status::Missing)
-            .map(|(idx, count)| (idx, *count))
+            .filter(|(index, _)| self.pieces_status[*index] == Status::Missing)
+            .map(|(index, count)| (index, *count))
             .collect();
 
         // Sort by rarest
@@ -615,11 +615,11 @@ impl Manager {
             let mut writer = BufWriter::new(File::create(path)?);
 
             // Write pieces/chunks
-            for idx in start.file_index..end.file_index {
-                let name = utils::hash_to_string(&self.metainfo.piece(idx)) + ".piece";
+            for index in start.file_index..end.file_index {
+                let name = utils::hash_to_string(&self.metainfo.piece(index)) + ".piece";
                 let reader = &mut BufReader::new(File::open(name)?);
 
-                if idx == start.file_index {
+                if index == start.file_index {
                     reader.seek(std::io::SeekFrom::Start(start.byte_index as u64))?;
                 }
 
