@@ -3,7 +3,6 @@ use crate::frame::Bitfield;
 use crate::handler::{
     BitfieldCmd, BroadCmd, Handler, InitCmd, JobCmd, PieceDoneCmd, RequestCmd, UnchokeCmd,
 };
-use crate::hashmap;
 use crate::progress::{Progress, ViewCmd};
 use crate::{utils, Error, Metainfo, TrackerResp};
 use rand::seq::SliceRandom;
@@ -20,7 +19,7 @@ use tokio::time::{Duration, Instant, Interval};
 const JOB_CHANNEL_SIZE: usize = 64;
 const BROADCAST_CHANNEL_SIZE: usize = 32;
 const CHANGE_STATE_INTERVAL_SEC: u64 = 10;
-const OPTIMISTIC_UNCHOKE_INTERVAL_SEC: u64 = 30;
+const OPTIMISTIC_UNCHOKE_ROUND: u32 = 3;
 const MAX_UNCHOKED: u32 = 3;
 
 pub struct Manager {
@@ -30,6 +29,7 @@ pub struct Manager {
     metainfo: Metainfo,
     tracker: TrackerResp,
     view: Option<View>,
+    change_round: u32,
     job_tx_ch: mpsc::Sender<JobCmd>,
     job_rx_ch: mpsc::Receiver<JobCmd>,
     broad_ch: broadcast::Sender<BroadCmd>,
@@ -75,6 +75,7 @@ impl Manager {
             metainfo,
             tracker,
             view: None,
+            change_round: 0,
             job_tx_ch,
             job_rx_ch,
             broad_ch,
@@ -138,15 +139,13 @@ impl Manager {
 
     async fn event_loop(&mut self) {
         let mut change_state_timer = self.start_change_state_timer();
-        let mut optimistic_unchoke_timer = self.start_optimistic_unchoke_timer();
 
         // TODO: add listen
         // TODO: add tracker req
         // TODO: add file extractor job
         loop {
             tokio::select! {
-                _ = change_state_timer.tick() => self.timeout_change_state().expect("Can't update state"),
-                _ = optimistic_unchoke_timer.tick() => self.timeout_optimistic_unchoke().expect("Can't set optimistic unchoke"),
+                _ = change_state_timer.tick() => self.timeout_change_conn_state().expect("Can't change connection state"),
                 Some(cmd) = self.job_rx_ch.recv() => {
                     if self.handle_job_cmd(cmd).await.expect("Can't handle command") == false {
                         break;
@@ -161,13 +160,10 @@ impl Manager {
         time::interval_at(start, Duration::from_secs(CHANGE_STATE_INTERVAL_SEC))
     }
 
-    fn start_optimistic_unchoke_timer(&self) -> Interval {
-        let start = Instant::now() + Duration::from_secs(OPTIMISTIC_UNCHOKE_INTERVAL_SEC);
-        time::interval_at(start, Duration::from_secs(OPTIMISTIC_UNCHOKE_INTERVAL_SEC))
-    }
+    fn timeout_change_conn_state(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        self.change_round = (self.change_round + 1) % OPTIMISTIC_UNCHOKE_ROUND;
 
-    fn timeout_change_state(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        // If not all peers report their stats do nothing
+        // If not all peers reported their state, do nothing
         if self
             .peers
             .iter()
@@ -176,58 +172,74 @@ impl Manager {
             return Ok(());
         }
 
-        let cmd = match self.is_seeder_mode() {
-            true => {
-                let mut a: Vec<(String, u32)> = self
-                    .peers
-                    .iter()
-                    .map(|(addr, peer)| (addr.clone(), peer.download_rate.unwrap()))
-                    .collect();
-
-                self.fff(&mut a)?
-            }
-            false => {
-                let mut a: Vec<(String, u32)> = self
-                    .peers
-                    .iter()
-                    .map(|(addr, peer)| (addr.clone(), peer.uploaded_rate.unwrap()))
-                    .collect();
-
-                self.fff(&mut a)?
-            }
+        let new_opti = match self.change_round {
+            0 => self.new_optimistic_peers()?,
+            _ => vec![],
         };
 
+        let mut rate = match self.is_seeder_mode() {
+            true => self
+                .peers
+                .iter()
+                .map(|(addr, peer)| (addr.clone(), peer.download_rate.unwrap()))
+                .collect::<Vec<(String, u32)>>(),
+            false => self
+                .peers
+                .iter()
+                .map(|(addr, peer)| (addr.clone(), peer.uploaded_rate.unwrap()))
+                .collect::<Vec<(String, u32)>>(),
+        };
+
+        let cmd = self.change_state_cmd(&mut rate, &new_opti)?;
         let _ = self.broad_ch.send(cmd);
 
         Ok(())
     }
 
-    fn fff(&mut self, a: &mut Vec<(String, u32)>) -> Result<BroadCmd, Box<dyn std::error::Error>> {
-        // In descending order
-        a.sort_by(|(_, dr1), (_, dr2)| dr2.cmp(&dr1));
+    fn change_state_cmd(
+        &mut self,
+        rates: &mut Vec<(String, u32)>,
+        new_opti: &Vec<String>,
+    ) -> Result<BroadCmd, Box<dyn std::error::Error>> {
+        // Downloaded/uploaded rate in descending order
+        rates.sort_by(|(_, r1), (_, r2)| r2.cmp(&r1));
 
-        let mut hhh: HashMap<String, bool> = HashMap::new();
+        let mut am_choked_map: HashMap<String, bool> = HashMap::new();
 
+        // Unchoke peers
         let mut count = 0;
-        for (addr, _) in a.iter() {
+        for (addr, _) in rates.iter() {
             let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-
-            if peer.am_choked == false && !peer.optimistic_unchoke {
-                if count >= MAX_UNCHOKED {
-                    hhh.insert(addr.clone(), true);
-                    peer.am_choked = true;
-                }
-                count += 1;
-            } else if peer.am_choked == true && peer.interested {
-                if count < MAX_UNCHOKED {
-                    hhh.insert(addr.clone(), false);
+            if count < MAX_UNCHOKED {
+                if peer.am_choked == true && peer.interested && !new_opti.contains(addr) {
+                    // State changed from Choked to Unchoked
                     peer.am_choked = false;
+                    am_choked_map.insert(addr.clone(), false);
+                    count += 1;
+                } else if peer.am_choked == false {
+                    // State doesn't change
                     count += 1;
                 }
+            } else if peer.am_choked == false {
+                // State changed from Unchoked to Choked
+                peer.am_choked = true;
+                am_choked_map.insert(addr.clone(), true);
+            }
+
+            if !new_opti.is_empty() {
+                peer.optimistic_unchoke = false;
             }
         }
 
-        Ok(BroadCmd::ChangeOwnStatus { am_choked_map: hhh })
+        // Set new optimistic
+        for addr in new_opti.iter() {
+            let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
+            peer.am_choked = false;
+            am_choked_map.insert(addr.clone(), false);
+            peer.optimistic_unchoke = true;
+        }
+
+        Ok(BroadCmd::ChangeOwnStatus { am_choked_map })
     }
 
     fn is_seeder_mode(&self) -> bool {
@@ -236,38 +248,18 @@ impl Manager {
             .all(|status| *status == Status::Have)
     }
 
-    fn timeout_optimistic_unchoke(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        // TODO: possible fibrillation when in same second change state and optimistic unchoke happen
-        let x = self
+    fn new_optimistic_peers(&mut self) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+        let all_choked = self
             .peers
             .iter()
-            .filter(|(_, peer)| peer.am_choked)
+            .filter(|(_, peer)| peer.am_choked && peer.interested)
             .map(|(addr, _)| addr.clone())
             .collect::<Vec<String>>();
 
-        for (_, peer) in self
-            .peers
-            .iter_mut()
-            .filter(|(_, peer)| peer.optimistic_unchoke)
-        {
-            peer.optimistic_unchoke = false;
-            peer.am_choked = true;
+        match all_choked.choose(&mut rand::thread_rng()) {
+            Some(addr) => Ok(vec![addr.clone()]),
+            None => Ok(vec![]),
         }
-
-        match x.choose(&mut rand::thread_rng()) {
-            Some(addr) => {
-                let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-                peer.optimistic_unchoke = true;
-                peer.am_choked = false;
-
-                let hhh = hashmap![addr.clone() => false];
-                let cmd = BroadCmd::ChangeOwnStatus { am_choked_map: hhh };
-                let _ = self.broad_ch.send(cmd);
-            }
-            None => (),
-        }
-
-        Ok(())
     }
 
     async fn handle_job_cmd(&mut self, cmd: JobCmd) -> Result<bool, Error> {
