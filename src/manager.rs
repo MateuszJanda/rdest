@@ -63,6 +63,24 @@ pub enum Status {
     Have,
 }
 
+impl Peer {
+    fn new(pieces_num: usize, job: JoinHandle<()>) -> Peer {
+        Peer {
+            pieces: vec![false; pieces_num],
+            job: Some(job),
+            index: None,
+            am_interested: false,
+            am_choked: true,
+            interested: false,
+            choked: true,
+            optimistic_unchoke: false,
+            download_rate: None,
+            uploaded_rate: None,
+            rejected_piece: 0,
+        }
+    }
+}
+
 impl Manager {
     pub fn new(metainfo: Metainfo, tracker: TrackerResp, own_id: [u8; HASH_SIZE]) -> Manager {
         let (job_tx_ch, job_rx_ch) = mpsc::channel(JOB_CHANNEL_SIZE);
@@ -119,26 +137,13 @@ impl Manager {
             .await
         });
 
-        let peer = Peer {
-            pieces: vec![false; self.metainfo.pieces_num()],
-            job: Some(job),
-            index: None,
-            am_interested: false,
-            am_choked: true,
-            interested: false,
-            choked: true,
-            optimistic_unchoke: false,
-            download_rate: None,
-            uploaded_rate: None,
-            rejected_piece: 0,
-        };
-
         let (addr, _) = self.tracker.peers()[2].clone();
+        let peer = Peer::new(self.metainfo.pieces_num(), job);
         self.peers.insert(addr, peer);
     }
 
     async fn event_loop(&mut self) {
-        let mut change_state_timer = self.start_change_state_timer();
+        let mut change_state_timer = self.start_change_conn_state_timer();
 
         // TODO: add listen
         // TODO: add tracker req
@@ -155,7 +160,7 @@ impl Manager {
         }
     }
 
-    fn start_change_state_timer(&self) -> Interval {
+    fn start_change_conn_state_timer(&self) -> Interval {
         let start = Instant::now() + Duration::from_secs(CHANGE_STATE_INTERVAL_SEC);
         time::interval_at(start, Duration::from_secs(CHANGE_STATE_INTERVAL_SEC))
     }
@@ -401,7 +406,7 @@ impl Manager {
         };
 
         let peer = self.peers.get(addr).ok_or(Error::PeerNotFound)?;
-        let am_choked = if self.all_unchoked() < MAX_UNCHOKED {
+        let am_choked = if self.unchoked_num() < MAX_UNCHOKED {
             if peer.am_choked {
                 Some(false)
             } else {
@@ -429,7 +434,7 @@ impl Manager {
         Ok(true)
     }
 
-    fn all_unchoked(&self) -> u32 {
+    fn unchoked_num(&self) -> u32 {
         self.peers
             .iter()
             .filter(|(_, peer)| peer.am_choked == false && peer.optimistic_unchoke == true)
