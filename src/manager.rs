@@ -395,6 +395,7 @@ impl Manager {
         bitfield: &Bitfield,
         resp_ch: oneshot::Sender<BitfieldCmd>,
     ) -> Result<bool, Error> {
+        // Update peer pieces bitfield
         {
             let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
             peer.pieces.copy_from_slice(&bitfield.to_vec());
@@ -408,27 +409,23 @@ impl Manager {
             None => false,
         };
 
+        // Change to unchoked or not
         let peer = self.peers.get(addr).ok_or(Error::PeerNotFound)?;
-        let am_choked = if self.unchoked_num() < MAX_UNCHOKED {
-            if peer.am_choked {
-                Some(false)
-            } else {
-                None
-            }
+        let with_am_unchoked = if self.unchoked_num() < MAX_UNCHOKED && peer.am_choked {
+            true
         } else {
-            None
+            false
         };
 
+        // Update own state
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.am_interested = am_interested;
-
-        match am_choked {
-            Some(v) => peer.am_choked = v,
-            None => (),
+        if with_am_unchoked {
+            peer.am_choked = true;
         }
 
         let cmd = BitfieldCmd::SendState {
-            am_choked,
+            with_am_unchoked,
             am_interested,
         };
 
@@ -569,6 +566,7 @@ impl Manager {
     }
 
     async fn kill_job(&mut self, addr: &String, index: &Option<usize>) {
+        // Reset piece status
         match index {
             Some(index) if self.pieces_status[*index] != Status::Have => {
                 self.pieces_status[*index] = Status::Missing
@@ -576,6 +574,7 @@ impl Manager {
             _ => (),
         }
 
+        // Wait fot the task to finish
         match self.peers.get_mut(addr) {
             Some(peer) => match peer.job.take() {
                 Some(job) => job.await.expect("Can't kill job"),
@@ -584,6 +583,7 @@ impl Manager {
             None => (),
         }
 
+        // Remove peer data from map
         self.peers.remove(addr);
 
         println!("Job killed");

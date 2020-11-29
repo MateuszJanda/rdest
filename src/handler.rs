@@ -95,7 +95,7 @@ pub enum UnchokeCmd {
 #[derive(Debug)]
 pub enum BitfieldCmd {
     SendState {
-        am_choked: Option<bool>,
+        with_am_unchoked: bool,
         am_interested: bool,
     },
 }
@@ -625,13 +625,12 @@ impl Handler {
 
         match resp_rx.await? {
             BitfieldCmd::SendState {
-                am_choked,
+                with_am_unchoked,
                 am_interested,
             } => {
-                match am_choked {
-                    Some(true) => self.connection.send_msg(&Choke::new()).await?,
-                    Some(false) => self.connection.send_msg(&Unchoke::new()).await?,
-                    None => (),
+                match with_am_unchoked {
+                    true => self.connection.send_msg(&Unchoke::new()).await?,
+                    false => (),
                 }
 
                 match am_interested {
