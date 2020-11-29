@@ -43,6 +43,7 @@ pub enum JobCmd {
     },
     RecvNotInterested {
         addr: String,
+        resp_ch: oneshot::Sender<NotInterestedCmd>,
     },
     RecvHave {
         addr: String,
@@ -96,6 +97,12 @@ pub enum UnchokeCmd {
         piece_hash: [u8; HASH_SIZE],
     },
     SendNotInterested,
+    Ignore,
+}
+
+#[derive(Debug)]
+pub enum NotInterestedCmd {
+    PrepareKill,
     Ignore,
 }
 
@@ -453,8 +460,7 @@ impl Handler {
 
     async fn handle_not_interested(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
         self.peer_state.interested = false;
-        self.cmd_recv_not_interested().await?;
-        Ok(true)
+        self.cmd_recv_not_interested().await
     }
 
     async fn handle_have(&mut self, have: &Have) -> Result<bool, Box<dyn std::error::Error>> {
@@ -624,25 +630,30 @@ impl Handler {
         Ok(())
     }
 
-    async fn cmd_recv_not_interested(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn cmd_recv_not_interested(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
+        let (resp_tx, resp_rx) = oneshot::channel();
         self.job_ch
             .send(JobCmd::RecvNotInterested {
                 addr: self.connection.addr.clone(),
+                resp_ch: resp_tx,
             })
             .await?;
 
-        Ok(())
+        match resp_rx.await? {
+            NotInterestedCmd::PrepareKill => Ok(false),
+            NotInterestedCmd::Ignore => Ok(true),
+        }
     }
 
     async fn cmd_recv_have(&mut self, have: &Have) -> Result<(), Box<dyn std::error::Error>> {
         let (resp_tx, resp_rx) = oneshot::channel();
-        let cmd = JobCmd::RecvHave {
-            addr: self.connection.addr.clone(),
-            index: have.index(),
-            resp_ch: resp_tx,
-        };
-
-        self.job_ch.send(cmd).await?;
+        self.job_ch
+            .send(JobCmd::RecvHave {
+                addr: self.connection.addr.clone(),
+                index: have.index(),
+                resp_ch: resp_tx,
+            })
+            .await?;
 
         match resp_rx.await? {
             HaveCmd::SendInterestedAndRequest {

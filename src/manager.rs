@@ -1,7 +1,8 @@
 use crate::constant::HASH_SIZE;
 use crate::frame::Bitfield;
 use crate::handler::{
-    BitfieldCmd, BroadCmd, Handler, HaveCmd, InitCmd, JobCmd, PieceDoneCmd, RequestCmd, UnchokeCmd,
+    BitfieldCmd, BroadCmd, Handler, HaveCmd, InitCmd, JobCmd, NotInterestedCmd, PieceDoneCmd,
+    RequestCmd, UnchokeCmd,
 };
 use crate::progress::{Progress, ViewCmd};
 use crate::{utils, Error, Metainfo, TrackerResp};
@@ -276,7 +277,9 @@ impl Manager {
             JobCmd::RecvChoke { addr } => self.handle_choke(&addr),
             JobCmd::RecvUnchoke { addr, resp_ch } => self.handle_unchoke(&addr, resp_ch),
             JobCmd::RecvInterested { addr } => self.handle_interested(&addr),
-            JobCmd::RecvNotInterested { addr } => self.handle_not_interested(&addr),
+            JobCmd::RecvNotInterested { addr, resp_ch } => {
+                self.handle_not_interested(&addr, resp_ch)
+            }
             JobCmd::RecvHave {
                 addr,
                 index,
@@ -386,10 +389,26 @@ impl Manager {
         Ok(true)
     }
 
-    fn handle_not_interested(&mut self, addr: &String) -> Result<bool, Error> {
-        // TODO: if peer not interested and I'm not interested then can be killed
-        let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-        peer.interested = false;
+    fn handle_not_interested(
+        &mut self,
+        addr: &String,
+        resp_ch: oneshot::Sender<NotInterestedCmd>,
+    ) -> Result<bool, Error> {
+        {
+            let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
+            peer.interested = false;
+        }
+
+        let peer = self.peers.get(addr).ok_or(Error::PeerNotFound)?;
+        let index = self.choose_piece(&peer.pieces);
+        let cmd = if !peer.am_interested && peer.index.is_none() && index.is_none() {
+            NotInterestedCmd::PrepareKill
+        } else {
+            NotInterestedCmd::Ignore
+        };
+
+        let _ = resp_ch.send(cmd);
+
         Ok(true)
     }
 
