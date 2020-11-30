@@ -618,8 +618,8 @@ impl Manager {
     }
 
     fn choose_piece(&self, pieces: &Vec<bool>) -> Option<usize> {
+        // Count how many peers have specific piece
         let mut vec: Vec<u32> = vec![0; self.metainfo.pieces_num()];
-
         for (_, peer) in self.peers.iter() {
             for (index, have) in peer.pieces.iter().enumerate() {
                 if *have {
@@ -628,9 +628,7 @@ impl Manager {
             }
         }
 
-        // Shuffle to get better distribution of pieces from peers
-        vec.shuffle(&mut rand::thread_rng());
-
+        // Create pair (index, count) for missing pieces
         let mut rarest: Vec<(usize, u32)> = vec
             .iter()
             .enumerate()
@@ -638,8 +636,11 @@ impl Manager {
             .map(|(index, count)| (index, *count))
             .collect();
 
+        // Shuffle to get better distribution of pieces from peers
+        rarest.shuffle(&mut rand::thread_rng());
+
         // Sort by rarest
-        rarest.sort_by(|(_, a_count), (_, b_count)| a_count.cmp(&b_count));
+        rarest.sort_by(|(_, count1), (_, count2)| count1.cmp(&count2));
 
         for (index, count) in rarest.iter() {
             if count > &0 && pieces[*index] == true {
