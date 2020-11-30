@@ -28,7 +28,7 @@ pub struct Manager {
     pieces_status: Vec<Status>,
     peers: HashMap<String, Peer>,
     metainfo: Metainfo,
-    tracker: TrackerResp,
+    candidates: Vec<(String, [u8; HASH_SIZE])>,
     view: Option<View>,
     change_round: u32,
     job_tx_ch: mpsc::Sender<JobCmd>,
@@ -92,7 +92,7 @@ impl Manager {
             pieces_status: vec![Status::Missing; metainfo.pieces_num()],
             peers: HashMap::new(),
             metainfo,
-            tracker,
+            candidates: tracker.peers(),
             view: None,
             change_round: 0,
             job_tx_ch,
@@ -117,8 +117,13 @@ impl Manager {
     }
 
     fn spawn_jobs(&mut self) {
+        let (addr, peer_id) = match self.candidates.pop() {
+            Some(value) => value,
+            None => return,
+        };
+        let addr222 = addr.clone();
+
         // TODO: spawn MAX_UNCHOKED + 1 + 1 jobs
-        let (addr, peer_id) = self.tracker.peers()[2].clone();
         let own_id = self.own_id.clone();
         let info_hash = *self.metainfo.info_hash();
         let pieces_num = self.metainfo.pieces_num();
@@ -138,9 +143,8 @@ impl Manager {
             .await
         });
 
-        let (addr, _) = self.tracker.peers()[2].clone();
         let peer = Peer::new(self.metainfo.pieces_num(), job);
-        self.peers.insert(addr, peer);
+        self.peers.insert(addr222, peer);
     }
 
     async fn event_loop(&mut self) {
