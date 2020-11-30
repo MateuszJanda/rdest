@@ -376,6 +376,7 @@ impl Manager {
         };
 
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
+        peer.choked = false;
         peer.index = index;
         peer.am_interested = index.is_some();
 
@@ -556,6 +557,7 @@ impl Manager {
 
         let cmd = match index {
             Some(index) => {
+                println!("Some index {:?}", index);
                 let peer = self.peers.get(addr).ok_or(Error::PeerNotFound)?;
                 if !peer.choked {
                     PieceDoneCmd::SendRequest {

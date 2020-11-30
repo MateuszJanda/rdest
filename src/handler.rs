@@ -619,6 +619,8 @@ impl Handler {
                 self.piece_rx = Some(PieceRx::new(index, piece_length, &piece_hash));
                 self.connection.send_msg(&Interested::new()).await?;
 
+                println!("UnchokeCmd::SendInterestedAndRequest");
+
                 // BEP3 suggests send more than one request to get good better TCP performance (pipeline)
                 self.send_request().await?;
                 self.send_request().await?;
@@ -629,15 +631,20 @@ impl Handler {
                 piece_hash,
             } => {
                 self.piece_rx = Some(PieceRx::new(index, piece_length, &piece_hash));
+                println!("UnchokeCmd::SendRequest");
 
                 // BEP3 suggests send more than one request to get good better TCP performance (pipeline)
                 self.send_request().await?;
                 self.send_request().await?;
             }
             UnchokeCmd::SendNotInterested => {
+                println!("UnchokeCmd::SendNotInterested");
                 self.connection.send_msg(&NotInterested::new()).await?
             }
-            UnchokeCmd::Ignore => (),
+            UnchokeCmd::Ignore => {
+                println!("UnchokeCmd::Ignore");
+                ()
+            }
         }
 
         Ok(())
@@ -686,6 +693,8 @@ impl Handler {
             } => {
                 self.piece_rx = Some(PieceRx::new(index, piece_length, &piece_hash));
                 self.connection.send_msg(&Interested::new()).await?;
+
+                println!("HaveCmd::SendRequest");
 
                 // BEP3 suggests send more than one request to get good better TCP performance (pipeline)
                 self.send_request().await?;
@@ -779,15 +788,24 @@ impl Handler {
             } => {
                 self.piece_rx = Some(PieceRx::new(index, piece_length, &piece_hash));
 
+                println!("PieceDoneCmd::SendRequest");
+
                 // BEP3 suggests send more than one request to get good better TCP performance (pipeline)
                 self.send_request().await?;
                 self.send_request().await?;
             }
             PieceDoneCmd::SendNotInterested => {
+                println!("PieceDoneCmd::SendNotInterested");
                 self.connection.send_msg(&NotInterested::new()).await?
             }
-            PieceDoneCmd::PrepareKill => return Ok(false),
-            PieceDoneCmd::Ignore => (),
+            PieceDoneCmd::PrepareKill => {
+                println!("PieceDoneCmd::PrepareKill");
+                return Ok(false);
+            }
+            PieceDoneCmd::Ignore => {
+                println!("PieceDoneCmd::Ignore");
+                ()
+            }
         }
 
         Ok(true)
@@ -810,8 +828,6 @@ impl Handler {
         if let Some(piece_rx) = self.piece_rx.as_mut() {
             if let Some((block_begin, block_len)) = piece_rx.left.pop_front() {
                 piece_rx.requested.push_back((block_begin, block_len));
-
-                println!("Wysyłam kolejny request");
                 let msg = Request::new(piece_rx.index, block_begin, block_len);
                 self.connection.send_msg(&msg).await?;
             }
