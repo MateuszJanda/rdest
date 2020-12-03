@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::fs;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Clone, Debug)]
 pub struct Metainfo {
     announce: String,
     name: String,

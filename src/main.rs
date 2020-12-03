@@ -1,4 +1,4 @@
-use rdest::{Manager, Metainfo, TrackerClient};
+use rdest::{Manager, Metainfo};
 use std::net::Ipv4Addr;
 use tokio;
 use tokio::net::TcpListener;
@@ -16,7 +16,7 @@ async fn main() {
     // println!("{:?}", t);
 
     // let r = TrackerResp::from_file("response.data".to_string()).unwrap();
-    let r = TrackerClient::connect(&t).await.unwrap(); // TODO
+    // let r = TrackerClient::connect(&t).await.unwrap(); // TODO
 
     // for v in r.peers {
     //     println!("{:?}", v);
@@ -24,7 +24,7 @@ async fn main() {
 
     // println!("{:?}", ResponseParser::from_file("response.data".to_string()));
 
-    let mut m = Manager::new(t, r, *b"ABCDEFGHIJKLMNOPQRST");
+    let mut m = Manager::new(t, *b"ABCDEFGHIJKLMNOPQRST");
     m.run().await;
 
     // loop {

@@ -16,36 +16,48 @@ pub enum TrackerCmd {
     Fail(String),
 }
 
-#[derive(PartialEq, Clone, Debug)]
-pub struct TrackerClient {}
+#[derive(Clone, Debug)]
+pub struct TrackerClient {
+    own_id: [u8; HASH_SIZE],
+    metainfo: Metainfo,
+    tracker_ch: mpsc::Sender<TrackerCmd>,
+}
 
 impl TrackerClient {
-    pub async fn run(
-        peer_id: &[u8; HASH_SIZE],
-        metainfo: &Metainfo,
-        tracker_ch: &mut mpsc::Sender<TrackerCmd>,
-    ) {
+    pub fn new(
+        own_id: &[u8; HASH_SIZE],
+        metainfo: Metainfo,
+        tracker_ch: mpsc::Sender<TrackerCmd>,
+    ) -> TrackerClient {
+        TrackerClient {
+            own_id: *own_id,
+            metainfo,
+            tracker_ch,
+        }
+    }
+
+    pub async fn run(&mut self) {
         let params = [
-            ("peer_id", String::from_utf8(peer_id.to_vec()).unwrap()),
+            ("peer_id", String::from_utf8(self.own_id.to_vec()).unwrap()),
             ("port", PORT.to_string()),
             ("uploaded", "0".to_string()),
             ("downloaded", "0".to_string()),
-            ("left", metainfo.total_length().to_string()),
+            ("left", self.metainfo.total_length().to_string()),
             ("event", "started".to_string()),
             ("numwant", "20".to_string()),
         ];
 
         let client = reqwest::Client::new();
-        let url = &Self::get_url(metainfo);
+        let url = &Self::get_url(&self.metainfo);
 
         loop {
             match Self::parse_resp(client.get(url).query(&params).send().await).await {
                 Ok(resp) => {
-                    Self::send(tracker_ch, TrackerCmd::TrackerResp(resp)).await;
+                    self.send(TrackerCmd::TrackerResp(resp)).await;
                     break;
                 }
                 Err(e) => {
-                    Self::send(tracker_ch, TrackerCmd::Fail(e)).await;
+                    self.send(TrackerCmd::Fail(e)).await;
                     time::delay_for(Duration::from_millis(DELAY_MS)).await;
                 }
             }
@@ -71,8 +83,8 @@ impl TrackerClient {
         }
     }
 
-    async fn send(tracker_ch: &mut mpsc::Sender<TrackerCmd>, cmd: TrackerCmd) {
-        tracker_ch
+    async fn send(&mut self, cmd: TrackerCmd) {
+        self.tracker_ch
             .send(cmd)
             .await
             .expect("Can't communicate to manager");

@@ -5,7 +5,8 @@ use crate::handler::{
     RequestCmd, UnchokeCmd,
 };
 use crate::progress::{Progress, ViewCmd};
-use crate::{utils, Error, Metainfo, TrackerResp};
+use crate::tracker_client::TrackerCmd;
+use crate::{utils, Error, Metainfo, TrackerClient};
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
 use std::fs;
@@ -31,8 +32,11 @@ pub struct Manager {
     candidates: Vec<(String, [u8; HASH_SIZE])>,
     view: Option<View>,
     change_round: u32,
+    ttt: Option<JoinHandle<()>>,
     job_tx_ch: mpsc::Sender<JobCmd>,
     job_rx_ch: mpsc::Receiver<JobCmd>,
+    tracker_tx_ch: mpsc::Sender<TrackerCmd>,
+    tracker_rx_ch: mpsc::Receiver<TrackerCmd>,
     broad_ch: broadcast::Sender<BroadCmd>,
 }
 
@@ -83,8 +87,9 @@ impl Peer {
 }
 
 impl Manager {
-    pub fn new(metainfo: Metainfo, tracker: TrackerResp, own_id: [u8; HASH_SIZE]) -> Manager {
+    pub fn new(metainfo: Metainfo, own_id: [u8; HASH_SIZE]) -> Manager {
         let (job_tx_ch, job_rx_ch) = mpsc::channel(JOB_CHANNEL_SIZE);
+        let (tracker_tx_ch, tracker_rx_ch) = mpsc::channel(JOB_CHANNEL_SIZE);
         let (broad_ch, _) = broadcast::channel(BROADCAST_CHANNEL_SIZE);
 
         Manager {
@@ -92,20 +97,30 @@ impl Manager {
             pieces_status: vec![Status::Missing; metainfo.pieces_num()],
             peers: HashMap::new(),
             metainfo,
-            candidates: tracker.peers(),
+            candidates: vec![],
             view: None,
             change_round: 0,
+            ttt: None,
             job_tx_ch,
             job_rx_ch,
+            tracker_tx_ch,
+            tracker_rx_ch,
             broad_ch,
         }
     }
 
     pub async fn run(&mut self) {
         self.spawn_view();
-        self.spawn_jobs();
+
+        let mut t = TrackerClient::new(
+            &self.own_id,
+            self.metainfo.clone(),
+            self.tracker_tx_ch.clone(),
+        );
+        self.ttt = Some(tokio::spawn(async move { t.run().await }));
 
         self.event_loop().await;
+        // self.spawn_jobs();
     }
 
     fn spawn_view(&mut self) {
@@ -156,6 +171,26 @@ impl Manager {
         loop {
             tokio::select! {
                 _ = change_state_timer.tick() => self.timeout_change_conn_state().expect("Can't change connection state"),
+                Some(cmd) = self.tracker_rx_ch.recv() => {
+                    println!("Tracker resp");
+                    match cmd {
+                        TrackerCmd::TrackerResp(resp) => {
+                            self.candidates.extend_from_slice(&resp.peers());
+                            for _ in 0..1 {
+                                self.spawn_jobs();
+                            }
+                        }
+                        TrackerCmd::Fail(_) => (),
+                    }
+
+                    // kill tracker client
+                    match &mut self.ttt.take() {
+                        Some(job) => {
+                            job.await.expect("Can't kill tracker client");
+                        }
+                        _ => (),
+                    }
+                }
                 Some(cmd) = self.job_rx_ch.recv() => {
                     if self.handle_job_cmd(cmd).await.expect("Can't handle command") == false {
                         break;
