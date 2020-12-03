@@ -1,7 +1,5 @@
 use crate::constant::{HASH_SIZE, PORT};
 use crate::{Metainfo, TrackerResp};
-use rand::distributions::Alphanumeric;
-use rand::Rng;
 use reqwest::Response;
 use tokio::sync::mpsc;
 use tokio::time;
@@ -48,16 +46,16 @@ impl TrackerClient {
         ];
 
         let client = reqwest::Client::new();
-        let url = &Self::get_url(&self.metainfo);
+        let url = &Self::create_url(&self.metainfo);
 
         loop {
             match Self::parse_resp(client.get(url).query(&params).send().await).await {
                 Ok(resp) => {
-                    self.send(TrackerCmd::TrackerResp(resp)).await;
+                    self.send_cmd(TrackerCmd::TrackerResp(resp)).await;
                     break;
                 }
                 Err(e) => {
-                    self.send(TrackerCmd::Fail(e)).await;
+                    self.send_cmd(TrackerCmd::Fail(e)).await;
                     time::delay_for(Duration::from_millis(DELAY_MS)).await;
                 }
             }
@@ -83,46 +81,14 @@ impl TrackerClient {
         }
     }
 
-    async fn send(&mut self, cmd: TrackerCmd) {
+    async fn send_cmd(&mut self, cmd: TrackerCmd) {
         self.tracker_ch
             .send(cmd)
             .await
             .expect("Can't communicate to manager");
     }
 
-    pub async fn connect(metainfo: &Metainfo) -> Result<TrackerResp, Box<dyn std::error::Error>> {
-        let peer_id = rand::thread_rng()
-            .sample_iter(&Alphanumeric)
-            .take(HASH_SIZE)
-            .collect::<String>();
-
-        let params = [
-            ("peer_id", peer_id),
-            ("port", PORT.to_string()),
-            ("uploaded", "0".to_string()),
-            ("downloaded", "0".to_string()),
-            ("left", metainfo.total_length().to_string()),
-            ("event", "started".to_string()),
-            ("numwant", "20".to_string()),
-        ];
-
-        let client = reqwest::Client::new();
-        let resp = client
-            .get(&Self::get_url(metainfo))
-            .query(&params)
-            .send()
-            .await?;
-
-        let body = resp.bytes().await?;
-        let data = match TrackerResp::from_bencode(body.as_ref()) {
-            Ok(data) => data,
-            Err(e) => Err(e)?,
-        };
-
-        Ok(data)
-    }
-
-    fn get_url(metainfo: &Metainfo) -> String {
+    fn create_url(metainfo: &Metainfo) -> String {
         let info_hash: String = form_urlencoded::byte_serialize(metainfo.info_hash()).collect();
         metainfo.tracker_url().clone() + "?info_hash=" + info_hash.as_str()
     }
