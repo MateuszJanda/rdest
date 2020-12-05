@@ -3,6 +3,7 @@ mod connection;
 mod constant;
 mod deep_finder;
 mod error;
+mod extractor;
 mod frame;
 mod handler;
 mod manager;
