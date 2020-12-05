@@ -94,11 +94,10 @@ impl Handshake {
                 {
                     return Err(Error::InvalidInfoHash);
                 }
+                Ok(())
             }
-            None => (),
+            None => Ok(()),
         }
-
-        Ok(())
     }
 }
 
