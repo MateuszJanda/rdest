@@ -1,7 +1,7 @@
-use crate::constant::{MSG_LEN_SIZE, MSG_ID_SIZE};
-use std::io::Cursor;
-use crate::Error;
+use crate::constant::{MSG_ID_SIZE, MSG_LEN_SIZE};
 use crate::serializer::Serializer;
+use crate::Error;
+use std::io::Cursor;
 
 #[derive(Debug)]
 pub struct Have {

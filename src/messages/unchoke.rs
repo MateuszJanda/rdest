@@ -1,6 +1,6 @@
 use crate::constant::MSG_LEN_SIZE;
-use crate::Error;
 use crate::serializer::Serializer;
+use crate::Error;
 
 #[derive(Debug)]
 pub struct Unchoke {}

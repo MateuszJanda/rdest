@@ -4,10 +4,15 @@ use crate::commands::{
 };
 use crate::connection::Connection;
 use crate::constant::{HASH_SIZE, PEER_ID_SIZE, PIECE_BLOCK_SIZE};
-use crate::frame::{Bitfield, Frame, Piece, Request};
+use crate::frame::{Frame, Piece, Request};
+use crate::messages::bitfield::Bitfield;
 use crate::messages::choke::Choke;
 use crate::messages::handshake::Handshake;
+use crate::messages::have::Have;
+use crate::messages::interested::Interested;
 use crate::messages::keep_alive::KeepAlive;
+use crate::messages::not_interested::NotInterested;
+use crate::messages::unchoke::Unchoke;
 use crate::{utils, Error};
 use std::collections::VecDeque;
 use std::fs;
@@ -15,10 +20,6 @@ use tokio::net::TcpStream;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time;
 use tokio::time::{Duration, Instant, Interval};
-use crate::messages::unchoke::Unchoke;
-use crate::messages::interested::Interested;
-use crate::messages::not_interested::NotInterested;
-use crate::messages::have::Have;
 
 const KEEP_ALIVE_INTERVAL_SEC: u64 = 120;
 const STATS_INTERVAL_SEC: u64 = 10;

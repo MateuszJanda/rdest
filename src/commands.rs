@@ -1,5 +1,5 @@
 use crate::constant::HASH_SIZE;
-use crate::frame::Bitfield;
+use crate::messages::bitfield::Bitfield;
 use crate::TrackerResp;
 use std::collections::HashMap;
 use tokio::sync::oneshot;

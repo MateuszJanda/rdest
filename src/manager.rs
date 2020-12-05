@@ -4,8 +4,8 @@ use crate::commands::{
 };
 use crate::constant::PEER_ID_SIZE;
 use crate::extractor::Extractor;
-use crate::frame::Bitfield;
 use crate::handler::Handler;
+use crate::messages::bitfield::Bitfield;
 use crate::progress::Progress;
 use crate::{Error, Metainfo, TrackerClient};
 use rand::seq::SliceRandom;
