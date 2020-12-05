@@ -1,12 +1,8 @@
+use crate::commands::ViewCmd;
 use std::io;
 use std::io::Write;
 use tokio::sync::mpsc;
 use tokio::time::{interval_at, Duration, Instant};
-
-pub enum ViewCmd {
-    Log(String),
-    Kill,
-}
 
 pub struct Progress {
     pos: usize,

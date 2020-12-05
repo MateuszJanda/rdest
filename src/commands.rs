@@ -16,6 +16,11 @@ pub enum ExtractorCmd {
     Fail(String),
 }
 
+pub enum ViewCmd {
+    Log(String),
+    Kill,
+}
+
 #[derive(Debug, Clone)]
 pub enum BroadCmd {
     SendHave {
