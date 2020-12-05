@@ -1,15 +1,12 @@
 use crate::commands::{
-    BitfieldCmd, BroadCmd, HaveCmd, InitCmd, JobCmd, NotInterestedCmd, PieceDoneCmd, RequestCmd,
-    UnchokeCmd,
+    BitfieldCmd, BroadCmd, ExtractorCmd, HaveCmd, InitCmd, JobCmd, NotInterestedCmd, PieceDoneCmd,
+    RequestCmd, TrackerCmd, UnchokeCmd,
 };
 use crate::constant::HASH_SIZE;
-use crate::extractor::{Extractor, ExtractorCmd};
+use crate::extractor::Extractor;
 use crate::frame::Bitfield;
-use crate::handler::{
-    Handler
-};
+use crate::handler::Handler;
 use crate::progress::{Progress, ViewCmd};
-use crate::tracker_client::TrackerCmd;
 use crate::{Error, Metainfo, TrackerClient};
 use rand::seq::SliceRandom;
 use std::collections::HashMap;

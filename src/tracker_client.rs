@@ -1,3 +1,4 @@
+use crate::commands::TrackerCmd;
 use crate::constant::{HASH_SIZE, PORT};
 use crate::{Metainfo, TrackerResp};
 use reqwest::Response;
@@ -7,12 +8,6 @@ use tokio::time::Duration;
 use url::form_urlencoded;
 
 const DELAY_MS: u64 = 500;
-
-#[derive(Debug, Clone)]
-pub enum TrackerCmd {
-    TrackerResp(TrackerResp),
-    Fail(String),
-}
 
 #[derive(Clone, Debug)]
 pub struct TrackerClient {

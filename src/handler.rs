@@ -9,7 +9,7 @@ use crate::frame::{
     Unchoke,
 };
 use crate::{utils, Error};
-use std::collections::{ VecDeque};
+use std::collections::VecDeque;
 use std::fs;
 use tokio::net::TcpStream;
 use tokio::sync::{broadcast, mpsc, oneshot};

@@ -1,7 +1,20 @@
 use crate::constant::HASH_SIZE;
 use crate::frame::Bitfield;
+use crate::TrackerResp;
 use std::collections::HashMap;
 use tokio::sync::oneshot;
+
+#[derive(Debug, Clone)]
+pub enum TrackerCmd {
+    TrackerResp(TrackerResp),
+    Fail(String),
+}
+
+#[derive(Debug, Clone)]
+pub enum ExtractorCmd {
+    Done,
+    Fail(String),
+}
 
 #[derive(Debug, Clone)]
 pub enum BroadCmd {

@@ -1,15 +1,10 @@
+use crate::commands::ExtractorCmd;
 use crate::{utils, Metainfo};
 use std::fs;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Seek, Write};
 use std::path::Path;
 use tokio::sync::mpsc;
-
-#[derive(Debug, Clone)]
-pub enum ExtractorCmd {
-    Done,
-    Fail(String),
-}
 
 pub struct Extractor {
     metainfo: Metainfo,
