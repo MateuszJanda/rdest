@@ -179,10 +179,8 @@ impl Handler {
         mut job_ch: mpsc::Sender<JobCmd>,
         broad_ch: broadcast::Receiver<BroadCmd>,
     ) {
-        println!("Try connect to {}", &addr);
         match TcpStream::connect(&addr).await {
             Ok(socket) => {
-                println!("connected");
                 let handler = Handler::new(
                     socket, addr, own_id, peer_id, info_hash, pieces_num, job_ch, broad_ch,
                 );
@@ -204,7 +202,6 @@ impl Handler {
         job_ch: mpsc::Sender<JobCmd>,
         broad_ch: broadcast::Receiver<BroadCmd>,
     ) {
-        println!("Accept from {}", &addr);
         let handler = Handler::new(
             socket, addr, own_id, peer_id, info_hash, pieces_num, job_ch, broad_ch,
         );
@@ -642,7 +639,7 @@ impl Handler {
                 self.connection.send_msg(&NotInterested::new()).await?
             }
             PieceDoneCmd::PrepareKill => return Ok(false),
-            PieceDoneCmd::Ignore => println!("PieceDoneCmd::Ignore"),
+            PieceDoneCmd::Ignore => (),
         }
 
         Ok(true)
