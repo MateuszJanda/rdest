@@ -1,6 +1,6 @@
 use crate::commands::{
     BitfieldCmd, BroadCmd, ExtractorCmd, HaveCmd, InitCmd, JobCmd, NotInterestedCmd, PieceDoneCmd,
-    RequestCmd, TrackerCmd, UnchokeCmd, ViewCmd,
+    ReqData, RequestCmd, TrackerCmd, UnchokeCmd, ViewCmd,
 };
 use crate::constant::{PEER_ID_SIZE, PORT};
 use crate::extractor::Extractor;
@@ -446,19 +446,19 @@ impl Manager {
         let cmd = match index {
             Some(index) if !peer.am_interested => {
                 self.pieces_status[index] = Status::Reserved;
-                UnchokeCmd::SendInterestedAndRequest {
+                UnchokeCmd::SendInterestedAndRequest(ReqData {
                     index,
                     piece_length: self.metainfo.piece_length(index),
                     piece_hash: *self.metainfo.piece(index),
-                }
+                })
             }
             Some(index) => {
                 self.pieces_status[index] = Status::Reserved;
-                UnchokeCmd::SendRequest {
+                UnchokeCmd::SendRequest(ReqData {
                     index,
                     piece_length: self.metainfo.piece_length(index),
                     piece_hash: *self.metainfo.piece(index),
-                }
+                })
             }
             None if peer.am_interested => UnchokeCmd::SendNotInterested,
             None => UnchokeCmd::Ignore,
@@ -516,11 +516,11 @@ impl Manager {
                 self.pieces_status[index] = Status::Reserved;
                 peer.index = Some(index);
                 peer.am_interested = true;
-                HaveCmd::SendInterestedAndRequest {
+                HaveCmd::SendInterestedAndRequest(ReqData {
                     index,
                     piece_length: self.metainfo.piece_length(index),
                     piece_hash: *self.metainfo.piece(index),
-                }
+                })
             } else {
                 peer.am_interested = true;
                 HaveCmd::SendInterested
@@ -640,11 +640,11 @@ impl Manager {
                 println!("Some index {:?}", index);
                 let peer = self.peers.get(addr).ok_or(Error::PeerNotFound)?;
                 if !peer.choked {
-                    PieceDoneCmd::SendRequest {
+                    PieceDoneCmd::SendRequest(ReqData {
                         index,
                         piece_length: self.metainfo.piece_length(index),
                         piece_hash: *self.metainfo.piece(index),
-                    }
+                    })
                 } else {
                     PieceDoneCmd::Ignore
                 }

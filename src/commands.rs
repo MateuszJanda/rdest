@@ -83,22 +83,21 @@ pub enum JobCmd {
 }
 
 #[derive(Debug)]
+pub struct ReqData {
+    pub index: usize,
+    pub piece_length: usize,
+    pub piece_hash: [u8; HASH_SIZE],
+}
+
+#[derive(Debug)]
 pub enum InitCmd {
     SendBitfield { bitfield: Bitfield },
 }
 
 #[derive(Debug)]
 pub enum UnchokeCmd {
-    SendInterestedAndRequest {
-        index: usize,
-        piece_length: usize,
-        piece_hash: [u8; HASH_SIZE],
-    },
-    SendRequest {
-        index: usize,
-        piece_length: usize,
-        piece_hash: [u8; HASH_SIZE],
-    },
+    SendInterestedAndRequest(ReqData),
+    SendRequest(ReqData),
     SendNotInterested,
     Ignore,
 }
@@ -111,11 +110,7 @@ pub enum NotInterestedCmd {
 
 #[derive(Debug)]
 pub enum HaveCmd {
-    SendInterestedAndRequest {
-        index: usize,
-        piece_length: usize,
-        piece_hash: [u8; HASH_SIZE],
-    },
+    SendInterestedAndRequest(ReqData),
     SendInterested,
     Ignore,
 }
@@ -139,11 +134,7 @@ pub enum RequestCmd {
 
 #[derive(Debug)]
 pub enum PieceDoneCmd {
-    SendRequest {
-        index: usize,
-        piece_length: usize,
-        piece_hash: [u8; HASH_SIZE],
-    },
+    SendRequest(ReqData),
     SendNotInterested,
     PrepareKill,
     Ignore,

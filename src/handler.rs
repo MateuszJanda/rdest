@@ -1,6 +1,6 @@
 use crate::commands::{
-    BitfieldCmd, BroadCmd, HaveCmd, InitCmd, JobCmd, NotInterestedCmd, PieceDoneCmd, RequestCmd,
-    UnchokeCmd,
+    BitfieldCmd, BroadCmd, HaveCmd, InitCmd, JobCmd, NotInterestedCmd, PieceDoneCmd, ReqData,
+    RequestCmd, UnchokeCmd,
 };
 use crate::connection::Connection;
 use crate::constant::{HASH_SIZE, PEER_ID_SIZE, PIECE_BLOCK_SIZE};
@@ -67,13 +67,13 @@ struct Stats {
 }
 
 impl PieceRx {
-    fn new(index: usize, piece_length: usize, piece_hash: &[u8; HASH_SIZE]) -> PieceRx {
+    fn new(req_data: ReqData) -> PieceRx {
         PieceRx {
-            index,
-            hash: *piece_hash,
-            buff: vec![0; piece_length],
+            index: req_data.index,
+            hash: req_data.piece_hash,
+            buff: vec![0; req_data.piece_length],
             requested: VecDeque::from(vec![]),
-            left: Self::left(piece_length),
+            left: Self::left(req_data.piece_length),
         }
     }
 
@@ -517,32 +517,10 @@ impl Handler {
             .await?;
 
         match resp_rx.await? {
-            UnchokeCmd::SendInterestedAndRequest {
-                index,
-                piece_length,
-                piece_hash,
-            } => {
-                self.piece_rx = Some(PieceRx::new(index, piece_length, &piece_hash));
-                self.connection.send_msg(&Interested::new()).await?;
-
-                println!("UnchokeCmd::SendInterestedAndRequest");
-
-                // BEP3 suggests send more than one request to get good better TCP performance (pipeline)
-                self.send_request().await?;
-                self.send_request().await?;
+            UnchokeCmd::SendInterestedAndRequest(req_data) => {
+                self.new_request(true, req_data).await?
             }
-            UnchokeCmd::SendRequest {
-                index,
-                piece_length,
-                piece_hash,
-            } => {
-                self.piece_rx = Some(PieceRx::new(index, piece_length, &piece_hash));
-                println!("UnchokeCmd::SendRequest");
-
-                // BEP3 suggests send more than one request to get good better TCP performance (pipeline)
-                self.send_request().await?;
-                self.send_request().await?;
-            }
+            UnchokeCmd::SendRequest(req_data) => self.new_request(false, req_data).await?,
             UnchokeCmd::SendNotInterested => {
                 println!("UnchokeCmd::SendNotInterested");
                 self.connection.send_msg(&NotInterested::new()).await?
@@ -592,20 +570,8 @@ impl Handler {
             .await?;
 
         match resp_rx.await? {
-            HaveCmd::SendInterestedAndRequest {
-                index,
-                piece_length,
-                piece_hash,
-            } => {
-                self.piece_rx = Some(PieceRx::new(index, piece_length, &piece_hash));
-                self.connection.send_msg(&Interested::new()).await?;
+            HaveCmd::SendInterestedAndRequest(req_data) => self.new_request(true, req_data).await?,
 
-                println!("HaveCmd::SendRequest");
-
-                // BEP3 suggests send more than one request to get good better TCP performance (pipeline)
-                self.send_request().await?;
-                self.send_request().await?;
-            }
             HaveCmd::SendInterested => self.connection.send_msg(&Interested::new()).await?,
             HaveCmd::Ignore => (),
         }
@@ -680,19 +646,7 @@ impl Handler {
             .await?;
 
         match resp_rx.await? {
-            PieceDoneCmd::SendRequest {
-                index,
-                piece_length,
-                piece_hash,
-            } => {
-                self.piece_rx = Some(PieceRx::new(index, piece_length, &piece_hash));
-
-                println!("PieceDoneCmd::SendRequest");
-
-                // BEP3 suggests send more than one request to get good better TCP performance (pipeline)
-                self.send_request().await?;
-                self.send_request().await?;
-            }
+            PieceDoneCmd::SendRequest(req_data) => self.new_request(false, req_data).await?,
             PieceDoneCmd::SendNotInterested => {
                 println!("PieceDoneCmd::SendNotInterested");
                 self.connection.send_msg(&NotInterested::new()).await?
@@ -723,7 +677,20 @@ impl Handler {
         Ok(())
     }
 
-    async fn new_request(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn new_request(
+        &mut self,
+        interested: bool,
+        req_data: ReqData,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        self.piece_rx = Some(PieceRx::new(req_data));
+
+        if interested {
+            self.connection.send_msg(&Interested::new()).await?;
+        }
+
+        // BEP3 suggests send more than one request to get good better TCP performance (pipeline)
+        self.send_request().await?;
+        self.send_request().await?;
         Ok(())
     }
 
