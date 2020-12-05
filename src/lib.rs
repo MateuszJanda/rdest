@@ -8,6 +8,7 @@ mod extractor;
 mod frame;
 mod handler;
 mod manager;
+mod messages;
 mod metainfo;
 mod progress;
 mod raw_finder;
