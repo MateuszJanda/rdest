@@ -1,14 +1,11 @@
-use crate::constant::PIECE_BLOCK_SIZE;
+use crate::constant::{MSG_ID_POS, MSG_ID_SIZE, MSG_LEN_SIZE, PIECE_BLOCK_SIZE};
 use crate::messages::handshake::Handshake;
+use crate::messages::keep_alive::KeepAlive;
 use crate::serializer::Serializer;
 use crate::Error;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
 use std::io::Cursor;
-
-const LEN_SIZE: usize = 4;
-const ID_POS: usize = LEN_SIZE;
-const ID_SIZE: usize = 1;
 
 #[derive(Debug)]
 pub enum Frame {
@@ -26,31 +23,12 @@ pub enum Frame {
 }
 
 #[derive(Debug)]
-pub struct KeepAlive {}
-
-impl KeepAlive {
-    const LEN: u32 = 0;
-    const LEN_SIZE: usize = LEN_SIZE;
-    const FULL_SIZE: usize = KeepAlive::LEN_SIZE;
-
-    pub fn new() -> KeepAlive {
-        KeepAlive {}
-    }
-}
-
-impl Serializer for KeepAlive {
-    fn data(&self) -> Vec<u8> {
-        KeepAlive::LEN.to_be_bytes().to_vec()
-    }
-}
-
-#[derive(Debug)]
 pub struct Choke {}
 
 impl Choke {
     const LEN: u32 = 1;
     const ID: u8 = 0;
-    const LEN_SIZE: usize = LEN_SIZE;
+    const LEN_SIZE: usize = MSG_LEN_SIZE;
     const FULL_SIZE: usize = Choke::LEN_SIZE + Choke::LEN as usize;
 
     pub fn new() -> Choke {
@@ -82,7 +60,7 @@ pub struct Unchoke {}
 impl Unchoke {
     const LEN: u32 = 1;
     const ID: u8 = 1;
-    const LEN_SIZE: usize = LEN_SIZE;
+    const LEN_SIZE: usize = MSG_LEN_SIZE;
     const FULL_SIZE: usize = Unchoke::LEN_SIZE + Unchoke::LEN as usize;
 
     pub fn new() -> Unchoke {
@@ -114,7 +92,7 @@ pub struct Interested {}
 impl Interested {
     const LEN: u32 = 1;
     const ID: u8 = 2;
-    const LEN_SIZE: usize = LEN_SIZE;
+    const LEN_SIZE: usize = MSG_LEN_SIZE;
     const FULL_SIZE: usize = Interested::LEN_SIZE + Interested::LEN as usize;
 
     pub fn new() -> Interested {
@@ -146,7 +124,7 @@ pub struct NotInterested {}
 impl NotInterested {
     const LEN: u32 = 1;
     const ID: u8 = 3;
-    const LEN_SIZE: usize = LEN_SIZE;
+    const LEN_SIZE: usize = MSG_LEN_SIZE;
     const FULL_SIZE: usize = NotInterested::LEN_SIZE + NotInterested::LEN as usize;
 
     pub fn new() -> NotInterested {
@@ -180,8 +158,8 @@ pub struct Have {
 impl Have {
     const LEN: u32 = 5;
     const ID: u8 = 4;
-    const LEN_SIZE: usize = LEN_SIZE;
-    const ID_SIZE: usize = ID_SIZE;
+    const LEN_SIZE: usize = MSG_LEN_SIZE;
+    const ID_SIZE: usize = MSG_ID_SIZE;
     const INDEX_SIZE: usize = 4;
     const FULL_SIZE: usize = Have::LEN_SIZE + Have::LEN as usize;
 
@@ -240,8 +218,8 @@ pub struct Bitfield {
 
 impl Bitfield {
     const ID: u8 = 5;
-    const LEN_SIZE: usize = LEN_SIZE;
-    const ID_SIZE: usize = ID_SIZE;
+    const LEN_SIZE: usize = MSG_LEN_SIZE;
+    const ID_SIZE: usize = MSG_ID_SIZE;
 
     pub fn from_vec(pieces: &Vec<bool>) -> Bitfield {
         let mut v = vec![];
@@ -325,8 +303,8 @@ pub struct Request {
 impl Request {
     const LEN: u32 = 13;
     const ID: u8 = 6;
-    const LEN_SIZE: usize = LEN_SIZE;
-    const ID_SIZE: usize = ID_SIZE;
+    const LEN_SIZE: usize = MSG_LEN_SIZE;
+    const ID_SIZE: usize = MSG_ID_SIZE;
     const INDEX_SIZE: usize = 4;
     const BEGIN_SIZE: usize = 4;
     const LENGTH_SIZE: usize = 4;
@@ -421,8 +399,8 @@ pub struct Piece {
 
 impl Piece {
     const ID: u8 = 7;
-    const LEN_SIZE: usize = LEN_SIZE;
-    const ID_SIZE: usize = ID_SIZE;
+    const LEN_SIZE: usize = MSG_LEN_SIZE;
+    const ID_SIZE: usize = MSG_ID_SIZE;
     const INDEX_SIZE: usize = 4;
     const BEGIN_SIZE: usize = 4;
     const MIN_LEN: usize = 9;
@@ -521,8 +499,8 @@ pub struct Cancel {
 impl Cancel {
     const LEN: u32 = 13;
     const ID: u8 = 8;
-    const LEN_SIZE: usize = LEN_SIZE;
-    const ID_SIZE: usize = ID_SIZE;
+    const LEN_SIZE: usize = MSG_LEN_SIZE;
+    const ID_SIZE: usize = MSG_ID_SIZE;
     const INDEX_SIZE: usize = 4;
     const BEGIN_SIZE: usize = 4;
     const LENGTH_SIZE: usize = 4;
@@ -647,7 +625,7 @@ impl Frame {
             }
             None => {
                 // To skip unknown message
-                crs.set_position((LEN_SIZE + length) as u64);
+                crs.set_position((MSG_LEN_SIZE + length) as u64);
                 Err(Error::UnknownId(msg_id))
             }
         }
@@ -668,9 +646,9 @@ impl Frame {
         let start = crs.position() as usize;
         let end = crs.get_ref().len();
 
-        if end - start >= LEN_SIZE as usize {
-            let mut b = [0; LEN_SIZE];
-            b.copy_from_slice(&crs.get_ref()[0..LEN_SIZE]);
+        if end - start >= MSG_LEN_SIZE as usize {
+            let mut b = [0; MSG_LEN_SIZE];
+            b.copy_from_slice(&crs.get_ref()[0..MSG_LEN_SIZE]);
             return Ok(u32::from_be_bytes(b) as usize);
         }
 
@@ -681,8 +659,8 @@ impl Frame {
         let start = crs.position() as usize;
         let end = crs.get_ref().len();
 
-        if end - start >= (LEN_SIZE + ID_SIZE) as usize {
-            return Ok(crs.get_ref()[ID_POS]);
+        if end - start >= (MSG_LEN_SIZE + MSG_ID_SIZE) as usize {
+            return Ok(crs.get_ref()[MSG_ID_POS]);
         }
 
         Err(Error::Incomplete("Message ID getter".into()))

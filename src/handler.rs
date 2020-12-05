@@ -5,9 +5,10 @@ use crate::commands::{
 use crate::connection::Connection;
 use crate::constant::{HASH_SIZE, PEER_ID_SIZE, PIECE_BLOCK_SIZE};
 use crate::frame::{
-    Bitfield, Choke, Frame, Have, Interested, KeepAlive, NotInterested, Piece, Request, Unchoke,
+    Bitfield, Choke, Frame, Have, Interested, NotInterested, Piece, Request, Unchoke,
 };
 use crate::messages::handshake::Handshake;
+use crate::messages::keep_alive::KeepAlive;
 use crate::{utils, Error};
 use std::collections::VecDeque;
 use std::fs;
