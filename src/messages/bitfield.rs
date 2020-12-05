@@ -62,7 +62,7 @@ impl Bitfield {
     }
 
     pub fn validate(&self, pieces_num: usize) -> Result<(), Error> {
-        match self.to_vec().len() < pieces_num {
+        match self.to_vec().len() == pieces_num {
             true => Ok(()),
             false => Err(Error::InvalidLength("Bitfield".into())),
         }

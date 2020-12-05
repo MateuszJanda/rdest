@@ -6,6 +6,7 @@ use sha1;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::fs;
+use std::path::PathBuf;
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct Metainfo {
@@ -29,7 +30,7 @@ pub struct PiecePos {
 }
 
 impl Metainfo {
-    pub fn from_file(path: String) -> Result<Metainfo, Error> {
+    pub fn from_file(path: PathBuf) -> Result<Metainfo, Error> {
         match &fs::read(path) {
             Ok(val) => Self::from_bencode(val),
             Err(_) => Err(Error::MetaFileNotFound),
