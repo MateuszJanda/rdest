@@ -80,10 +80,9 @@ impl PieceRx {
     fn left(piece_length: usize) -> VecDeque<(usize, usize)> {
         let mut res = VecDeque::from(vec![]);
         for block_begin in (0..piece_length).step_by(PIECE_BLOCK_SIZE) {
-            let block_length = if block_begin + PIECE_BLOCK_SIZE > piece_length {
-                piece_length % PIECE_BLOCK_SIZE
-            } else {
-                PIECE_BLOCK_SIZE
+            let block_length = match block_begin + PIECE_BLOCK_SIZE > piece_length {
+                true => piece_length % PIECE_BLOCK_SIZE,
+                false => PIECE_BLOCK_SIZE,
             };
             res.push_back((block_begin, block_length))
         }
