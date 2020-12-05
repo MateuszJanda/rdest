@@ -9,8 +9,8 @@ pub struct Have {
 }
 
 impl Have {
-    const LEN: u32 = 5;
     pub const ID: u8 = 4;
+    const LEN: u32 = 5;
     const LEN_SIZE: usize = MSG_LEN_SIZE;
     const ID_SIZE: usize = MSG_ID_SIZE;
     const INDEX_SIZE: usize = 4;
@@ -33,11 +33,10 @@ impl Have {
     }
 
     pub fn check(available_data: usize, length: usize) -> Result<usize, Error> {
-        if length == Have::LEN as usize && available_data >= Have::LEN_SIZE + length {
-            return Ok(Have::FULL_SIZE);
+        match length == Have::LEN as usize && available_data >= Have::LEN_SIZE + length {
+            true => Ok(Have::FULL_SIZE),
+            false => Err(Error::Incomplete("Have".into())),
         }
-
-        Err(Error::Incomplete("Have".into()))
     }
 
     pub fn index(&self) -> usize {
@@ -45,11 +44,10 @@ impl Have {
     }
 
     pub fn validate(&self, pieces_num: usize) -> Result<(), Error> {
-        if self.index as usize >= pieces_num {
-            return Err(Error::InvalidIndex("Have".into()));
+        match (self.index as usize) < pieces_num {
+            true => Ok(()),
+            false => Err(Error::InvalidIndex("Have".into())),
         }
-
-        Ok(())
     }
 }
 
