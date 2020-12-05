@@ -16,11 +16,10 @@ impl Interested {
     }
 
     pub fn check(length: usize) -> Result<usize, Error> {
-        if length == Interested::LEN as usize {
-            return Ok(Interested::FULL_SIZE);
+        match length == Interested::LEN as usize {
+            true => Ok(Interested::FULL_SIZE),
+            false => Err(Error::Incomplete("Interested".into())),
         }
-
-        Err(Error::Incomplete("Interested".into()))
     }
 }
 
