@@ -6,8 +6,8 @@ use crate::Error;
 pub struct Choke {}
 
 impl Choke {
-    const LEN: u32 = 1;
     pub const ID: u8 = 0;
+    const LEN: u32 = 1;
     const LEN_SIZE: usize = MSG_LEN_SIZE;
     const FULL_SIZE: usize = Choke::LEN_SIZE + Choke::LEN as usize;
 
@@ -16,11 +16,10 @@ impl Choke {
     }
 
     pub fn check(length: usize) -> Result<usize, Error> {
-        if length == Choke::LEN as usize {
-            return Ok(Choke::FULL_SIZE);
+        match length == Choke::LEN as usize {
+            true => Ok(Choke::FULL_SIZE),
+            false => Err(Error::Incomplete("Choke".into())),
         }
-
-        Err(Error::Incomplete("Choke".into()))
     }
 }
 

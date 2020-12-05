@@ -18,9 +18,9 @@ impl Bitfield {
     pub fn from_vec(pieces: &Vec<bool>) -> Bitfield {
         let mut vec = vec![];
 
-        for p in pieces.chunks(Bitfield::BITS_IN_BYTE) {
+        for piece in pieces.chunks(Bitfield::BITS_IN_BYTE) {
             let mut byte: u8 = 0;
-            for (idx, present) in p.iter().enumerate() {
+            for (idx, present) in piece.iter().enumerate() {
                 if *present {
                     byte |= Bitfield::BYTE_MASK >> idx;
                 }
@@ -57,7 +57,7 @@ impl Bitfield {
     pub fn check(available_data: usize, length: usize) -> Result<usize, Error> {
         match available_data >= Bitfield::LEN_SIZE + length {
             true => Ok(Bitfield::LEN_SIZE + length),
-            false => Err(Error::Incomplete("Bitfield".into()))
+            false => Err(Error::Incomplete("Bitfield".into())),
         }
     }
 
