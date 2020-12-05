@@ -2,7 +2,7 @@ use crate::commands::{
     BitfieldCmd, BroadCmd, ExtractorCmd, HaveCmd, InitCmd, JobCmd, NotInterestedCmd, PieceDoneCmd,
     RequestCmd, TrackerCmd, UnchokeCmd, ViewCmd,
 };
-use crate::constant::HASH_SIZE;
+use crate::constant::{HASH_SIZE, PEER_ID_SIZE};
 use crate::extractor::Extractor;
 use crate::frame::Bitfield;
 use crate::handler::Handler;
@@ -22,7 +22,7 @@ const OPTIMISTIC_UNCHOKE_ROUND: u32 = 3;
 const MAX_UNCHOKED: u32 = 3;
 
 pub struct Manager {
-    own_id: [u8; HASH_SIZE],
+    own_id: [u8; PEER_ID_SIZE],
     pieces_status: Vec<Status>,
     peers: HashMap<String, Peer>,
     metainfo: Metainfo,
