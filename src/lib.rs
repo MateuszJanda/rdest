@@ -1,4 +1,5 @@
 mod bdecoder;
+mod commands;
 mod connection;
 mod constant;
 mod deep_finder;

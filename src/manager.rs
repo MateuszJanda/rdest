@@ -1,9 +1,12 @@
+use crate::commands::{
+    BitfieldCmd, BroadCmd, HaveCmd, InitCmd, JobCmd, NotInterestedCmd, PieceDoneCmd, RequestCmd,
+    UnchokeCmd,
+};
 use crate::constant::HASH_SIZE;
 use crate::extractor::{Extractor, ExtractorCmd};
 use crate::frame::Bitfield;
 use crate::handler::{
-    BitfieldCmd, BroadCmd, Handler, HaveCmd, InitCmd, JobCmd, NotInterestedCmd, PieceDoneCmd,
-    RequestCmd, UnchokeCmd,
+    Handler
 };
 use crate::progress::{Progress, ViewCmd};
 use crate::tracker_client::TrackerCmd;
