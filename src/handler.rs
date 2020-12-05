@@ -384,7 +384,6 @@ impl Handler {
         }
 
         self.cmd_recv_unchoke().await?;
-
         Ok(true)
     }
 
@@ -441,16 +440,15 @@ impl Handler {
     async fn handle_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
         // Verify message
         let piece_rx = self.piece_rx.as_mut().ok_or(Error::PieceNotRequested)?;
-        if !piece_rx
+        let is_piece_requested = piece_rx
             .requested
             .iter()
             .any(|(block_begin, block_length)| {
                 piece
                     .validate(piece_rx.index, *block_begin, *block_length)
                     .is_ok()
-            })
-        {
-            println!("handle_piece {:?}", piece_rx.requested);
+            });
+        if !is_piece_requested {
             return Err(Error::BlockNotRequested.into());
         }
 
