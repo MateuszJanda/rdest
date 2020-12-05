@@ -11,6 +11,7 @@ mod manager;
 mod metainfo;
 mod progress;
 mod raw_finder;
+mod serializer;
 mod tracker_client;
 mod tracker_resp;
 mod utils;

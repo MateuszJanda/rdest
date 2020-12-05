@@ -1,4 +1,5 @@
-use crate::frame::{Frame, Serializer};
+use crate::frame::Frame;
+use crate::serializer::Serializer;
 use crate::Error;
 use bytes::{Buf, BytesMut};
 use std::io::Cursor;

@@ -1,4 +1,5 @@
 use crate::constant::{HASH_SIZE, PEER_ID_SIZE, PIECE_BLOCK_SIZE};
+use crate::serializer::Serializer;
 use crate::Error;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
@@ -21,10 +22,6 @@ pub enum Frame {
     Request(Request),
     Piece(Piece),
     Cancel(Cancel),
-}
-
-pub trait Serializer {
-    fn data(&self) -> Vec<u8>;
 }
 
 #[derive(Debug)]
