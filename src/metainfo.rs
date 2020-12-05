@@ -229,6 +229,7 @@ impl Metainfo {
     }
 
     pub fn file_piece_ranges(&self) -> Vec<(String, PiecePos, PiecePos)> {
+        // TODO: maybe PathBuf should be used
         let dir = if self.files.len() > 1 {
             self.name.clone() + "/"
         } else {
