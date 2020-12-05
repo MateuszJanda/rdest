@@ -260,7 +260,6 @@ impl Handler {
                 Ok(cmd) = self.broad_ch.recv() => self.handle_manager_cmd(cmd).await?,
                 Ok(frame) = self.connection.recv_frame() => {
                     if self.handle_frame(frame).await? == false {
-                        println!("handle_frame - koncze normalnie");
                         break;
                     }
                 }
@@ -474,7 +473,6 @@ impl Handler {
     }
 
     async fn init_handshake(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        println!("wysyłam handshake");
         self.connection
             .send_msg(&Handshake::new(&self.info_hash, &self.own_id))
             .await?;
@@ -488,10 +486,7 @@ impl Handler {
             .await?;
 
         match resp_rx.await? {
-            InitCmd::SendBitfield { bitfield } => {
-                println!("wysyłam bitfield");
-                self.connection.send_msg(&bitfield).await?;
-            }
+            InitCmd::SendBitfield { bitfield } => self.connection.send_msg(&bitfield).await?,
         }
 
         Ok(())
@@ -522,13 +517,9 @@ impl Handler {
             }
             UnchokeCmd::SendRequest(req_data) => self.new_request(false, req_data).await?,
             UnchokeCmd::SendNotInterested => {
-                println!("UnchokeCmd::SendNotInterested");
                 self.connection.send_msg(&NotInterested::new()).await?
             }
-            UnchokeCmd::Ignore => {
-                println!("UnchokeCmd::Ignore");
-                ()
-            }
+            UnchokeCmd::Ignore => (),
         }
 
         Ok(())
@@ -648,17 +639,10 @@ impl Handler {
         match resp_rx.await? {
             PieceDoneCmd::SendRequest(req_data) => self.new_request(false, req_data).await?,
             PieceDoneCmd::SendNotInterested => {
-                println!("PieceDoneCmd::SendNotInterested");
                 self.connection.send_msg(&NotInterested::new()).await?
             }
-            PieceDoneCmd::PrepareKill => {
-                println!("PieceDoneCmd::PrepareKill");
-                return Ok(false);
-            }
-            PieceDoneCmd::Ignore => {
-                println!("PieceDoneCmd::Ignore");
-                ()
-            }
+            PieceDoneCmd::PrepareKill => return Ok(false),
+            PieceDoneCmd::Ignore => println!("PieceDoneCmd::Ignore"),
         }
 
         Ok(true)
