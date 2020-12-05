@@ -5,4 +5,5 @@ pub mod have;
 pub mod interested;
 pub mod keep_alive;
 pub mod not_interested;
+pub mod request;
 pub mod unchoke;
