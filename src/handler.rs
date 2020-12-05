@@ -6,8 +6,6 @@ use crate::connection::Connection;
 use crate::constant::{HASH_SIZE, PEER_ID_SIZE, PIECE_BLOCK_SIZE};
 use crate::frame::Frame;
 use crate::messages::bitfield::Bitfield;
-use crate::messages::choke::Choke;
-use crate::messages::handshake::Handshake;
 use crate::messages::have::Have;
 use crate::messages::interested::Interested;
 use crate::messages::keep_alive::KeepAlive;
@@ -15,6 +13,7 @@ use crate::messages::not_interested::NotInterested;
 use crate::messages::piece::Piece;
 use crate::messages::request::Request;
 use crate::messages::unchoke::Unchoke;
+use crate::messages::{choke::Choke, handshake::Handshake};
 use crate::{utils, Error};
 use std::collections::VecDeque;
 use std::fs;
@@ -153,11 +152,11 @@ impl Handler {
     ) {
         println!("Try connect to {}", &addr);
         match TcpStream::connect(&addr).await {
-            Ok(stream) => {
+            Ok(socket) => {
                 println!("connected");
 
                 let mut handler = Handler {
-                    connection: Connection::new(addr, stream),
+                    connection: Connection::new(addr, socket),
                     own_id,
                     peer_id,
                     info_hash,
@@ -193,6 +192,53 @@ impl Handler {
                 Self::kill_req(&addr, &None, &"Connection fail".to_string(), &mut job_ch).await
             }
         }
+    }
+
+    pub async fn run_listen(
+        socket: TcpStream,
+        addr: String,
+        own_id: [u8; PEER_ID_SIZE],
+        peer_id: Option<[u8; PEER_ID_SIZE]>,
+        info_hash: [u8; HASH_SIZE],
+        pieces_num: usize,
+        job_ch: mpsc::Sender<JobCmd>,
+        broad_ch: broadcast::Receiver<BroadCmd>,
+    ) {
+        // println!("Try connect to {}", &addr);
+        println!("Accept");
+
+        let mut handler = Handler {
+            connection: Connection::new(addr, socket),
+            own_id,
+            peer_id,
+            info_hash,
+            pieces_num,
+            piece_tx: None,
+            piece_rx: None,
+            peer_state: State {
+                choked: true,
+                interested: false,
+                keep_alive: false,
+            },
+            stats: Stats::new(),
+            msg_buff: vec![],
+            job_ch,
+            broad_ch,
+        };
+
+        let reason = match handler.event_loop().await {
+            Ok(_) => "End job normally".to_string(),
+            Err(e) => e.to_string(),
+        };
+
+        let index = handler.piece_rx.map_or(None, |p| Some(p.index));
+        Self::kill_req(
+            &handler.connection.addr,
+            &index,
+            &reason,
+            &mut handler.job_ch,
+        )
+        .await;
     }
 
     async fn kill_req(

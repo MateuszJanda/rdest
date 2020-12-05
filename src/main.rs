@@ -1,16 +1,11 @@
 use rdest::{Manager, Metainfo};
-use std::net::Ipv4Addr;
 use tokio;
-use tokio::net::TcpListener;
 
 #[tokio::main]
 async fn main() {
     println!("Hello, world!");
 
     // let mut listener = TcpListener::bind("127.0.0.1:6881").await.unwrap();
-    let mut _listener = TcpListener::bind((Ipv4Addr::new(0, 0, 0, 0), 6881))
-        .await
-        .unwrap();
 
     let t = Metainfo::from_file(String::from("ubuntu-20.04.1-desktop-amd64.iso.torrent")).unwrap();
     // println!("{:?}", t);

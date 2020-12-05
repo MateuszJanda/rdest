@@ -2,7 +2,7 @@ use crate::commands::{
     BitfieldCmd, BroadCmd, ExtractorCmd, HaveCmd, InitCmd, JobCmd, NotInterestedCmd, PieceDoneCmd,
     RequestCmd, TrackerCmd, UnchokeCmd, ViewCmd,
 };
-use crate::constant::PEER_ID_SIZE;
+use crate::constant::{PEER_ID_SIZE, PORT};
 use crate::extractor::Extractor;
 use crate::handler::Handler;
 use crate::messages::bitfield::Bitfield;
@@ -10,6 +10,8 @@ use crate::progress::Progress;
 use crate::{Error, Metainfo, TrackerClient};
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
+use std::net::Ipv4Addr;
+use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tokio::time;
@@ -167,6 +169,10 @@ impl Manager {
     }
 
     async fn event_loop(&mut self) {
+        let mut listener = TcpListener::bind((Ipv4Addr::new(0, 0, 0, 0), PORT))
+            .await
+            .expect(&format!("Can't bind to port {}", PORT));
+
         let mut change_state_timer = self.start_change_conn_state_timer();
 
         // TODO: add listen
@@ -175,6 +181,9 @@ impl Manager {
         loop {
             tokio::select! {
                 _ = change_state_timer.tick() => self.timeout_change_conn_state().expect("Can't change connection state"),
+                Ok((socket, _)) = listener.accept() => {
+                    self.spawn_listen(socket);
+                }
                 Some(cmd) = self.tracker_rx_ch.recv() => {
                     println!("Tracker resp");
                     match cmd {
@@ -216,6 +225,31 @@ impl Manager {
                 }
             }
         }
+    }
+
+    fn spawn_listen(&mut self, socket: TcpStream) {
+        let addr = match socket.peer_addr() {
+            Ok(addr) => addr.to_string(),
+            Err(_) => return (),
+        };
+
+        let addr222 = addr.clone();
+
+        let own_id = self.own_id.clone();
+        let info_hash = *self.metainfo.info_hash();
+        let pieces_num = self.metainfo.pieces_num();
+        let job_ch = self.job_tx_ch.clone();
+        let broad_ch = self.broad_ch.subscribe();
+
+        let job = tokio::spawn(async move {
+            Handler::run_listen(
+                socket, addr, own_id, None, info_hash, pieces_num, job_ch, broad_ch,
+            )
+            .await
+        });
+
+        let peer = Peer::new(self.metainfo.pieces_num(), job);
+        self.peers.insert(addr222, peer);
     }
 
     fn start_change_conn_state_timer(&self) -> Interval {

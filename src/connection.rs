@@ -8,17 +8,17 @@ use tokio::net::TcpStream;
 
 pub struct Connection {
     pub addr: String,
-    pub stream: TcpStream,
+    pub socket: TcpStream,
     pub buffer: BytesMut,
 }
 
 const BUFFER_SIZE: usize = 65536;
 
 impl Connection {
-    pub fn new(addr: String, stream: TcpStream) -> Connection {
+    pub fn new(addr: String, socket: TcpStream) -> Connection {
         Connection {
             addr,
-            stream,
+            socket,
             buffer: BytesMut::with_capacity(BUFFER_SIZE),
         }
     }
@@ -45,7 +45,7 @@ impl Connection {
         &mut self,
         msg: &T,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        self.stream.write_all(msg.data().as_slice()).await?;
+        self.socket.write_all(msg.data().as_slice()).await?;
 
         Ok(())
     }
@@ -57,7 +57,7 @@ impl Connection {
                 return Ok(Some(frame));
             }
 
-            let n = match self.stream.read_buf(&mut self.buffer).await {
+            let n = match self.socket.read_buf(&mut self.buffer).await {
                 Err(_) => return Err(Error::CantReadFromSocket),
                 Ok(n) => n,
             };
