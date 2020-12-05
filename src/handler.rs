@@ -287,7 +287,7 @@ impl Handler {
 
     async fn timeout_sync_stats(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if self.stats.downloaded.len() == MAX_STATS_QUEUE_SIZE {
-            self.cmd_sync_stats().await?;
+            self.trigger_cmd_sync_stats().await?;
         }
         self.stats.shift();
         Ok(())
@@ -365,7 +365,7 @@ impl Handler {
 
     async fn handle_choke(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
         self.peer_state.choked = true;
-        self.cmd_recv_choke().await?;
+        self.trigger_cmd_recv_choke().await?;
         Ok(true)
     }
 
@@ -379,24 +379,24 @@ impl Handler {
             self.msg_buff.clear();
         }
 
-        self.cmd_recv_unchoke().await?;
+        self.trigger_cmd_recv_unchoke().await?;
         Ok(true)
     }
 
     async fn handle_interested(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
         self.peer_state.interested = true;
-        self.cmd_recv_interested().await?;
+        self.trigger_cmd_recv_interested().await?;
         Ok(true)
     }
 
     async fn handle_not_interested(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
         self.peer_state.interested = false;
-        self.cmd_recv_not_interested().await
+        self.trigger_cmd_recv_not_interested().await
     }
 
     async fn handle_have(&mut self, have: &Have) -> Result<bool, Box<dyn std::error::Error>> {
         have.validate(self.pieces_num)?;
-        self.cmd_recv_have(have).await?;
+        self.trigger_cmd_recv_have(have).await?;
         Ok(true)
     }
 
@@ -405,7 +405,7 @@ impl Handler {
         bitfield: Bitfield,
     ) -> Result<bool, Box<dyn std::error::Error>> {
         bitfield.validate(self.pieces_num)?;
-        self.cmd_recv_bitfield(bitfield).await?;
+        self.trigger_cmd_recv_bitfield(bitfield).await?;
         Ok(true)
     }
 
@@ -422,7 +422,7 @@ impl Handler {
             Some(piece_tx) if piece_tx.index == request.index() => {
                 self.send_piece(request).await?;
             }
-            _ => self.cmd_recv_request(request).await?,
+            _ => self.trigger_cmd_recv_request(request).await?,
         }
 
         Ok(true)
@@ -461,7 +461,7 @@ impl Handler {
             }
 
             self.save_piece_to_file();
-            return Ok(self.cmd_recv_piece().await?);
+            return Ok(self.trigger_cmd_recv_piece().await?);
         } else {
             self.send_request().await?;
         }
@@ -489,7 +489,7 @@ impl Handler {
         Ok(())
     }
 
-    async fn cmd_recv_choke(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn trigger_cmd_recv_choke(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.job_ch
             .send(JobCmd::RecvChoke {
                 addr: self.connection.addr.clone(),
@@ -499,7 +499,7 @@ impl Handler {
         Ok(())
     }
 
-    async fn cmd_recv_unchoke(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn trigger_cmd_recv_unchoke(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let (resp_tx, resp_rx) = oneshot::channel();
         self.job_ch
             .send(JobCmd::RecvUnchoke {
@@ -510,9 +510,9 @@ impl Handler {
 
         match resp_rx.await? {
             UnchokeCmd::SendInterestedAndRequest(req_data) => {
-                self.new_request(true, req_data).await?
+                self.new_peer_request(true, req_data).await?
             }
-            UnchokeCmd::SendRequest(req_data) => self.new_request(false, req_data).await?,
+            UnchokeCmd::SendRequest(req_data) => self.new_peer_request(false, req_data).await?,
             UnchokeCmd::SendNotInterested => {
                 self.connection.send_msg(&NotInterested::new()).await?
             }
@@ -522,7 +522,7 @@ impl Handler {
         Ok(())
     }
 
-    async fn cmd_recv_interested(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn trigger_cmd_recv_interested(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.job_ch
             .send(JobCmd::RecvInterested {
                 addr: self.connection.addr.clone(),
@@ -532,7 +532,9 @@ impl Handler {
         Ok(())
     }
 
-    async fn cmd_recv_not_interested(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
+    async fn trigger_cmd_recv_not_interested(
+        &mut self,
+    ) -> Result<bool, Box<dyn std::error::Error>> {
         let (resp_tx, resp_rx) = oneshot::channel();
         self.job_ch
             .send(JobCmd::RecvNotInterested {
@@ -547,7 +549,10 @@ impl Handler {
         }
     }
 
-    async fn cmd_recv_have(&mut self, have: &Have) -> Result<(), Box<dyn std::error::Error>> {
+    async fn trigger_cmd_recv_have(
+        &mut self,
+        have: &Have,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let (resp_tx, resp_rx) = oneshot::channel();
         self.job_ch
             .send(JobCmd::RecvHave {
@@ -558,7 +563,9 @@ impl Handler {
             .await?;
 
         match resp_rx.await? {
-            HaveCmd::SendInterestedAndRequest(req_data) => self.new_request(true, req_data).await?,
+            HaveCmd::SendInterestedAndRequest(req_data) => {
+                self.new_peer_request(true, req_data).await?
+            }
 
             HaveCmd::SendInterested => self.connection.send_msg(&Interested::new()).await?,
             HaveCmd::Ignore => (),
@@ -567,7 +574,7 @@ impl Handler {
         Ok(())
     }
 
-    async fn cmd_recv_bitfield(
+    async fn trigger_cmd_recv_bitfield(
         &mut self,
         bitfield: Bitfield,
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -600,7 +607,7 @@ impl Handler {
         Ok(())
     }
 
-    async fn cmd_recv_request(
+    async fn trigger_cmd_recv_request(
         &mut self,
         request: Request,
     ) -> Result<(), Box<dyn std::error::Error>> {
@@ -624,7 +631,7 @@ impl Handler {
         Ok(())
     }
 
-    async fn cmd_recv_piece(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
+    async fn trigger_cmd_recv_piece(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
         let (resp_tx, resp_rx) = oneshot::channel();
         self.job_ch
             .send(JobCmd::PieceDone {
@@ -634,7 +641,7 @@ impl Handler {
             .await?;
 
         match resp_rx.await? {
-            PieceDoneCmd::SendRequest(req_data) => self.new_request(false, req_data).await?,
+            PieceDoneCmd::SendRequest(req_data) => self.new_peer_request(false, req_data).await?,
             PieceDoneCmd::SendNotInterested => {
                 self.connection.send_msg(&NotInterested::new()).await?
             }
@@ -645,7 +652,7 @@ impl Handler {
         Ok(true)
     }
 
-    async fn cmd_sync_stats(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn trigger_cmd_sync_stats(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.job_ch
             .send(JobCmd::SyncStats {
                 addr: self.connection.addr.clone(),
@@ -658,7 +665,7 @@ impl Handler {
         Ok(())
     }
 
-    async fn new_request(
+    async fn new_peer_request(
         &mut self,
         interested: bool,
         req_data: ReqData,
