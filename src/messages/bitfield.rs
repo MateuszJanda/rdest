@@ -12,22 +12,24 @@ impl Bitfield {
     pub const ID: u8 = 5;
     const LEN_SIZE: usize = MSG_LEN_SIZE;
     const ID_SIZE: usize = MSG_ID_SIZE;
+    const BITS_IN_BYTE: usize = 8;
+    const BYTE_MASK: u8 = 0b1000_0000;
 
     pub fn from_vec(pieces: &Vec<bool>) -> Bitfield {
-        let mut v = vec![];
+        let mut vec = vec![];
 
-        for p in pieces.chunks(8) {
+        for p in pieces.chunks(Bitfield::BITS_IN_BYTE) {
             let mut byte: u8 = 0;
-            for (idx, vv) in p.iter().enumerate() {
-                if *vv {
-                    byte |= 0b1000_0000 >> idx;
+            for (idx, present) in p.iter().enumerate() {
+                if *present {
+                    byte |= Bitfield::BYTE_MASK >> idx;
                 }
             }
 
-            v.push(byte);
+            vec.push(byte);
         }
 
-        Bitfield { pieces: v }
+        Bitfield { pieces: vec }
     }
 
     pub fn from(crs: &Cursor<&[u8]>) -> Bitfield {
@@ -43,13 +45,8 @@ impl Bitfield {
         let mut pieces = vec![];
         for b in self.pieces.iter() {
             let mut byte = *b;
-            for _ in 0..8 {
-                if byte & 0b1000_0000 != 0 {
-                    pieces.push(true);
-                } else {
-                    pieces.push(false);
-                }
-
+            for _ in 0..Bitfield::BITS_IN_BYTE {
+                pieces.push(byte & Bitfield::BYTE_MASK != 0);
                 byte = byte << 1;
             }
         }
@@ -58,19 +55,17 @@ impl Bitfield {
     }
 
     pub fn check(available_data: usize, length: usize) -> Result<usize, Error> {
-        if available_data >= Bitfield::LEN_SIZE + length {
-            return Ok(Bitfield::LEN_SIZE + length);
+        match available_data >= Bitfield::LEN_SIZE + length {
+            true => Ok(Bitfield::LEN_SIZE + length),
+            false => Err(Error::Incomplete("Bitfield".into()))
         }
-
-        Err(Error::Incomplete("Bitfield".into()))
     }
 
     pub fn validate(&self, pieces_num: usize) -> Result<(), Error> {
-        if self.to_vec().len() != pieces_num {
-            return Err(Error::InvalidLength("Bitfield".into()));
+        match self.to_vec().len() < pieces_num {
+            true => Ok(()),
+            false => Err(Error::InvalidLength("Bitfield".into())),
         }
-
-        Ok(())
     }
 }
 
