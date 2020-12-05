@@ -384,10 +384,8 @@ impl Manager {
             JobCmd::RecvRequest {
                 addr,
                 index,
-                block_begin,
-                block_length,
                 resp_ch,
-            } => self.handle_request(&addr, index, block_begin, block_length, resp_ch),
+            } => self.handle_request(&addr, index, resp_ch),
             JobCmd::PieceDone { addr, resp_ch } => self.handle_piece_done(&addr, resp_ch),
             JobCmd::SyncStats {
                 addr,
@@ -595,8 +593,6 @@ impl Manager {
         &mut self,
         addr: &String,
         index: usize,
-        block_begin: usize,
-        block_length: usize,
         resp_ch: oneshot::Sender<RequestCmd>,
     ) -> Result<bool, Error> {
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
@@ -606,11 +602,6 @@ impl Manager {
         }
 
         if index >= self.metainfo.pieces_num() {
-            let _ = resp_ch.send(RequestCmd::Ignore);
-            return Ok(true);
-        }
-
-        if block_begin + block_length >= self.metainfo.piece_length(index) {
             let _ = resp_ch.send(RequestCmd::Ignore);
             return Ok(true);
         }

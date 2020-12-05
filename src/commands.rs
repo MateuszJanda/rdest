@@ -63,8 +63,6 @@ pub enum JobCmd {
     RecvRequest {
         addr: String,
         index: usize,
-        block_begin: usize,
-        block_length: usize,
         resp_ch: oneshot::Sender<RequestCmd>,
     },
     PieceDone {

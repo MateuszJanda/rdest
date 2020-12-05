@@ -655,8 +655,6 @@ impl Handler {
             .send(JobCmd::RecvRequest {
                 addr: self.connection.addr.clone(),
                 index: request.index(),
-                block_begin: request.block_begin(),
-                block_length: request.block_length(),
                 resp_ch: resp_tx,
             })
             .await?;
