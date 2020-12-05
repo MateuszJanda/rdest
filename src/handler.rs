@@ -141,6 +141,36 @@ impl Stats {
 }
 
 impl Handler {
+    fn new(
+        socket: TcpStream,
+        addr: String,
+        own_id: [u8; PEER_ID_SIZE],
+        peer_id: Option<[u8; PEER_ID_SIZE]>,
+        info_hash: [u8; HASH_SIZE],
+        pieces_num: usize,
+        job_ch: mpsc::Sender<JobCmd>,
+        broad_ch: broadcast::Receiver<BroadCmd>,
+    ) -> Handler {
+        Handler {
+            connection: Connection::new(addr, socket),
+            own_id,
+            peer_id,
+            info_hash,
+            pieces_num,
+            piece_tx: None,
+            piece_rx: None,
+            peer_state: State {
+                choked: true,
+                interested: false,
+                keep_alive: false,
+            },
+            stats: Stats::new(),
+            msg_buff: vec![],
+            job_ch,
+            broad_ch,
+        }
+    }
+
     pub async fn run(
         addr: String,
         own_id: [u8; PEER_ID_SIZE],
@@ -155,24 +185,9 @@ impl Handler {
             Ok(socket) => {
                 println!("connected");
 
-                let mut handler = Handler {
-                    connection: Connection::new(addr, socket),
-                    own_id,
-                    peer_id,
-                    info_hash,
-                    pieces_num,
-                    piece_tx: None,
-                    piece_rx: None,
-                    peer_state: State {
-                        choked: true,
-                        interested: false,
-                        keep_alive: false,
-                    },
-                    stats: Stats::new(),
-                    msg_buff: vec![],
-                    job_ch,
-                    broad_ch,
-                };
+                let mut handler = Handler::new(
+                    socket, addr, own_id, peer_id, info_hash, pieces_num, job_ch, broad_ch,
+                );
 
                 let reason = match handler.event_loop().await {
                     Ok(_) => "End job normally".to_string(),
@@ -204,27 +219,11 @@ impl Handler {
         job_ch: mpsc::Sender<JobCmd>,
         broad_ch: broadcast::Receiver<BroadCmd>,
     ) {
-        // println!("Try connect to {}", &addr);
-        println!("Accept");
+        println!("Accept from {}", &addr);
 
-        let mut handler = Handler {
-            connection: Connection::new(addr, socket),
-            own_id,
-            peer_id,
-            info_hash,
-            pieces_num,
-            piece_tx: None,
-            piece_rx: None,
-            peer_state: State {
-                choked: true,
-                interested: false,
-                keep_alive: false,
-            },
-            stats: Stats::new(),
-            msg_buff: vec![],
-            job_ch,
-            broad_ch,
-        };
+        let mut handler = Handler::new(
+            socket, addr, own_id, peer_id, info_hash, pieces_num, job_ch, broad_ch,
+        );
 
         let reason = match handler.event_loop().await {
             Ok(_) => "End job normally".to_string(),
