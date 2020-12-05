@@ -11,7 +11,7 @@ pub enum ExtractorCmd {
     Fail(String),
 }
 
-struct Extractor {
+pub struct Extractor {
     metainfo: Metainfo,
     channel: mpsc::Sender<ExtractorCmd>,
 }
@@ -22,18 +22,15 @@ impl Extractor {
     }
 
     pub async fn run(&mut self) {
-        match self.extract_files() {
-            Ok(_) => self
-                .channel
-                .send(ExtractorCmd::Done)
-                .await
-                .expect("Can't communicate to manager"),
-            Err(e) => self
-                .channel
-                .send(ExtractorCmd::Fail(e.to_string()))
-                .await
-                .expect("Can't communicate to manager"),
-        }
+        let cmd = match self.extract_files() {
+            Ok(()) => ExtractorCmd::Done,
+            Err(e) => ExtractorCmd::Fail(e.to_string()),
+        };
+
+        self.channel
+            .send(cmd)
+            .await
+            .expect("Can't communicate to manager")
     }
 
     fn extract_files(&self) -> Result<(), Box<dyn std::error::Error>> {

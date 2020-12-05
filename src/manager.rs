@@ -1,4 +1,5 @@
 use crate::constant::HASH_SIZE;
+use crate::extractor::{Extractor, ExtractorCmd};
 use crate::frame::Bitfield;
 use crate::handler::{
     BitfieldCmd, BroadCmd, Handler, HaveCmd, InitCmd, JobCmd, NotInterestedCmd, PieceDoneCmd,
@@ -6,13 +7,9 @@ use crate::handler::{
 };
 use crate::progress::{Progress, ViewCmd};
 use crate::tracker_client::TrackerCmd;
-use crate::{utils, Error, Metainfo, TrackerClient};
+use crate::{Error, Metainfo, TrackerClient};
 use rand::seq::SliceRandom;
 use std::collections::HashMap;
-use std::fs;
-use std::fs::File;
-use std::io::{BufReader, BufWriter, Read, Seek, Write};
-use std::path::Path;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::task::JoinHandle;
 use tokio::time;
@@ -33,10 +30,13 @@ pub struct Manager {
     view: Option<View>,
     change_round: u32,
     ttt: Option<JoinHandle<()>>,
+    eee: Option<JoinHandle<()>>,
     job_tx_ch: mpsc::Sender<JobCmd>,
     job_rx_ch: mpsc::Receiver<JobCmd>,
     tracker_tx_ch: mpsc::Sender<TrackerCmd>,
     tracker_rx_ch: mpsc::Receiver<TrackerCmd>,
+    extractor_tx_ch: mpsc::Sender<ExtractorCmd>,
+    extractor_rx_ch: mpsc::Receiver<ExtractorCmd>,
     broad_ch: broadcast::Sender<BroadCmd>,
 }
 
@@ -90,6 +90,7 @@ impl Manager {
     pub fn new(metainfo: Metainfo, own_id: [u8; HASH_SIZE]) -> Manager {
         let (job_tx_ch, job_rx_ch) = mpsc::channel(JOB_CHANNEL_SIZE);
         let (tracker_tx_ch, tracker_rx_ch) = mpsc::channel(JOB_CHANNEL_SIZE);
+        let (extractor_tx_ch, extractor_rx_ch) = mpsc::channel(JOB_CHANNEL_SIZE);
         let (broad_ch, _) = broadcast::channel(BROADCAST_CHANNEL_SIZE);
 
         Manager {
@@ -101,10 +102,13 @@ impl Manager {
             view: None,
             change_round: 0,
             ttt: None,
+            eee: None,
             job_tx_ch,
             job_rx_ch,
             tracker_tx_ch,
             tracker_rx_ch,
+            extractor_tx_ch,
+            extractor_rx_ch,
             broad_ch,
         }
     }
@@ -187,6 +191,20 @@ impl Manager {
                     match &mut self.ttt.take() {
                         Some(job) => {
                             job.await.expect("Can't kill tracker client");
+                        }
+                        _ => (),
+                    }
+                }
+                Some(cmd) = self.extractor_rx_ch.recv() => {
+                    match cmd {
+                        ExtractorCmd::Done => (),
+                        ExtractorCmd::Fail(_) => (), // TODO
+                    }
+
+                    // kill extractor
+                    match &mut self.eee.take() {
+                        Some(job) => {
+                            job.await.expect("Can't kill extractor");
                         }
                         _ => (),
                     }
@@ -649,9 +667,11 @@ impl Manager {
 
         if self.peers.is_empty() {
             self.kill_view().await;
-            if let Err(_) = self.extract_files() {
-                ()
-            }
+
+            // spawn extractor
+            let mut extractor = Extractor::new(self.metainfo.clone(), self.extractor_tx_ch.clone());
+            self.eee = Some(tokio::spawn(async move { extractor.run().await }));
+
             return Ok(false);
         }
 
@@ -734,39 +754,5 @@ impl Manager {
             }
             _ => (),
         }
-    }
-
-    fn extract_files(&self) -> Result<(), Box<dyn std::error::Error>> {
-        for (path, start, end) in self.metainfo.file_piece_ranges().iter() {
-            // Create directories if needed
-            fs::create_dir_all(Path::new(path).parent().unwrap())?;
-
-            // Create output file
-            let mut writer = BufWriter::new(File::create(path)?);
-
-            // Write pieces/chunks
-            for index in start.file_index..end.file_index {
-                let name = utils::hash_to_string(&self.metainfo.piece(index)) + ".piece";
-                let reader = &mut BufReader::new(File::open(name)?);
-
-                if index == start.file_index {
-                    reader.seek(std::io::SeekFrom::Start(start.byte_index as u64))?;
-                }
-
-                let mut buffer = vec![];
-                reader.read_to_end(&mut buffer)?;
-                writer.write_all(buffer.as_slice())?;
-            }
-
-            // Write last chunk
-            let name = utils::hash_to_string(&self.metainfo.piece(end.file_index)) + ".piece";
-            let reader = &mut BufReader::new(File::open(name)?);
-
-            let mut buffer = vec![0; end.byte_index];
-            reader.read_exact(buffer.as_mut_slice())?;
-            writer.write_all(buffer.as_slice())?;
-        }
-
-        Ok(())
     }
 }
