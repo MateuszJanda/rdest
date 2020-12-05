@@ -1,5 +1,5 @@
 use crate::commands::TrackerCmd;
-use crate::constant::{HASH_SIZE, PORT};
+use crate::constant::{PEER_ID_SIZE, PORT};
 use crate::{Metainfo, TrackerResp};
 use reqwest::Response;
 use tokio::sync::mpsc;
@@ -11,14 +11,14 @@ const DELAY_MS: u64 = 500;
 
 #[derive(Clone, Debug)]
 pub struct TrackerClient {
-    own_id: [u8; HASH_SIZE],
+    own_id: [u8; PEER_ID_SIZE],
     metainfo: Metainfo,
     tracker_ch: mpsc::Sender<TrackerCmd>,
 }
 
 impl TrackerClient {
     pub fn new(
-        own_id: &[u8; HASH_SIZE],
+        own_id: &[u8; PEER_ID_SIZE],
         metainfo: Metainfo,
         tracker_ch: mpsc::Sender<TrackerCmd>,
     ) -> TrackerClient {

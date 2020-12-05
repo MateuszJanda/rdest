@@ -2,7 +2,7 @@ use crate::commands::{
     BitfieldCmd, BroadCmd, ExtractorCmd, HaveCmd, InitCmd, JobCmd, NotInterestedCmd, PieceDoneCmd,
     RequestCmd, TrackerCmd, UnchokeCmd, ViewCmd,
 };
-use crate::constant::{HASH_SIZE, PEER_ID_SIZE};
+use crate::constant::PEER_ID_SIZE;
 use crate::extractor::Extractor;
 use crate::frame::Bitfield;
 use crate::handler::Handler;
@@ -26,7 +26,7 @@ pub struct Manager {
     pieces_status: Vec<Status>,
     peers: HashMap<String, Peer>,
     metainfo: Metainfo,
-    candidates: Vec<(String, [u8; HASH_SIZE])>,
+    candidates: Vec<(String, [u8; PEER_ID_SIZE])>,
     view: Option<View>,
     change_round: u32,
     ttt: Option<JoinHandle<()>>,
@@ -87,7 +87,7 @@ impl Peer {
 }
 
 impl Manager {
-    pub fn new(metainfo: Metainfo, own_id: [u8; HASH_SIZE]) -> Manager {
+    pub fn new(metainfo: Metainfo, own_id: [u8; PEER_ID_SIZE]) -> Manager {
         let (job_tx_ch, job_rx_ch) = mpsc::channel(JOB_CHANNEL_SIZE);
         let (tracker_tx_ch, tracker_rx_ch) = mpsc::channel(JOB_CHANNEL_SIZE);
         let (extractor_tx_ch, extractor_rx_ch) = mpsc::channel(JOB_CHANNEL_SIZE);

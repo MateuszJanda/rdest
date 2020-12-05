@@ -1,4 +1,4 @@
-use crate::constant::{HASH_SIZE, PIECE_BLOCK_SIZE};
+use crate::constant::{HASH_SIZE, PEER_ID_SIZE, PIECE_BLOCK_SIZE};
 use crate::Error;
 use num_derive::FromPrimitive;
 use num_traits::FromPrimitive;
@@ -30,7 +30,7 @@ pub trait Serializer {
 #[derive(Debug)]
 pub struct Handshake {
     info_hash: [u8; HASH_SIZE],
-    peer_id: [u8; HASH_SIZE],
+    peer_id: [u8; PEER_ID_SIZE],
 }
 
 impl Handshake {
@@ -43,10 +43,10 @@ impl Handshake {
     const LEN_SIZE: usize = 1;
     const RESERVED_SIZE: usize = 8;
     const INFO_HASH_SIZE: usize = HASH_SIZE;
-    const PEER_ID_SIZE: usize = HASH_SIZE;
+    const PEER_ID_SIZE: usize = PEER_ID_SIZE;
     const FULL_SIZE: usize = Handshake::LEN_SIZE + Handshake::LEN as usize;
 
-    pub fn new(info_hash: &[u8; HASH_SIZE], peer_id: &[u8; HASH_SIZE]) -> Handshake {
+    pub fn new(info_hash: &[u8; HASH_SIZE], peer_id: &[u8; PEER_ID_SIZE]) -> Handshake {
         Handshake {
             info_hash: info_hash.clone(),
             peer_id: peer_id.clone(),
@@ -90,14 +90,14 @@ impl Handshake {
         return Err(Error::InvalidProtocolId);
     }
 
-    pub fn peer_id(&self) -> &[u8; HASH_SIZE] {
+    pub fn peer_id(&self) -> &[u8; PEER_ID_SIZE] {
         &self.peer_id
     }
 
     pub fn validate(
         &self,
         info_hash: &[u8; HASH_SIZE],
-        peer_id: &Option<[u8; HASH_SIZE]>,
+        peer_id: &Option<[u8; PEER_ID_SIZE]>,
     ) -> Result<(), Error> {
         if self
             .info_hash

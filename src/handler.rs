@@ -3,7 +3,7 @@ use crate::commands::{
     UnchokeCmd,
 };
 use crate::connection::Connection;
-use crate::constant::{HASH_SIZE, PIECE_BLOCK_SIZE};
+use crate::constant::{HASH_SIZE, PEER_ID_SIZE, PIECE_BLOCK_SIZE};
 use crate::frame::{
     Bitfield, Choke, Frame, Handshake, Have, Interested, KeepAlive, NotInterested, Piece, Request,
     Unchoke,
@@ -22,8 +22,8 @@ const MAX_STATS_QUEUE_SIZE: usize = 2;
 
 pub struct Handler {
     connection: Connection,
-    own_id: [u8; HASH_SIZE],
-    peer_id: Option<[u8; HASH_SIZE]>,
+    own_id: [u8; PEER_ID_SIZE],
+    peer_id: Option<[u8; PEER_ID_SIZE]>,
     info_hash: [u8; HASH_SIZE],
     pieces_num: usize,
     piece_tx: Option<PieceTx>,
@@ -137,8 +137,8 @@ impl Stats {
 impl Handler {
     pub async fn run(
         addr: String,
-        own_id: [u8; HASH_SIZE],
-        peer_id: Option<[u8; HASH_SIZE]>,
+        own_id: [u8; PEER_ID_SIZE],
+        peer_id: Option<[u8; PEER_ID_SIZE]>,
         info_hash: [u8; HASH_SIZE],
         pieces_num: usize,
         mut job_ch: mpsc::Sender<JobCmd>,
