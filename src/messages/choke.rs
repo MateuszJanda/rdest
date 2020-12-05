@@ -6,8 +6,8 @@ use crate::Error;
 pub struct Choke {}
 
 impl Choke {
-    pub const ID: u8 = 0;
     const LEN: u32 = 1;
+    pub const ID: u8 = 0;
     const LEN_SIZE: usize = MSG_LEN_SIZE;
     const FULL_SIZE: usize = Choke::LEN_SIZE + Choke::LEN as usize;
 

@@ -9,8 +9,8 @@ pub struct Have {
 }
 
 impl Have {
-    pub const ID: u8 = 4;
     const LEN: u32 = 5;
+    pub const ID: u8 = 4;
     const LEN_SIZE: usize = MSG_LEN_SIZE;
     const ID_SIZE: usize = MSG_ID_SIZE;
     const INDEX_SIZE: usize = 4;

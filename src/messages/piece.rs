@@ -48,11 +48,10 @@ impl Piece {
     }
 
     pub fn check(available_data: usize, length: usize) -> Result<usize, Error> {
-        if length >= Piece::MIN_LEN && available_data >= Piece::LEN_SIZE + length {
-            return Ok(Piece::LEN_SIZE + length);
+        match length >= Piece::MIN_LEN && available_data >= Piece::LEN_SIZE + length {
+            true => Ok(Piece::LEN_SIZE + length),
+            false => Err(Error::Incomplete("Piece".into())),
         }
-
-        Err(Error::Incomplete("Piece".into()))
     }
 
     pub fn block_begin(&self) -> usize {
