@@ -1,4 +1,5 @@
 use crate::constant::{MSG_ID_POS, MSG_ID_SIZE, MSG_LEN_SIZE, PIECE_BLOCK_SIZE};
+use crate::messages::choke::Choke;
 use crate::messages::handshake::Handshake;
 use crate::messages::keep_alive::KeepAlive;
 use crate::serializer::Serializer;
@@ -20,38 +21,6 @@ pub enum Frame {
     Request(Request),
     Piece(Piece),
     Cancel(Cancel),
-}
-
-#[derive(Debug)]
-pub struct Choke {}
-
-impl Choke {
-    const LEN: u32 = 1;
-    const ID: u8 = 0;
-    const LEN_SIZE: usize = MSG_LEN_SIZE;
-    const FULL_SIZE: usize = Choke::LEN_SIZE + Choke::LEN as usize;
-
-    pub fn new() -> Choke {
-        Choke {}
-    }
-
-    pub fn check(length: usize) -> Result<usize, Error> {
-        if length == Choke::LEN as usize {
-            return Ok(Choke::FULL_SIZE);
-        }
-
-        Err(Error::Incomplete("Choke".into()))
-    }
-}
-
-impl Serializer for Choke {
-    fn data(&self) -> Vec<u8> {
-        let mut vec = vec![];
-        vec.extend_from_slice(&Choke::LEN.to_be_bytes());
-        vec.push(Choke::ID);
-
-        vec
-    }
 }
 
 #[derive(Debug)]
