@@ -4,7 +4,7 @@ use crate::commands::{
 };
 use crate::connection::Connection;
 use crate::constant::{HASH_SIZE, PEER_ID_SIZE, PIECE_BLOCK_SIZE};
-use crate::frame::{Frame, Piece};
+use crate::frame::Frame;
 use crate::messages::bitfield::Bitfield;
 use crate::messages::choke::Choke;
 use crate::messages::handshake::Handshake;
@@ -12,6 +12,7 @@ use crate::messages::have::Have;
 use crate::messages::interested::Interested;
 use crate::messages::keep_alive::KeepAlive;
 use crate::messages::not_interested::NotInterested;
+use crate::messages::piece::Piece;
 use crate::messages::request::Request;
 use crate::messages::unchoke::Unchoke;
 use crate::{utils, Error};
