@@ -171,7 +171,7 @@ impl Handler {
         }
     }
 
-    pub async fn run(
+    pub async fn run_incoming(
         addr: String,
         own_id: [u8; PEER_ID_SIZE],
         peer_id: Option<[u8; PEER_ID_SIZE]>,
@@ -184,24 +184,10 @@ impl Handler {
         match TcpStream::connect(&addr).await {
             Ok(socket) => {
                 println!("connected");
-
-                let mut handler = Handler::new(
+                let handler = Handler::new(
                     socket, addr, own_id, peer_id, info_hash, pieces_num, job_ch, broad_ch,
                 );
-
-                let reason = match handler.event_loop().await {
-                    Ok(_) => "End job normally".to_string(),
-                    Err(e) => e.to_string(),
-                };
-
-                let index = handler.piece_rx.map_or(None, |p| Some(p.index));
-                Self::kill_req(
-                    &handler.connection.addr,
-                    &index,
-                    &reason,
-                    &mut handler.job_ch,
-                )
-                .await;
+                Self::run(handler).await;
             }
             Err(_) => {
                 Self::kill_req(&addr, &None, &"Connection fail".to_string(), &mut job_ch).await
@@ -209,7 +195,7 @@ impl Handler {
         }
     }
 
-    pub async fn run_listen(
+    pub async fn run_outgoing(
         socket: TcpStream,
         addr: String,
         own_id: [u8; PEER_ID_SIZE],
@@ -220,17 +206,21 @@ impl Handler {
         broad_ch: broadcast::Receiver<BroadCmd>,
     ) {
         println!("Accept from {}", &addr);
-
-        let mut handler = Handler::new(
+        let handler = Handler::new(
             socket, addr, own_id, peer_id, info_hash, pieces_num, job_ch, broad_ch,
         );
+        Self::run(handler).await;
+    }
 
+    async fn run(mut handler: Handler) {
         let reason = match handler.event_loop().await {
             Ok(_) => "End job normally".to_string(),
             Err(e) => e.to_string(),
         };
 
-        let index = handler.piece_rx.map_or(None, |p| Some(p.index));
+        let index = handler
+            .piece_rx
+            .map_or(None, |piece_rx| Some(piece_rx.index));
         Self::kill_req(
             &handler.connection.addr,
             &index,

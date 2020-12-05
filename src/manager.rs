@@ -152,7 +152,7 @@ impl Manager {
         let broad_ch = self.broad_ch.subscribe();
 
         let job = tokio::spawn(async move {
-            Handler::run(
+            Handler::run_incoming(
                 addr,
                 own_id,
                 Some(peer_id),
@@ -242,7 +242,7 @@ impl Manager {
         let broad_ch = self.broad_ch.subscribe();
 
         let job = tokio::spawn(async move {
-            Handler::run_listen(
+            Handler::run_outgoing(
                 socket, addr, own_id, None, info_hash, pieces_num, job_ch, broad_ch,
             )
             .await
