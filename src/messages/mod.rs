@@ -1,4 +1,5 @@
 pub mod bitfield;
+pub mod cancel;
 pub mod choke;
 pub mod handshake;
 pub mod have;
