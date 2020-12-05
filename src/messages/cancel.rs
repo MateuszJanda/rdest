@@ -27,11 +27,11 @@ impl Cancel {
 
         let start = start + Cancel::INDEX_SIZE;
         let mut block_begin = [0; Cancel::BEGIN_SIZE];
-        block_begin.clone_from_slice(&crs.get_ref()[start..start + Cancel::BEGIN_SIZE]);
+        block_begin.copy_from_slice(&crs.get_ref()[start..start + Cancel::BEGIN_SIZE]);
 
         let start = start + Cancel::BEGIN_SIZE;
         let mut block_length = [0; Cancel::LENGTH_SIZE];
-        block_length.clone_from_slice(&crs.get_ref()[start..start + Cancel::LENGTH_SIZE]);
+        block_length.copy_from_slice(&crs.get_ref()[start..start + Cancel::LENGTH_SIZE]);
 
         Cancel {
             index: u32::from_be_bytes(index),
@@ -41,11 +41,10 @@ impl Cancel {
     }
 
     pub fn check(available_data: usize, length: usize) -> Result<usize, Error> {
-        if length == Cancel::LEN as usize && available_data >= Cancel::LEN_SIZE + length {
-            return Ok(Cancel::FULL_SIZE);
+        match length == Cancel::LEN as usize && available_data >= Cancel::LEN_SIZE + length {
+            true => return Ok(Cancel::FULL_SIZE),
+            false => Err(Error::Incomplete("Cancel".into())),
         }
-
-        Err(Error::Incomplete("Cancel".into()))
     }
 }
 
