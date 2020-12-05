@@ -134,8 +134,6 @@ pub enum BitfieldCmd {
 pub enum RequestCmd {
     LoadAndSendPiece {
         index: usize,
-        block_begin: usize,
-        block_length: usize,
         piece_hash: [u8; HASH_SIZE],
     },
     Ignore,

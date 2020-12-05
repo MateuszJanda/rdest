@@ -424,12 +424,7 @@ impl Handler {
 
         match &self.piece_tx {
             Some(piece_tx) if piece_tx.index == request.index() => {
-                self.send_piece(
-                    request.index(),
-                    request.block_begin(),
-                    request.block_length(),
-                )
-                .await?;
+                self.send_piece(request).await?;
             }
             _ => self.cmd_recv_request(request).await?,
         }
@@ -667,14 +662,9 @@ impl Handler {
             .await?;
 
         match resp_rx.await? {
-            RequestCmd::LoadAndSendPiece {
-                index,
-                block_begin,
-                block_length,
-                piece_hash,
-            } => {
+            RequestCmd::LoadAndSendPiece { index, piece_hash } => {
                 self.load_piece_from_file(index, &piece_hash)?;
-                self.send_piece(index, block_begin, block_length).await?;
+                self.send_piece(request).await?;
             }
             RequestCmd::Ignore => (),
         }
@@ -735,6 +725,10 @@ impl Handler {
         Ok(())
     }
 
+    async fn new_request(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        Ok(())
+    }
+
     async fn send_request(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         if let Some(piece_rx) = self.piece_rx.as_mut() {
             if let Some((block_begin, block_len)) = piece_rx.left.pop_front() {
@@ -747,20 +741,22 @@ impl Handler {
         Ok(())
     }
 
-    async fn send_piece(
-        &mut self,
-        index: usize,
-        block_begin: usize,
-        block_length: usize,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    async fn send_piece(&mut self, request: Request) -> Result<(), Box<dyn std::error::Error>> {
         match &self.piece_tx {
             Some(piece_tx) => {
-                self.stats.update_uploaded(block_length);
+                let block_begin = request.block_begin();
+                let block_end = block_begin + request.block_length();
+
+                if block_end >= piece_tx.buff.len() {
+                    return Err(Error::PieceOutOfRange.into());
+                }
+
+                self.stats.update_uploaded(request.block_length());
                 self.connection
                     .send_msg(&Piece::new(
-                        index,
-                        block_begin,
-                        piece_tx.buff[block_begin..block_begin + block_length].to_vec(),
+                        request.index(),
+                        request.block_begin(),
+                        piece_tx.buff[block_begin..block_end].to_vec(),
                     ))
                     .await?;
                 Ok(())

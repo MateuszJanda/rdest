@@ -622,8 +622,6 @@ impl Manager {
 
         let _ = resp_ch.send(RequestCmd::LoadAndSendPiece {
             index,
-            block_begin,
-            block_length,
             piece_hash: *self.metainfo.piece(index),
         });
 
