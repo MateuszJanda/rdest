@@ -1,5 +1,4 @@
 use rdest::{Manager, Metainfo};
-use std::path::PathBuf;
 use structopt::StructOpt;
 use tokio;
 
@@ -15,7 +14,6 @@ async fn main() {
 
     let args = Cli::from_args();
     let path = args.path;
-    // let path = PathBuf::from("ubuntu-20.04.1-desktop-amd64.iso.torrent");
 
     let metainfo = match Metainfo::from_file(path) {
         Ok(metainfo) => metainfo,
