@@ -73,7 +73,6 @@ pub enum JobCmd {
         addr: String,
         downloaded_rate: Option<u32>,
         uploaded_rate: Option<u32>,
-        rejected_piece: u32,
     },
     KillReq {
         addr: String,

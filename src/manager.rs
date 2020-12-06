@@ -391,8 +391,7 @@ impl Manager {
                 addr,
                 downloaded_rate,
                 uploaded_rate,
-                rejected_piece,
-            } => self.handle_sync_stats(&addr, &downloaded_rate, &uploaded_rate, rejected_piece),
+            } => self.handle_sync_stats(&addr, &downloaded_rate, &uploaded_rate),
             JobCmd::KillReq {
                 addr,
                 index,
@@ -669,13 +668,10 @@ impl Manager {
         addr: &String,
         downloaded_rate: &Option<u32>,
         uploaded_rate: &Option<u32>,
-        rejected_piece: u32,
     ) -> Result<bool, Error> {
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.download_rate = *downloaded_rate;
         peer.uploaded_rate = *uploaded_rate;
-        // TODO: log this
-        peer.rejected_piece = rejected_piece;
         Ok(true)
     }
 

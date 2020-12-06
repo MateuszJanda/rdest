@@ -63,7 +63,6 @@ struct State {
 struct Stats {
     downloaded: VecDeque<usize>,
     uploaded: VecDeque<usize>,
-    rejected_piece: u32,
 }
 
 impl PieceRx {
@@ -96,7 +95,6 @@ impl Stats {
         Stats {
             downloaded: VecDeque::from(vec![0]),
             uploaded: VecDeque::from(vec![0]),
-            rejected_piece: 0,
         }
     }
 
@@ -108,10 +106,6 @@ impl Stats {
         self.uploaded[0] += amount;
     }
 
-    fn update_rejected_piece(&mut self) {
-        self.rejected_piece += 1;
-    }
-
     fn shift(&mut self) {
         if self.downloaded.len() == MAX_STATS_QUEUE_SIZE {
             self.downloaded.pop_back();
@@ -119,7 +113,6 @@ impl Stats {
         }
         self.downloaded.push_front(0);
         self.uploaded.push_front(0);
-        self.rejected_piece = 0;
     }
 
     fn downloaded_rate(&self) -> Option<u32> {
@@ -450,11 +443,7 @@ impl Handler {
 
         // Send new request or call manager to decide
         if piece_rx.left.is_empty() && piece_rx.requested.is_empty() {
-            if !self.verify_piece_hash() {
-                self.stats.update_rejected_piece();
-                return Ok(true);
-            }
-
+            self.verify_piece_hash()?;
             self.save_piece_to_file();
             return Ok(self.trigger_cmd_recv_piece().await?);
         } else {
@@ -653,7 +642,6 @@ impl Handler {
                 addr: self.connection.addr.clone(),
                 downloaded_rate: self.stats.downloaded_rate(),
                 uploaded_rate: self.stats.uploaded_rate(),
-                rejected_piece: self.stats.rejected_piece,
             })
             .await?;
 
@@ -695,6 +683,7 @@ impl Handler {
                 let block_begin = request.block_begin();
                 let block_end = block_begin + request.block_length();
 
+                // TODO: Move validation to handle_request
                 if block_end >= piece_tx.buff.len() {
                     return Err(Error::PieceOutOfRange.into());
                 }
@@ -713,16 +702,19 @@ impl Handler {
         }
     }
 
-    fn verify_piece_hash(&self) -> bool {
+    fn verify_piece_hash(&self) -> Result<(), Error> {
         match self.piece_rx.as_ref() {
             Some(piece_rx) => {
                 let mut m = sha1::Sha1::new();
                 m.update(piece_rx.buff.as_ref());
                 println!("Checksum: {:?} {:?}", m.digest().bytes(), piece_rx.hash);
 
-                return m.digest().bytes() == piece_rx.hash;
+                match m.digest().bytes() == piece_rx.hash {
+                    true => Ok(()),
+                    false => Err(Error::PieceHashMismatch),
+                }
             }
-            None => false,
+            None => Err(Error::PieceBuffMissing),
         }
     }
 
