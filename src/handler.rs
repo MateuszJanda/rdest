@@ -66,7 +66,7 @@ struct Stats {
 }
 
 impl PieceRx {
-    fn new(req_data: ReqData) -> PieceRx {
+    fn new(req_data: &ReqData) -> PieceRx {
         PieceRx {
             index: req_data.index,
             hash: req_data.piece_hash,
@@ -408,9 +408,9 @@ impl Handler {
 
         match &self.piece_tx {
             Some(piece_tx) if piece_tx.index == request.index() => {
-                self.send_piece(request).await?;
+                self.send_piece(&request).await?;
             }
-            _ => self.trigger_cmd_recv_request(request).await?,
+            _ => self.trigger_cmd_recv_request(&request).await?,
         }
 
         Ok(true)
@@ -494,9 +494,9 @@ impl Handler {
 
         match resp_rx.await? {
             UnchokeCmd::SendInterestedAndRequest(req_data) => {
-                self.new_peer_request(true, req_data).await?
+                self.new_peer_request(true, &req_data).await?
             }
-            UnchokeCmd::SendRequest(req_data) => self.new_peer_request(false, req_data).await?,
+            UnchokeCmd::SendRequest(req_data) => self.new_peer_request(false, &req_data).await?,
             UnchokeCmd::SendNotInterested => {
                 self.connection.send_msg(&NotInterested::new()).await?
             }
@@ -548,7 +548,7 @@ impl Handler {
 
         match resp_rx.await? {
             HaveCmd::SendInterestedAndRequest(req_data) => {
-                self.new_peer_request(true, req_data).await?
+                self.new_peer_request(true, &req_data).await?
             }
 
             HaveCmd::SendInterested => self.connection.send_msg(&Interested::new()).await?,
@@ -593,7 +593,7 @@ impl Handler {
 
     async fn trigger_cmd_recv_request(
         &mut self,
-        request: Request,
+        request: &Request,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let (resp_tx, resp_rx) = oneshot::channel();
         self.job_ch
@@ -625,7 +625,7 @@ impl Handler {
             .await?;
 
         match resp_rx.await? {
-            PieceDoneCmd::SendRequest(req_data) => self.new_peer_request(false, req_data).await?,
+            PieceDoneCmd::SendRequest(req_data) => self.new_peer_request(false, &req_data).await?,
             PieceDoneCmd::SendNotInterested => {
                 self.connection.send_msg(&NotInterested::new()).await?
             }
@@ -651,7 +651,7 @@ impl Handler {
     async fn new_peer_request(
         &mut self,
         interested: bool,
-        req_data: ReqData,
+        req_data: &ReqData,
     ) -> Result<(), Box<dyn std::error::Error>> {
         self.piece_rx = Some(PieceRx::new(req_data));
 
@@ -677,7 +677,7 @@ impl Handler {
         Ok(())
     }
 
-    async fn send_piece(&mut self, request: Request) -> Result<(), Box<dyn std::error::Error>> {
+    async fn send_piece(&mut self, request: &Request) -> Result<(), Box<dyn std::error::Error>> {
         match &self.piece_tx {
             Some(piece_tx) => {
                 let block_begin = request.block_begin();
