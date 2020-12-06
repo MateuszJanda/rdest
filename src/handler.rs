@@ -181,10 +181,10 @@ impl Handler {
     ) {
         match TcpStream::connect(&addr).await {
             Ok(socket) => {
-                let handler = Handler::new(
+                let mut handler = Handler::new(
                     socket, addr, own_id, peer_id, info_hash, pieces_num, job_ch, broad_ch,
                 );
-                Self::run(handler).await;
+                handler.run().await;
             }
             Err(_) => {
                 Self::kill_req(&addr, &None, &"Connection fail".to_string(), &mut job_ch).await
@@ -202,28 +202,23 @@ impl Handler {
         job_ch: mpsc::Sender<JobCmd>,
         broad_ch: broadcast::Receiver<BroadCmd>,
     ) {
-        let handler = Handler::new(
+        let mut handler = Handler::new(
             socket, addr, own_id, peer_id, info_hash, pieces_num, job_ch, broad_ch,
         );
-        Self::run(handler).await;
+        handler.run().await;
     }
 
-    async fn run(mut handler: Handler) {
-        let reason = match handler.event_loop().await {
+    async fn run(&mut self) {
+        let reason = match self.event_loop().await {
             Ok(_) => "End job normally".to_string(),
             Err(e) => e.to_string(),
         };
 
-        let index = handler
+        let index = self
             .piece_rx
+            .as_ref()
             .map_or(None, |piece_rx| Some(piece_rx.index));
-        Self::kill_req(
-            &handler.connection.addr,
-            &index,
-            &reason,
-            &mut handler.job_ch,
-        )
-        .await;
+        Self::kill_req(&self.connection.addr, &index, &reason, &mut self.job_ch).await;
     }
 
     async fn kill_req(
