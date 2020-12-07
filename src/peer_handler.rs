@@ -26,7 +26,7 @@ const KEEP_ALIVE_INTERVAL_SEC: u64 = 120;
 const STATS_INTERVAL_SEC: u64 = 10;
 const MAX_STATS_QUEUE_SIZE: usize = 2;
 
-pub struct Handler {
+pub struct PeerHandler {
     connection: Connection,
     own_id: [u8; PEER_ID_SIZE],
     peer_id: Option<[u8; PEER_ID_SIZE]>,
@@ -132,7 +132,7 @@ impl Stats {
     }
 }
 
-impl Handler {
+impl PeerHandler {
     fn new(
         socket: TcpStream,
         addr: String,
@@ -142,8 +142,8 @@ impl Handler {
         pieces_num: usize,
         job_ch: mpsc::Sender<JobCmd>,
         broad_ch: broadcast::Receiver<BroadCmd>,
-    ) -> Handler {
-        Handler {
+    ) -> PeerHandler {
+        PeerHandler {
             connection: Connection::new(addr, socket),
             own_id,
             peer_id,
@@ -174,7 +174,7 @@ impl Handler {
     ) {
         match TcpStream::connect(&addr).await {
             Ok(socket) => {
-                let mut handler = Handler::new(
+                let mut handler = PeerHandler::new(
                     socket, addr, own_id, peer_id, info_hash, pieces_num, job_ch, broad_ch,
                 );
                 handler.run().await;
@@ -195,7 +195,7 @@ impl Handler {
         job_ch: mpsc::Sender<JobCmd>,
         broad_ch: broadcast::Receiver<BroadCmd>,
     ) {
-        let mut handler = Handler::new(
+        let mut handler = PeerHandler::new(
             socket, addr, own_id, peer_id, info_hash, pieces_num, job_ch, broad_ch,
         );
         handler.run().await;

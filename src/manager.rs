@@ -4,8 +4,8 @@ use crate::commands::{
 };
 use crate::constant::{PEER_ID_SIZE, PORT};
 use crate::extractor::Extractor;
-use crate::handler::Handler;
 use crate::messages::bitfield::Bitfield;
+use crate::peer_handler::PeerHandler;
 use crate::progress::Progress;
 use crate::{Error, Metainfo, TrackerClient};
 use rand::seq::SliceRandom;
@@ -152,7 +152,7 @@ impl Manager {
         let broad_ch = self.broad_ch.subscribe();
 
         let job = tokio::spawn(async move {
-            Handler::run_incoming(
+            PeerHandler::run_incoming(
                 addr,
                 own_id,
                 Some(peer_id),
@@ -242,7 +242,7 @@ impl Manager {
         let broad_ch = self.broad_ch.subscribe();
 
         let job = tokio::spawn(async move {
-            Handler::run_outgoing(
+            PeerHandler::run_outgoing(
                 socket, addr, own_id, None, info_hash, pieces_num, job_ch, broad_ch,
             )
             .await
