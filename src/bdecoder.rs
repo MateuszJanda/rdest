@@ -46,8 +46,10 @@ impl BValue {
                 Delimiter::List => values.push(Self::value_list(it)?),
                 Delimiter::Dict => values.push(Self::value_dict(it, pos)?),
                 Delimiter::End if with_end => return Ok(values),
-                Delimiter::End => return Err(Error::DecodeUnexpectedChar(line!(), pos)),
-                Delimiter::Unknown => return Err(Error::DecodeIncorrectChar(line!(), pos)),
+                Delimiter::End => return Err(Error::DecodeUnexpectedChar(file!(), line!(), pos)),
+                Delimiter::Unknown => {
+                    return Err(Error::DecodeIncorrectChar(file!(), line!(), pos))
+                }
             }
         }
 
@@ -95,7 +97,7 @@ impl BValue {
         str_raw.push(b':');
 
         if !len_bytes.iter().all(|b| (b'0'..=b'9').contains(b)) {
-            return Err(Error::DecodeIncorrectChar(line!(), pos));
+            return Err(Error::DecodeIncorrectChar(file!(), line!(), pos));
         }
 
         let len_str = match String::from_utf8(len_bytes) {
@@ -182,7 +184,7 @@ impl BValue {
                 if (b'0'..=b'9').contains(b) || *b == b'-' {
                     Ok(*b)
                 } else {
-                    Err(Error::DecodeIncorrectChar(line!(), pos))
+                    Err(Error::DecodeIncorrectChar(file!(), line!(), pos))
                 }
             })
             .collect()

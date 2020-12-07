@@ -28,17 +28,9 @@ impl DeepFinder {
                 }
                 Delimiter::Dict => values.append(&mut Self::raw_dict(it, extract)?),
                 Delimiter::End if with_end => return Ok(values),
-                Delimiter::End => {
-                    return Err(Error::Decode(format!(
-                        "Raw Loop [{}]: Unexpected end character",
-                        pos
-                    )))
-                }
+                Delimiter::End => return Err(Error::DecodeUnexpectedChar(file!(), line!(), pos)),
                 Delimiter::Unknown => {
-                    return Err(Error::Decode(format!(
-                        "Raw Loop [{}]: Incorrect character",
-                        pos
-                    )))
+                    return Err(Error::DecodeIncorrectChar(file!(), line!(), pos))
                 }
             }
         }
@@ -102,10 +94,7 @@ impl DeepFinder {
                     }
                     Delimiter::End => break,
                     Delimiter::Unknown => {
-                        return Err(Error::Decode(format!(
-                            "Traverse [{}] : Incorrect character",
-                            pos
-                        )))
+                        return Err(Error::DecodeIncorrectChar(file!(), line!(), pos))
                     }
                 };
             } else if !key_turn {
@@ -139,18 +128,8 @@ impl DeepFinder {
             Delimiter::Int => values.append(&mut Self::raw_int(it, pos, extract)?),
             Delimiter::List => values.append(&mut Self::raw_list(it, extract)?),
             Delimiter::Dict => values.append(&mut Self::raw_dict(it, extract)?),
-            Delimiter::End => {
-                return Err(Error::Decode(format!(
-                    "Extract dict val [{}]: Unexpected end character",
-                    pos
-                )))
-            }
-            Delimiter::Unknown => {
-                return Err(Error::Decode(format!(
-                    "Extract dict val [{}]: Incorrect character",
-                    pos
-                )))
-            }
+            Delimiter::End => return Err(Error::DecodeUnexpectedChar(file!(), line!(), pos)),
+            Delimiter::Unknown => return Err(Error::DecodeIncorrectChar(file!(), line!(), pos)),
         }
 
         Ok(values)

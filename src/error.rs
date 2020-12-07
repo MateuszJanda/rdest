@@ -23,9 +23,8 @@ pub enum Error {
     CantReadFromSocket,
     ConnectionReset,
     ConnectionClosed,
-    Decode(String), // TODO: remove
-    DecodeUnexpectedChar(u32, usize),
-    DecodeIncorrectChar(u32, usize),
+    DecodeUnexpectedChar(&'static str, u32, usize),
+    DecodeIncorrectChar(&'static str, u32, usize),
     DecodeUnableConvert(u32, String, usize),
     DecodeNotEnoughChars(u32, usize),
     DecodeMissingTerminalChars(u32, usize),
@@ -73,12 +72,11 @@ impl fmt::Display for Error {
             Error::InfoMissing => write!(f, "Info field missing"),
             Error::ConnectionReset => write!(f, "Connection reset by peer"),
             Error::ConnectionClosed => write!(f, "Connection closed by peer"),
-            Error::Decode(s) => write!(f, "{}", s),
-            Error::DecodeUnexpectedChar(line, pos) => {
-                write!(f, "Line:{}, unexpected end character at {}", line, pos)
+            Error::DecodeUnexpectedChar(file, line, pos) => {
+                write!(f, "{}:{}, unexpected end character at {}", file, line, pos)
             }
-            Error::DecodeIncorrectChar(line, pos) => {
-                write!(f, "Line:{}, incorrect character at {}", line, pos)
+            Error::DecodeIncorrectChar(file, line, pos) => {
+                write!(f, "{}:{}, incorrect character at {}", file, line, pos)
             }
             Error::DecodeUnableConvert(line, name, pos) => {
                 write!(f, "Line:{}, unable convert to {} at {}", line, name, pos)
