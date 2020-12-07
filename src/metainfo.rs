@@ -69,15 +69,16 @@ impl Metainfo {
         }
 
         let name = Self::find_name(dict)?;
-        let mut files = vec![];
-        if length.is_some() {
-            files.push(File {
-                length: length.unwrap(),
+        let files = match length {
+            Some(length) => vec![File {
+                length,
                 path: name.clone(),
-            });
-        } else if multi_files.is_some() {
-            files = multi_files.unwrap();
-        }
+            }],
+            None => match multi_files {
+                Some(multi_files) => multi_files,
+                None => vec![],
+            },
+        };
 
         let metainfo = Metainfo {
             announce: Self::find_announce(dict)?,
