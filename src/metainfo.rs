@@ -228,20 +228,18 @@ impl Metainfo {
         &self.info_hash
     }
 
-    pub fn file_piece_ranges(&self) -> Vec<(String, PiecePos, PiecePos)> {
-        // TODO: maybe PathBuf should be used
-        let dir = if self.files.len() > 1 {
-            self.name.clone() + "/"
-        } else {
-            "".to_string()
+    pub fn file_piece_ranges(&self) -> Vec<(PathBuf, PiecePos, PiecePos)> {
+        let dir = match self.files.len() > 1 {
+            true => PathBuf::from(&self.name),
+            false => PathBuf::new(),
         };
 
-        let mut ranges: Vec<(String, PiecePos, PiecePos)> = vec![];
+        let mut ranges: Vec<(PathBuf, PiecePos, PiecePos)> = vec![];
         let mut pos: usize = 0;
 
         for File { length, path } in self.files.iter() {
             ranges.push((
-                dir.clone() + path,
+                dir.join(path),
                 self.piece_pos(pos),
                 self.piece_pos(pos + *length as usize),
             ));
@@ -253,10 +251,9 @@ impl Metainfo {
     }
 
     fn piece_pos(&self, pos: usize) -> PiecePos {
-        let file_index = if pos % self.piece_length as usize != 0 {
-            pos / self.piece_length as usize + 1
-        } else {
-            pos / self.piece_length as usize
+        let file_index = match pos % self.piece_length as usize != 0 {
+            true => pos / self.piece_length as usize + 1,
+            false => pos / self.piece_length as usize,
         };
 
         let byte_index = pos % self.piece_length as usize;

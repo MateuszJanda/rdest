@@ -3,7 +3,6 @@ use crate::{utils, Metainfo};
 use std::fs;
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Seek, Write};
-use std::path::Path;
 use tokio::sync::mpsc;
 
 pub struct Extractor {
@@ -31,7 +30,9 @@ impl Extractor {
     fn extract_files(&self) -> Result<(), Box<dyn std::error::Error>> {
         for (path, start, end) in self.metainfo.file_piece_ranges().iter() {
             // Create directories if needed
-            fs::create_dir_all(Path::new(path).parent().unwrap())?;
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent)?;
+            }
 
             // Create output file
             let mut writer = BufWriter::new(File::create(path)?);
