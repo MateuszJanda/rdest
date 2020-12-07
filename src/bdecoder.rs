@@ -185,12 +185,9 @@ impl BValue {
 
     fn extract_int(it: &mut Enumerate<Iter<u8>>, pos: usize) -> Result<Vec<u8>, Error> {
         it.take_while(|(_, &b)| b != b'e')
-            .map(|(_, b)| {
-                if (b'0'..=b'9').contains(b) || *b == b'-' {
-                    Ok(*b)
-                } else {
-                    Err(Error::DecodeIncorrectChar(file!(), line!(), pos))
-                }
+            .map(|(_, b)| match (b'0'..=b'9').contains(b) || *b == b'-' {
+                true => Ok(*b),
+                false => Err(Error::DecodeIncorrectChar(file!(), line!(), pos)),
             })
             .collect()
     }

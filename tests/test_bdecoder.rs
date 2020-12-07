@@ -130,7 +130,7 @@ fn int_incorrect_format3() {
 fn int_incorrect_character() {
     assert_eq!(
         BDecoder::from_array(b"i+4e"),
-        Err(Error::DecodeIncorrectChar(&"src/bdecoder.rs", 192, 0))
+        Err(Error::DecodeIncorrectChar(&"src/bdecoder.rs", 190, 0))
     );
 }
 
