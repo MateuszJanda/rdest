@@ -23,7 +23,15 @@ pub enum Error {
     CantReadFromSocket,
     ConnectionReset,
     ConnectionClosed,
-    Decode(String),
+    Decode(String), // TODO: remove
+    DecodeUnexpectedChar(u32, usize),
+    DecodeIncorrectChar(u32, usize),
+    DecodeUnableConvert(u32, String, usize),
+    DecodeNotEnoughChars(u32, usize),
+    DecodeMissingTerminalChars(u32, usize),
+    DecodeLeadingZero(u32, usize),
+    DecodeOddNumOfElements(u32, usize),
+    DecodeKeyNotString(u32, usize),
     TrackerFileNotFound,
     TrackerBEncodeMissing,
     TrackerDataMissing,
@@ -66,6 +74,30 @@ impl fmt::Display for Error {
             Error::ConnectionReset => write!(f, "Connection reset by peer"),
             Error::ConnectionClosed => write!(f, "Connection closed by peer"),
             Error::Decode(s) => write!(f, "{}", s),
+            Error::DecodeUnexpectedChar(line, pos) => {
+                write!(f, "Line:{}, unexpected end character at {}", line, pos)
+            }
+            Error::DecodeIncorrectChar(line, pos) => {
+                write!(f, "Line:{}, incorrect character at {}", line, pos)
+            }
+            Error::DecodeUnableConvert(line, name, pos) => {
+                write!(f, "Line:{}, unable convert to {} at {}", line, name, pos)
+            }
+            Error::DecodeNotEnoughChars(line, pos) => {
+                write!(f, "Line:{}, not enough characters at {}", line, pos)
+            }
+            Error::DecodeMissingTerminalChars(line, pos) => {
+                write!(f, "Line:{}, missing terminate character at {}", line, pos)
+            }
+            Error::DecodeLeadingZero(line, pos) => {
+                write!(f, "Line:{}, leading zero at {}", line, pos)
+            }
+            Error::DecodeOddNumOfElements(line, pos) => {
+                write!(f, "Line:{}, odd number of elements at {}", line, pos)
+            }
+            Error::DecodeKeyNotString(line, pos) => {
+                write!(f, "Line:{}, key is not string at {}", line, pos)
+            }
             Error::TrackerFileNotFound => write!(f, "Tracker, file not found"),
             Error::TrackerBEncodeMissing => write!(f, "Tracker, bencode is missing"),
             Error::TrackerDataMissing => write!(f, "Tracker, data is missing"),

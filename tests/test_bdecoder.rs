@@ -10,7 +10,7 @@ fn empty_input() {
 fn incorrect_character() {
     assert_eq!(
         BDecoder::from_array(b"x"),
-        Err(Error::Decode("Loop [0]: Incorrect character".into()))
+        Err(Error::DecodeIncorrectChar(50, 0))
     );
 }
 
@@ -26,7 +26,7 @@ fn byte_str() {
 fn byte_str_unexpected_end() {
     assert_eq!(
         BDecoder::from_array(b"4"),
-        Err(Error::Decode("ByteStr [0]: Not enough characters".into()))
+        Err(Error::DecodeNotEnoughChars(112, 0))
     );
 }
 
@@ -34,7 +34,7 @@ fn byte_str_unexpected_end() {
 fn byte_str_missing_value() {
     assert_eq!(
         BDecoder::from_array(b"4:"),
-        Err(Error::Decode("ByteStr [0]: Not enough characters".into()))
+        Err(Error::DecodeNotEnoughChars(112, 0))
     );
 }
 
@@ -42,7 +42,7 @@ fn byte_str_missing_value() {
 fn byte_str_not_enough_characters() {
     assert_eq!(
         BDecoder::from_array(b"4:spa"),
-        Err(Error::Decode("ByteStr [0]: Not enough characters".into()))
+        Err(Error::DecodeNotEnoughChars(112, 0))
     );
 }
 
@@ -50,7 +50,7 @@ fn byte_str_not_enough_characters() {
 fn byte_str_invalid_len_character() {
     assert_eq!(
         BDecoder::from_array(b"4+3:spa"),
-        Err(Error::Decode("ByteStr [0]: Incorrect character".into()))
+        Err(Error::DecodeIncorrectChar(98, 0))
     );
 }
 
@@ -66,9 +66,7 @@ fn byte_str_zero_length() {
 fn int_missing_e() {
     assert_eq!(
         BDecoder::from_array(b"i"),
-        Err(Error::Decode(
-            "Int [0]: Missing terminate character 'e'".into()
-        ))
+        Err(Error::DecodeMissingTerminalChars(128, 0))
     );
 }
 
@@ -76,7 +74,7 @@ fn int_missing_e() {
 fn int_missing_value() {
     assert_eq!(
         BDecoder::from_array(b"ie"),
-        Err(Error::Decode("Int [0]: Unable convert to int".into()))
+        Err(Error::DecodeUnableConvert(141, "int".into(), 0))
     );
 }
 
@@ -84,7 +82,7 @@ fn int_missing_value() {
 fn int_incorrect_format1() {
     assert_eq!(
         BDecoder::from_array(b"i-e"),
-        Err(Error::Decode("Int [0]: Unable convert to int".into()))
+        Err(Error::DecodeUnableConvert(141, "int".into(), 0))
     );
 }
 
@@ -92,7 +90,7 @@ fn int_incorrect_format1() {
 fn int_incorrect_format2() {
     assert_eq!(
         BDecoder::from_array(b"i--4e"),
-        Err(Error::Decode("Int [0]: Unable convert to int".into()))
+        Err(Error::DecodeUnableConvert(141, "int".into(), 0))
     );
 }
 
@@ -100,7 +98,7 @@ fn int_incorrect_format2() {
 fn int_incorrect_format3() {
     assert_eq!(
         BDecoder::from_array(b"i-4-e"),
-        Err(Error::Decode("Int [0]: Unable convert to int".into()))
+        Err(Error::DecodeUnableConvert(141, "int".into(), 0))
     );
 }
 
@@ -108,7 +106,7 @@ fn int_incorrect_format3() {
 fn int_incorrect_character() {
     assert_eq!(
         BDecoder::from_array(b"i+4e"),
-        Err(Error::Decode("Int [0]: Incorrect character".into()))
+        Err(Error::DecodeIncorrectChar(185, 0))
     );
 }
 
@@ -116,7 +114,7 @@ fn int_incorrect_character() {
 fn int_leading_zero() {
     assert_eq!(
         BDecoder::from_array(b"i01e"),
-        Err(Error::Decode("Int [0]: Leading zero".into()))
+        Err(Error::DecodeLeadingZero(136, 0))
     );
 }
 
@@ -124,7 +122,7 @@ fn int_leading_zero() {
 fn int_leading_zero_for_negative() {
     assert_eq!(
         BDecoder::from_array(b"i-01e"),
-        Err(Error::Decode("Int [0]: Leading zero".into()))
+        Err(Error::DecodeLeadingZero(136, 0))
     );
 }
 
@@ -185,7 +183,7 @@ fn list_of_nested_values() {
 fn dict_odd_number_of_elements() {
     assert_eq!(
         BDecoder::from_array(b"di1ee"),
-        Err(Error::Decode("Dict [0]: Odd number of elements".into()))
+        Err(Error::DecodeOddNumOfElements(156, 0))
     );
 }
 
@@ -193,7 +191,7 @@ fn dict_odd_number_of_elements() {
 fn dict_key_not_string() {
     assert_eq!(
         BDecoder::from_array(b"di1ei1ee"),
-        Err(Error::Decode("Dict [0]: Key not string".into()))
+        Err(Error::DecodeKeyNotString(174, 0))
     );
 }
 
@@ -225,6 +223,6 @@ fn empty_string_and_int() {
 fn incorrect_value_char_pointer_change() {
     assert_eq!(
         BDecoder::from_array(b"i1ei2ei01e"),
-        Err(Error::Decode("Int [6]: Leading zero".into()))
+        Err(Error::DecodeLeadingZero(136, 6))
     );
 }

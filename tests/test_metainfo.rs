@@ -255,7 +255,7 @@ fn empty_input_incorrect() {
 fn incorrect_bencode() {
     assert_eq!(
         Metainfo::from_bencode(b"12"),
-        Err(Error::Decode("ByteStr [0]: Not enough characters".into()))
+        Err(Error::DecodeNotEnoughChars(112, 0))
     );
 }
 
