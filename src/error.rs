@@ -25,12 +25,12 @@ pub enum Error {
     ConnectionClosed,
     DecodeUnexpectedChar(&'static str, u32, usize),
     DecodeIncorrectChar(&'static str, u32, usize),
-    DecodeUnableConvert(u32, String, usize),
-    DecodeNotEnoughChars(u32, usize),
-    DecodeMissingTerminalChars(u32, usize),
-    DecodeLeadingZero(u32, usize),
-    DecodeOddNumOfElements(u32, usize),
-    DecodeKeyNotString(u32, usize),
+    DecodeUnableConvert(&'static str, u32, &'static str, usize),
+    DecodeNotEnoughChars(&'static str, u32, usize),
+    DecodeMissingTerminalChars(&'static str, u32, usize),
+    DecodeLeadingZero(&'static str, u32, usize),
+    DecodeOddNumOfElements(&'static str, u32, usize),
+    DecodeKeyNotString(&'static str, u32, usize),
     TrackerFileNotFound,
     TrackerBEncodeMissing,
     TrackerDataMissing,
@@ -78,23 +78,27 @@ impl fmt::Display for Error {
             Error::DecodeIncorrectChar(file, line, pos) => {
                 write!(f, "{}:{}, incorrect character at {}", file, line, pos)
             }
-            Error::DecodeUnableConvert(line, name, pos) => {
-                write!(f, "Line:{}, unable convert to {} at {}", line, name, pos)
+            Error::DecodeUnableConvert(file, line, name, pos) => write!(
+                f,
+                "{}:{}, unable convert to {} at {}",
+                file, line, name, pos
+            ),
+            Error::DecodeNotEnoughChars(file, line, pos) => {
+                write!(f, "{}:{}, not enough characters at {}", file, line, pos)
             }
-            Error::DecodeNotEnoughChars(line, pos) => {
-                write!(f, "Line:{}, not enough characters at {}", line, pos)
+            Error::DecodeMissingTerminalChars(file, line, pos) => write!(
+                f,
+                "{}:{}, missing terminate character at {}",
+                file, line, pos
+            ),
+            Error::DecodeLeadingZero(file, line, pos) => {
+                write!(f, "{}:{}, leading zero at {}", file, line, pos)
             }
-            Error::DecodeMissingTerminalChars(line, pos) => {
-                write!(f, "Line:{}, missing terminate character at {}", line, pos)
+            Error::DecodeOddNumOfElements(file, line, pos) => {
+                write!(f, "{}:{}, odd number of elements at {}", file, line, pos)
             }
-            Error::DecodeLeadingZero(line, pos) => {
-                write!(f, "Line:{}, leading zero at {}", line, pos)
-            }
-            Error::DecodeOddNumOfElements(line, pos) => {
-                write!(f, "Line:{}, odd number of elements at {}", line, pos)
-            }
-            Error::DecodeKeyNotString(line, pos) => {
-                write!(f, "Line:{}, key is not string at {}", line, pos)
+            Error::DecodeKeyNotString(file, line, pos) => {
+                write!(f, "{}:{}, key is not string at {}", file, line, pos)
             }
             Error::TrackerFileNotFound => write!(f, "Tracker, file not found"),
             Error::TrackerBEncodeMissing => write!(f, "Tracker, bencode is missing"),

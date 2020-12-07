@@ -102,16 +102,16 @@ impl BValue {
 
         let len_str = match String::from_utf8(len_bytes) {
             Ok(v) => v,
-            Err(_) => return Err(Error::DecodeUnableConvert(line!(), "string".into(), pos)),
+            Err(_) => return Err(Error::DecodeUnableConvert(file!(), line!(), &"string", pos)),
         };
         let len: usize = match len_str.parse() {
             Ok(v) => v,
-            Err(_) => return Err(Error::DecodeUnableConvert(line!(), "int".into(), pos)),
+            Err(_) => return Err(Error::DecodeUnableConvert(file!(), line!(), &"int", pos)),
         };
 
         let str_value: Vec<_> = it.take(len).map(|(_, &b)| b).collect();
         if str_value.len() != len {
-            return Err(Error::DecodeNotEnoughChars(line!(), pos));
+            return Err(Error::DecodeNotEnoughChars(file!(), line!(), pos));
         }
 
         str_raw.append(&mut str_value.clone());
@@ -127,20 +127,25 @@ impl BValue {
         raw_num.push(b'e');
 
         if let None = it_start.nth(num_as_bytes.len()) {
-            return Err(Error::DecodeMissingTerminalChars(line!(), pos));
+            return Err(Error::DecodeMissingTerminalChars(file!(), line!(), pos));
         }
         let num_as_str = match String::from_utf8(num_as_bytes) {
             Ok(v) => v,
-            Err(_) => return Err(Error::DecodeUnableConvert(line!(), "string".into(), pos)),
+            Err(_) => return Err(Error::DecodeUnableConvert(file!(), line!(), &"string", pos)),
         };
 
         if num_as_str.len() >= 2 && num_as_str.starts_with("0") || num_as_str.starts_with("-0") {
-            return Err(Error::DecodeLeadingZero(line!(), pos));
+            return Err(Error::DecodeLeadingZero(file!(), line!(), pos));
         }
 
         let num = num_as_str
             .parse::<i64>()
-            .or(Err(Error::DecodeUnableConvert(line!(), "int".into(), pos)))?;
+            .or(Err(Error::DecodeUnableConvert(
+                file!(),
+                line!(),
+                &"int",
+                pos,
+            )))?;
 
         Ok((num, raw_num))
     }
@@ -155,7 +160,7 @@ impl BValue {
     ) -> Result<HashMap<Vec<u8>, BValue>, Error> {
         let list = Self::values_vector(it, true)?;
         if list.len() % 2 != 0 {
-            return Err(Error::DecodeOddNumOfElements(line!(), pos));
+            return Err(Error::DecodeOddNumOfElements(file!(), line!(), pos));
         }
 
         let keys = Self::keys_from_list(&list, pos)?;
@@ -173,7 +178,7 @@ impl BValue {
             .step_by(2)
             .map(|v| match v {
                 BValue::ByteStr(vec) => Ok(vec.clone()),
-                _ => Err(Error::DecodeKeyNotString(line!(), pos)),
+                _ => Err(Error::DecodeKeyNotString(file!(), line!(), pos)),
             })
             .collect()
     }
