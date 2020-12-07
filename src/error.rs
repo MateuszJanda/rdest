@@ -24,7 +24,12 @@ pub enum Error {
     ConnectionReset,
     ConnectionClosed,
     Decode(String),
-    Tracker(String),
+    TrackerFileNotFound,
+    TrackerBEncodeMissing,
+    TrackerDataMissing,
+    TrackerIncorrectOrMissing(String),
+    TrackerRespFail(String),
+    TrackerInvalidU64(String),
     MetaFileNotFound,
     MetaBEncodeMissing,
     MetaDataMissing,
@@ -61,21 +66,30 @@ impl fmt::Display for Error {
             Error::ConnectionReset => write!(f, "Connection reset by peer"),
             Error::ConnectionClosed => write!(f, "Connection closed by peer"),
             Error::Decode(s) => write!(f, "{}", s),
-            Error::Tracker(s) => write!(f, "{}", s),
-            Error::MetaFileNotFound => write!(f, "Metainfo file not found"),
-            Error::MetaBEncodeMissing => write!(f, "Metainfo bencode is missing"),
-            Error::MetaDataMissing => write!(f, "Metainfo data is missing"),
+            Error::TrackerFileNotFound => write!(f, "Tracker, file not found"),
+            Error::TrackerBEncodeMissing => write!(f, "Tracker, bencode is missing"),
+            Error::TrackerDataMissing => write!(f, "Tracker, data is missing"),
+            Error::TrackerIncorrectOrMissing(name) => {
+                write!(f, "Tracker, incorrect or missing '{}' value", name)
+            }
+            Error::TrackerRespFail(reason) => write!(f, "Tracker fail: {}", reason),
+            Error::TrackerInvalidU64(name) => write!(f, "Tracker, can't convert '{}' to u64", name),
+            Error::MetaFileNotFound => write!(f, "Metainfo, file not found"),
+            Error::MetaBEncodeMissing => write!(f, "Metainfo, bencode is missing"),
+            Error::MetaDataMissing => write!(f, "Metainfo, data is missing"),
             Error::MetaLenAndFilesConflict => write!(
                 f,
-                "Conflicting 'length' and 'files' values present. Only one is allowed"
+                "Metainfo, conflicting 'length' and 'files' values present. Only one is allowed"
             ),
-            Error::MetaLenOrFilesMissing => write!(f, "Missing 'length' or 'files'"),
-            Error::MetaInvalidUtf8(name) => write!(f, "Can't convert '{}' to UTF-8", name),
-            Error::MetaIncorrectOrMissing(name) => {
-                write!(f, "Incorrect or missing '{}' value", name)
+            Error::MetaLenOrFilesMissing => write!(f, "Metainfo, missing 'length' or 'files'"),
+            Error::MetaInvalidUtf8(name) => {
+                write!(f, "Metainfo, Can't convert '{}' to UTF-8", name)
             }
-            Error::MetaInvalidU64(name) => write!(f, "Can't convert '{}' to u64", name),
-            Error::MetaNotDivisible(name) => write!(f, "'{}' not divisible by 20", name),
+            Error::MetaIncorrectOrMissing(name) => {
+                write!(f, "Metainfo, incorrect or missing '{}' value", name)
+            }
+            Error::MetaInvalidU64(name) => write!(f, "Metainfo, can't convert '{}' to u64", name),
+            Error::MetaNotDivisible(name) => write!(f, "Metainfo, '{}' not divisible by 20", name),
         }
     }
 }
