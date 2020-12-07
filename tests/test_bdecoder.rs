@@ -66,7 +66,11 @@ fn byte_str_zero_length() {
 fn int_missing_e() {
     assert_eq!(
         BDecoder::from_array(b"i"),
-        Err(Error::DecodeMissingTerminalChars(&"src/bdecoder.rs", 130, 0))
+        Err(Error::DecodeMissingTerminalChars(
+            &"src/bdecoder.rs",
+            130,
+            0
+        ))
     );
 }
 
@@ -74,7 +78,12 @@ fn int_missing_e() {
 fn int_missing_value() {
     assert_eq!(
         BDecoder::from_array(b"ie"),
-        Err(Error::DecodeUnableConvert(&"src/bdecoder.rs", 145, &"int", 0))
+        Err(Error::DecodeUnableConvert(
+            &"src/bdecoder.rs",
+            145,
+            &"int",
+            0
+        ))
     );
 }
 
@@ -82,7 +91,12 @@ fn int_missing_value() {
 fn int_incorrect_format1() {
     assert_eq!(
         BDecoder::from_array(b"i-e"),
-        Err(Error::DecodeUnableConvert(&"src/bdecoder.rs", 145, &"int", 0))
+        Err(Error::DecodeUnableConvert(
+            &"src/bdecoder.rs",
+            145,
+            &"int",
+            0
+        ))
     );
 }
 
@@ -90,7 +104,12 @@ fn int_incorrect_format1() {
 fn int_incorrect_format2() {
     assert_eq!(
         BDecoder::from_array(b"i--4e"),
-        Err(Error::DecodeUnableConvert(&"src/bdecoder.rs", 145, &"int", 0))
+        Err(Error::DecodeUnableConvert(
+            &"src/bdecoder.rs",
+            145,
+            &"int",
+            0
+        ))
     );
 }
 
@@ -98,7 +117,12 @@ fn int_incorrect_format2() {
 fn int_incorrect_format3() {
     assert_eq!(
         BDecoder::from_array(b"i-4-e"),
-        Err(Error::DecodeUnableConvert(&"src/bdecoder.rs", 145, &"int", 0))
+        Err(Error::DecodeUnableConvert(
+            &"src/bdecoder.rs",
+            145,
+            &"int",
+            0
+        ))
     );
 }
 
