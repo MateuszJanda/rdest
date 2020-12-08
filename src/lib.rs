@@ -10,6 +10,7 @@ mod manager;
 mod messages;
 mod metainfo;
 mod peer_handler;
+pub mod peer_id;
 mod progress;
 mod raw_finder;
 mod serializer;

@@ -1,3 +1,4 @@
+use rdest::peer_id;
 use rdest::{Manager, Metainfo};
 use structopt::StructOpt;
 use tokio;
@@ -22,7 +23,8 @@ async fn main() {
         Ok(metainfo) => metainfo,
         Err(e) => panic!("[-] Can't read metafile. Error: {}", e),
     };
-    let mut manager = Manager::new(metainfo, *b"ABCDEFGHIJKLMNOPQRST");
+    let own_id = peer_id::generate();
+    let mut manager = Manager::new(metainfo, own_id);
     manager.run().await;
 
     println!("-==[ koniec ]==-");
