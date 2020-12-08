@@ -23,8 +23,7 @@ async fn main() {
         Ok(metainfo) => metainfo,
         Err(e) => panic!("[-] Can't read metafile. Error: {}", e),
     };
-    let own_id = peer_id::generate();
-    let mut manager = Manager::new(metainfo, own_id);
+    let mut manager = Manager::new(metainfo, peer_id::generate());
     manager.run().await;
 
     println!("-==[ koniec ]==-");
