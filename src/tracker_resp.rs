@@ -1,4 +1,4 @@
-use crate::bvalue::BValue;
+use crate::bcodec::bvalue::BValue;
 use crate::constant::HASH_SIZE;
 use crate::{BDecoder, Error};
 use std::collections::HashMap;

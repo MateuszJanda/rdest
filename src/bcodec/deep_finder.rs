@@ -1,5 +1,5 @@
-use crate::bvalue::{BValue, Delimiter};
-use crate::raw_finder::RawFinder;
+use crate::bcodec::bvalue::{BValue, Delimiter};
+use crate::bcodec::raw_finder::RawFinder;
 use crate::Error;
 use std::iter::Enumerate;
 use std::slice::Iter;

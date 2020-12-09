@@ -1,4 +1,4 @@
-use crate::bvalue::BValue;
+use crate::bcodec::bvalue::BValue;
 use crate::Error;
 
 #[derive(PartialEq, Clone, Debug)]

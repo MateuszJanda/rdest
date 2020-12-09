@@ -1,6 +1,6 @@
-use crate::bvalue::BValue;
+use crate::bcodec::bvalue::BValue;
+use crate::bcodec::raw_finder::RawFinder;
 use crate::constant::HASH_SIZE;
-use crate::raw_finder::RawFinder;
 use crate::Error;
 use crate::{BDecoder, DeepFinder};
 use sha1;
