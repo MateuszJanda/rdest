@@ -1,4 +1,5 @@
 mod bdecoder;
+mod bvalue;
 mod commands;
 mod connection;
 mod constant;
@@ -21,7 +22,7 @@ mod utils;
 pub use crate::error::Error;
 
 pub use crate::bdecoder::BDecoder;
-pub use crate::bdecoder::BValue;
+pub use crate::bvalue::BValue;
 pub use crate::deep_finder::DeepFinder;
 pub use crate::raw_finder::RawFinder;
 

@@ -1,4 +1,4 @@
-use crate::bdecoder::{BValue, Delimiter};
+use crate::bvalue::{BValue, Delimiter};
 use crate::raw_finder::RawFinder;
 use crate::Error;
 use std::iter::Enumerate;

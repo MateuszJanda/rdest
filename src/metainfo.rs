@@ -1,7 +1,8 @@
+use crate::bvalue::BValue;
 use crate::constant::HASH_SIZE;
 use crate::raw_finder::RawFinder;
 use crate::Error;
-use crate::{BDecoder, BValue, DeepFinder};
+use crate::{BDecoder, DeepFinder};
 use sha1;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
