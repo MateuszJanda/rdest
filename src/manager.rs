@@ -138,7 +138,6 @@ impl Manager {
     pub async fn run(&mut self) {
         self.spawn_view();
         self.spawn_tracker();
-
         self.event_loop().await;
     }
 
@@ -152,32 +151,11 @@ impl Manager {
         loop {
             tokio::select! {
                 _ = change_state_timer.tick() => self.timeout_change_conn_state().expect("Can't change connection state"),
-                Ok((socket, _)) = listener.accept() => {
-                    self.spawn_peer_listener(socket);
-                }
-                Some(cmd) = self.tracker.rx_ch.recv() => {
-                    println!("Tracker resp");
-                    match cmd {
-                        TrackerCmd::TrackerResp(resp) => {
-                            self.candidates.extend_from_slice(&resp.peers());
-                            for _ in 0..1 {
-                                self.spawn_peer_handler();
-                            }
-                        }
-                        TrackerCmd::Fail(_) => (),
-                    }
-                    self.kill_tracker().await;
-                }
-                Some(cmd) = self.extractor.rx_ch.recv() => {
-                    match cmd {
-                        ExtractorCmd::Done => (),
-                        ExtractorCmd::Fail(_) => (), // TODO
-                    }
-
-                    self.kill_extractor().await;
-                }
+                Ok((socket, _)) = listener.accept() => self.spawn_peer_listener(socket),
+                Some(cmd) = self.tracker.rx_ch.recv() => self.handle_tracker_cmd(cmd).await,
+                Some(cmd) = self.extractor.rx_ch.recv() => self.handle_extractor_cmd(cmd).await,
                 Some(cmd) = self.peer_channels.rx.recv() => {
-                    if self.handle_job_cmd(cmd).await.expect("Can't handle command") == false {
+                    if self.handle_peer_cmd(cmd).await.expect("Can't handle command") == false {
                         break;
                     }
                 }
@@ -373,7 +351,30 @@ impl Manager {
         Ok(BroadCmd::SendOwnState { am_choked_map })
     }
 
-    async fn handle_job_cmd(&mut self, cmd: PeerCmd) -> Result<bool, Error> {
+    async fn handle_tracker_cmd(&mut self, cmd: TrackerCmd) {
+        println!("Tracker resp");
+        match cmd {
+            TrackerCmd::TrackerResp(resp) => {
+                self.candidates.extend_from_slice(&resp.peers());
+                for _ in 0..1 {
+                    self.spawn_peer_handler();
+                }
+            }
+            TrackerCmd::Fail(_) => (),
+        }
+        self.kill_tracker().await;
+    }
+
+    async fn handle_extractor_cmd(&mut self, cmd: ExtractorCmd) {
+        match cmd {
+            ExtractorCmd::Done => (),
+            ExtractorCmd::Fail(_) => (), // TODO
+        }
+
+        self.kill_extractor().await;
+    }
+
+    async fn handle_peer_cmd(&mut self, cmd: PeerCmd) -> Result<bool, Error> {
         match cmd {
             PeerCmd::Init { addr, resp_ch } => self.handle_init(&addr, resp_ch).await,
             PeerCmd::RecvChoke { addr } => self.handle_choke(&addr),
@@ -769,24 +770,19 @@ impl Manager {
 
         // Remove peer data from map
         self.peers.remove(addr);
-
         println!("Job killed");
     }
 
     async fn kill_tracker(&mut self) {
         match &mut self.tracker.job.take() {
-            Some(job) => {
-                job.await.expect("Can't kill tracker");
-            }
+            Some(job) => job.await.expect("Can't kill tracker"),
             _ => (),
         }
     }
 
     async fn kill_extractor(&mut self) {
         match &mut self.extractor.job.take() {
-            Some(job) => {
-                job.await.expect("Can't kill extractor");
-            }
+            Some(job) => job.await.expect("Can't kill extractor"),
             _ => (),
         }
     }
