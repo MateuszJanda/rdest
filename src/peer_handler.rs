@@ -1,5 +1,5 @@
 use crate::commands::{
-    BitfieldCmd, BroadCmd, HaveCmd, InitCmd, PeerCmd, NotInterestedCmd, PieceDoneCmd, ReqData,
+    BitfieldCmd, BroadCmd, HaveCmd, InitCmd, NotInterestedCmd, PeerCmd, PieceDoneCmd, ReqData,
     RequestCmd, UnchokeCmd,
 };
 use crate::connection::Connection;

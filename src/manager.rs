@@ -1,5 +1,5 @@
 use crate::commands::{
-    BitfieldCmd, BroadCmd, ExtractorCmd, HaveCmd, InitCmd, PeerCmd, NotInterestedCmd, PieceDoneCmd,
+    BitfieldCmd, BroadCmd, ExtractorCmd, HaveCmd, InitCmd, NotInterestedCmd, PeerCmd, PieceDoneCmd,
     ReqData, RequestCmd, TrackerCmd, UnchokeCmd, ViewCmd,
 };
 use crate::constant::{PEER_ID_SIZE, PORT};
@@ -138,50 +138,14 @@ impl Manager {
     pub async fn run(&mut self) {
         self.spawn_view();
 
-        let mut t = TrackerClient::new(&self.own_id, self.metainfo.clone(), self.tracker.tx_ch.clone());
-        self.tracker.job = Some(tokio::spawn(async move { t.run().await }));
+        let mut tracker = TrackerClient::new(
+            &self.own_id,
+            self.metainfo.clone(),
+            self.tracker.tx_ch.clone(),
+        );
+        self.tracker.job = Some(tokio::spawn(async move { tracker.run().await }));
 
         self.event_loop().await;
-        // self.spawn_jobs();
-    }
-
-    fn spawn_view(&mut self) {
-        let (mut view, channel) = Progress::new();
-        self.view = Some(View {
-            channel,
-            job: tokio::spawn(async move { view.run().await }),
-        });
-    }
-
-    fn spawn_jobs(&mut self) {
-        let (addr, peer_id) = match self.candidates.pop() {
-            Some(value) => value,
-            None => return,
-        };
-        let addr222 = addr.clone();
-
-        // TODO: spawn MAX_UNCHOKED + 1 + 1 jobs
-        let own_id = self.own_id.clone();
-        let info_hash = *self.metainfo.info_hash();
-        let pieces_num = self.metainfo.pieces_num();
-        let peer_ch = self.peer_channels.tx.clone();
-        let broad_ch = self.peer_channels.broad.subscribe();
-
-        let job = tokio::spawn(async move {
-            PeerHandler::run_incoming(
-                addr,
-                own_id,
-                Some(peer_id),
-                info_hash,
-                pieces_num,
-                peer_ch,
-                broad_ch,
-            )
-            .await
-        });
-
-        let peer = Peer::new(self.metainfo.pieces_num(), job);
-        self.peers.insert(addr222, peer);
     }
 
     async fn event_loop(&mut self) {
@@ -191,14 +155,11 @@ impl Manager {
 
         let mut change_state_timer = self.start_change_conn_state_timer();
 
-        // TODO: add listen
-        // TODO: add tracker req
-        // TODO: add file extractor job
         loop {
             tokio::select! {
                 _ = change_state_timer.tick() => self.timeout_change_conn_state().expect("Can't change connection state"),
                 Ok((socket, _)) = listener.accept() => {
-                    self.spawn_listen(socket);
+                    self.spawn_peer_listener(socket);
                 }
                 Some(cmd) = self.tracker.rx_ch.recv() => {
                     println!("Tracker resp");
@@ -206,7 +167,7 @@ impl Manager {
                         TrackerCmd::TrackerResp(resp) => {
                             self.candidates.extend_from_slice(&resp.peers());
                             for _ in 0..1 {
-                                self.spawn_jobs();
+                                self.spawn_peer_handler();
                             }
                         }
                         TrackerCmd::Fail(_) => (),
@@ -243,13 +204,52 @@ impl Manager {
         }
     }
 
-    fn spawn_listen(&mut self, socket: TcpStream) {
+    fn spawn_view(&mut self) {
+        let (mut view, channel) = Progress::new();
+        self.view = Some(View {
+            channel,
+            job: tokio::spawn(async move { view.run().await }),
+        });
+    }
+
+    fn spawn_peer_handler(&mut self) {
+        let (addr, peer_id) = match self.candidates.pop() {
+            Some(value) => value,
+            None => return,
+        };
+        let peer_addr = addr.clone();
+
+        // TODO: spawn MAX_UNCHOKED + 1 + 1 jobs
+        let own_id = self.own_id.clone();
+        let info_hash = *self.metainfo.info_hash();
+        let pieces_num = self.metainfo.pieces_num();
+        let peer_ch = self.peer_channels.tx.clone();
+        let broad_ch = self.peer_channels.broad.subscribe();
+
+        let job = tokio::spawn(async move {
+            PeerHandler::run_incoming(
+                addr,
+                own_id,
+                Some(peer_id),
+                info_hash,
+                pieces_num,
+                peer_ch,
+                broad_ch,
+            )
+            .await
+        });
+
+        let peer = Peer::new(self.metainfo.pieces_num(), job);
+        self.peers.insert(peer_addr, peer);
+    }
+
+    fn spawn_peer_listener(&mut self, socket: TcpStream) {
         let addr = match socket.peer_addr() {
             Ok(addr) => addr.to_string(),
             Err(_) => return (),
         };
 
-        let addr222 = addr.clone();
+        let peer_addr = addr.clone();
 
         let own_id = self.own_id.clone();
         let info_hash = *self.metainfo.info_hash();
@@ -265,7 +265,7 @@ impl Manager {
         });
 
         let peer = Peer::new(self.metainfo.pieces_num(), job);
-        self.peers.insert(addr222, peer);
+        self.peers.insert(peer_addr, peer);
     }
 
     fn start_change_conn_state_timer(&self) -> Interval {
