@@ -257,34 +257,30 @@ impl Manager {
             return Ok(());
         }
 
-        let new_opti = match self.round {
+        let new_optimistic = match self.round {
             0 => self.new_optimistic_peers()?,
             _ => vec![],
         };
 
-        let mut rate = match self.is_seeder_mode() {
-            true => self
-                .peers
-                .iter()
-                .map(|(addr, peer)| (addr.clone(), peer.download_rate.unwrap()))
-                .collect::<Vec<(String, u32)>>(),
-            false => self
-                .peers
-                .iter()
-                .map(|(addr, peer)| (addr.clone(), peer.uploaded_rate.unwrap()))
-                .collect::<Vec<(String, u32)>>(),
+        let is_seeder = self
+            .pieces_status
+            .iter()
+            .all(|status| *status == Status::Have);
+
+        let make_pair = match is_seeder {
+            true => |(addr, peer): (&String, &Peer)| (addr.clone(), peer.download_rate.unwrap()),
+            false => |(addr, peer): (&String, &Peer)| (addr.clone(), peer.uploaded_rate.unwrap()),
         };
 
-        let cmd = self.change_state_cmd(&mut rate, &new_opti)?;
-        let _ = self.peer_channels.broad.send(cmd);
-
-        Ok(())
-    }
-
-    fn is_seeder_mode(&self) -> bool {
-        self.pieces_status
+        let mut rate = self
+            .peers
             .iter()
-            .all(|status| *status == Status::Have)
+            .map(|param| make_pair(param))
+            .collect::<Vec<(String, u32)>>();
+
+        let cmd = self.change_state_cmd(&mut rate, &new_optimistic)?;
+        let _ = self.peer_channels.broad.send(cmd);
+        Ok(())
     }
 
     fn new_optimistic_peers(&mut self) -> Result<Vec<String>, Box<dyn std::error::Error>> {
@@ -304,7 +300,7 @@ impl Manager {
     fn change_state_cmd(
         &mut self,
         rates: &mut Vec<(String, u32)>,
-        new_opti: &Vec<String>,
+        new_optimistic: &Vec<String>,
     ) -> Result<BroadCmd, Box<dyn std::error::Error>> {
         // Downloaded/uploaded rate in descending order
         rates.sort_by(|(_, r1), (_, r2)| r2.cmp(&r1));
@@ -315,7 +311,7 @@ impl Manager {
             let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
             if count < MAX_UNCHOKED {
                 // Choked state changed to Unchoked
-                if peer.am_choked && peer.interested && !new_opti.contains(addr) {
+                if peer.am_choked && peer.interested && !new_optimistic.contains(addr) {
                     peer.am_choked = false;
                     am_choked_map.insert(addr.clone(), false);
                     count += 1;
@@ -334,13 +330,13 @@ impl Manager {
             }
 
             // If some new optimistic then disable "optimistic unchoke"
-            if !new_opti.is_empty() {
+            if !new_optimistic.is_empty() {
                 peer.optimistic_unchoke = false;
             }
         }
 
         // Set new optimistic unchoke
-        for addr in new_opti.iter() {
+        for addr in new_optimistic.iter() {
             let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
             peer.am_choked = false;
             am_choked_map.insert(addr.clone(), false);
@@ -507,7 +503,6 @@ impl Manager {
         };
 
         let _ = resp_ch.send(cmd);
-
         Ok(true)
     }
 
@@ -539,7 +534,6 @@ impl Manager {
         };
 
         let _ = resp_ch.send(cmd);
-
         Ok(true)
     }
 
