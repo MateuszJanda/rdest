@@ -31,12 +31,10 @@ pub struct Manager {
     candidates: Vec<(String, [u8; PEER_ID_SIZE])>,
     view: Option<View>,
     change_round: u32,
-    ttt: Option<JoinHandle<()>>,
+    ttt: Job<TrackerCmd>,
     eee: Option<JoinHandle<()>>,
     job_tx_ch: mpsc::Sender<JobCmd>,
     job_rx_ch: mpsc::Receiver<JobCmd>,
-    tracker_tx_ch: mpsc::Sender<TrackerCmd>,
-    tracker_rx_ch: mpsc::Receiver<TrackerCmd>,
     extractor_tx_ch: mpsc::Sender<ExtractorCmd>,
     extractor_rx_ch: mpsc::Receiver<ExtractorCmd>,
     broad_ch: broadcast::Sender<BroadCmd>,
@@ -63,11 +61,28 @@ struct View {
     job: JoinHandle<()>,
 }
 
+#[derive(Debug)]
+struct Job<Cmd> {
+    job: Option<JoinHandle<()>>,
+    tx_ch: mpsc::Sender<Cmd>,
+    rx_ch: mpsc::Receiver<Cmd>,
+}
+
 #[derive(PartialEq, Clone, Debug)]
 pub enum Status {
     Missing,
     Reserved,
     Have,
+}
+
+impl<Cmd> Job<Cmd> {
+    fn new(tx_ch: mpsc::Sender<Cmd>, rx_ch: mpsc::Receiver<Cmd>) -> Job<Cmd> {
+        Job {
+            job: None,
+            tx_ch,
+            rx_ch,
+        }
+    }
 }
 
 impl Peer {
@@ -103,12 +118,10 @@ impl Manager {
             candidates: vec![],
             view: None,
             change_round: 0,
-            ttt: None,
+            ttt: Job::new(tracker_tx_ch, tracker_rx_ch),
             eee: None,
             job_tx_ch,
             job_rx_ch,
-            tracker_tx_ch,
-            tracker_rx_ch,
             extractor_tx_ch,
             extractor_rx_ch,
             broad_ch,
@@ -118,12 +131,8 @@ impl Manager {
     pub async fn run(&mut self) {
         self.spawn_view();
 
-        let mut t = TrackerClient::new(
-            &self.own_id,
-            self.metainfo.clone(),
-            self.tracker_tx_ch.clone(),
-        );
-        self.ttt = Some(tokio::spawn(async move { t.run().await }));
+        let mut t = TrackerClient::new(&self.own_id, self.metainfo.clone(), self.ttt.tx_ch.clone());
+        self.ttt.job = Some(tokio::spawn(async move { t.run().await }));
 
         self.event_loop().await;
         // self.spawn_jobs();
@@ -184,7 +193,7 @@ impl Manager {
                 Ok((socket, _)) = listener.accept() => {
                     self.spawn_listen(socket);
                 }
-                Some(cmd) = self.tracker_rx_ch.recv() => {
+                Some(cmd) = self.ttt.rx_ch.recv() => {
                     println!("Tracker resp");
                     match cmd {
                         TrackerCmd::TrackerResp(resp) => {
@@ -197,7 +206,7 @@ impl Manager {
                     }
 
                     // kill tracker client
-                    match &mut self.ttt.take() {
+                    match &mut self.ttt.job.take() {
                         Some(job) => {
                             job.await.expect("Can't kill tracker client");
                         }
@@ -326,21 +335,21 @@ impl Manager {
         for (addr, _) in rates.iter() {
             let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
             if count < MAX_UNCHOKED {
+                // Choked state changed to Unchoked
                 if peer.am_choked && peer.interested && !new_opti.contains(addr) {
-                    // Choked state changed to Unchoked
                     peer.am_choked = false;
                     am_choked_map.insert(addr.clone(), false);
                     count += 1;
+                // Unchoked state doesn't change
                 } else if !peer.am_choked && peer.interested {
-                    // Unchoked state doesn't change
                     count += 1;
+                // Choke, because peer is not interested
                 } else if !peer.am_choked && !peer.interested {
-                    // Choke, because peer is not interested
                     peer.am_choked = true;
                     am_choked_map.insert(addr.clone(), true);
                 }
+            // Limit reached so change all rest peers states from Unchoked to Choked
             } else if !peer.am_choked {
-                // Limit reached so change all rest peers states from Unchoked to Choked
                 peer.am_choked = true;
                 am_choked_map.insert(addr.clone(), true);
             }
