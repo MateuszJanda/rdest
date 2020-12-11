@@ -137,13 +137,7 @@ impl Manager {
 
     pub async fn run(&mut self) {
         self.spawn_view();
-
-        let mut tracker = TrackerClient::new(
-            &self.own_id,
-            self.metainfo.clone(),
-            self.tracker.tx_ch.clone(),
-        );
-        self.tracker.job = Some(tokio::spawn(async move { tracker.run().await }));
+        self.spawn_tracker();
 
         self.event_loop().await;
     }
@@ -210,6 +204,20 @@ impl Manager {
             channel,
             job: tokio::spawn(async move { view.run().await }),
         });
+    }
+
+    fn spawn_tracker(&mut self) {
+        let mut tracker = TrackerClient::new(
+            &self.own_id,
+            self.metainfo.clone(),
+            self.tracker.tx_ch.clone(),
+        );
+        self.tracker.job = Some(tokio::spawn(async move { tracker.run().await }));
+    }
+
+    fn spawn_extractor(&mut self) {
+        let mut extractor = Extractor::new(self.metainfo.clone(), self.extractor.tx_ch.clone());
+        self.extractor.job = Some(tokio::spawn(async move { extractor.run().await }));
     }
 
     fn spawn_peer_handler(&mut self) {
@@ -698,15 +706,11 @@ impl Manager {
         reason: &String,
     ) -> Result<bool, Error> {
         println!("Kill reason: {}", reason);
-        self.kill_job(&addr, &index).await;
+        self.kill_peer(&addr, &index).await;
 
         if self.peers.is_empty() {
             self.kill_view().await;
-
-            // spawn extractor
-            let mut extractor = Extractor::new(self.metainfo.clone(), self.extractor.tx_ch.clone());
-            self.extractor.job = Some(tokio::spawn(async move { extractor.run().await }));
-
+            self.spawn_extractor();
             return Ok(false);
         }
 
@@ -747,7 +751,18 @@ impl Manager {
         None
     }
 
-    async fn kill_job(&mut self, addr: &String, index: &Option<usize>) {
+    async fn kill_view(&mut self) {
+        match &mut self.view.take() {
+            Some(view) => {
+                let _ = view.channel.send(ViewCmd::Kill).await;
+                let job = &mut view.job;
+                job.await.expect("Can't kill view");
+            }
+            _ => (),
+        }
+    }
+
+    async fn kill_peer(&mut self, addr: &String, index: &Option<usize>) {
         // Reset piece status
         match index {
             Some(index) if self.pieces_status[*index] != Status::Have => {
@@ -759,7 +774,7 @@ impl Manager {
         // Wait fot the task to finish
         match self.peers.get_mut(addr) {
             Some(peer) => match peer.job.take() {
-                Some(job) => job.await.expect("Can't kill job"),
+                Some(job) => job.await.expect("Can't kill peer job"),
                 None => (),
             },
             None => (),
@@ -769,17 +784,6 @@ impl Manager {
         self.peers.remove(addr);
 
         println!("Job killed");
-    }
-
-    async fn kill_view(&mut self) {
-        match &mut self.view.take() {
-            Some(view) => {
-                let _ = view.channel.send(ViewCmd::Kill).await;
-                let job = &mut view.job;
-                job.await.expect("Can't kill view");
-            }
-            _ => (),
-        }
     }
 
     async fn send_log(&mut self, text: &String) {
