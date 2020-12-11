@@ -1,5 +1,5 @@
 use crate::commands::{
-    BitfieldCmd, BroadCmd, ExtractorCmd, HaveCmd, InitCmd, JobCmd, NotInterestedCmd, PieceDoneCmd,
+    BitfieldCmd, BroadCmd, ExtractorCmd, HaveCmd, InitCmd, PeerCmd, NotInterestedCmd, PieceDoneCmd,
     ReqData, RequestCmd, TrackerCmd, UnchokeCmd, ViewCmd,
 };
 use crate::constant::{PEER_ID_SIZE, PORT};
@@ -17,7 +17,7 @@ use tokio::task::JoinHandle;
 use tokio::time;
 use tokio::time::{Duration, Instant, Interval};
 
-const JOB_CHANNEL_SIZE: usize = 64;
+const CHANNEL_SIZE: usize = 64;
 const BROADCAST_CHANNEL_SIZE: usize = 32;
 const CHANGE_STATE_INTERVAL_SEC: u64 = 10;
 const OPTIMISTIC_UNCHOKE_ROUND: u32 = 3;
@@ -65,8 +65,8 @@ struct Job<Cmd> {
 
 #[derive(Debug)]
 struct PeerChannels {
-    tx: mpsc::Sender<JobCmd>,
-    rx: mpsc::Receiver<JobCmd>,
+    tx: mpsc::Sender<PeerCmd>,
+    rx: mpsc::Receiver<PeerCmd>,
     broad: broadcast::Sender<BroadCmd>,
 }
 
@@ -89,8 +89,8 @@ impl<Cmd> Job<Cmd> {
 
 impl PeerChannels {
     fn new(
-        tx: mpsc::Sender<JobCmd>,
-        rx: mpsc::Receiver<JobCmd>,
+        tx: mpsc::Sender<PeerCmd>,
+        rx: mpsc::Receiver<PeerCmd>,
         broad: broadcast::Sender<BroadCmd>,
     ) -> PeerChannels {
         PeerChannels { tx, rx, broad }
@@ -116,22 +116,22 @@ impl Peer {
 
 impl Manager {
     pub fn new(metainfo: Metainfo, own_id: [u8; PEER_ID_SIZE]) -> Manager {
-        let (job_tx_ch, job_rx_ch) = mpsc::channel(JOB_CHANNEL_SIZE);
-        let (tracker_tx_ch, tracker_rx_ch) = mpsc::channel(JOB_CHANNEL_SIZE);
-        let (extractor_tx_ch, extractor_rx_ch) = mpsc::channel(JOB_CHANNEL_SIZE);
-        let (broad_ch, _) = broadcast::channel(BROADCAST_CHANNEL_SIZE);
+        let (peer_tx, peer_rx) = mpsc::channel(CHANNEL_SIZE);
+        let (tracker_tx, tracker_rx) = mpsc::channel(CHANNEL_SIZE);
+        let (extractor_tx, extractor_rx) = mpsc::channel(CHANNEL_SIZE);
+        let (broad, _) = broadcast::channel(BROADCAST_CHANNEL_SIZE);
 
         Manager {
             own_id,
             pieces_status: vec![Status::Missing; metainfo.pieces_num()],
             peers: HashMap::new(),
-            peer_channels: PeerChannels::new(job_tx_ch, job_rx_ch, broad_ch),
+            peer_channels: PeerChannels::new(peer_tx, peer_rx, broad),
             metainfo,
             candidates: vec![],
             view: None,
             change_round: 0,
-            ttt: Job::new(tracker_tx_ch, tracker_rx_ch),
-            eee: Job::new(extractor_tx_ch, extractor_rx_ch),
+            ttt: Job::new(tracker_tx, tracker_rx),
+            eee: Job::new(extractor_tx, extractor_rx),
         }
     }
 
@@ -164,7 +164,7 @@ impl Manager {
         let own_id = self.own_id.clone();
         let info_hash = *self.metainfo.info_hash();
         let pieces_num = self.metainfo.pieces_num();
-        let job_ch = self.peer_channels.tx.clone();
+        let peer_ch = self.peer_channels.tx.clone();
         let broad_ch = self.peer_channels.broad.subscribe();
 
         let job = tokio::spawn(async move {
@@ -174,7 +174,7 @@ impl Manager {
                 Some(peer_id),
                 info_hash,
                 pieces_num,
-                job_ch,
+                peer_ch,
                 broad_ch,
             )
             .await
@@ -378,37 +378,37 @@ impl Manager {
         Ok(BroadCmd::SendOwnState { am_choked_map })
     }
 
-    async fn handle_job_cmd(&mut self, cmd: JobCmd) -> Result<bool, Error> {
+    async fn handle_job_cmd(&mut self, cmd: PeerCmd) -> Result<bool, Error> {
         match cmd {
-            JobCmd::Init { addr, resp_ch } => self.handle_init(&addr, resp_ch).await,
-            JobCmd::RecvChoke { addr } => self.handle_choke(&addr),
-            JobCmd::RecvUnchoke { addr, resp_ch } => self.handle_unchoke(&addr, resp_ch),
-            JobCmd::RecvInterested { addr } => self.handle_interested(&addr),
-            JobCmd::RecvNotInterested { addr, resp_ch } => {
+            PeerCmd::Init { addr, resp_ch } => self.handle_init(&addr, resp_ch).await,
+            PeerCmd::RecvChoke { addr } => self.handle_choke(&addr),
+            PeerCmd::RecvUnchoke { addr, resp_ch } => self.handle_unchoke(&addr, resp_ch),
+            PeerCmd::RecvInterested { addr } => self.handle_interested(&addr),
+            PeerCmd::RecvNotInterested { addr, resp_ch } => {
                 self.handle_not_interested(&addr, resp_ch)
             }
-            JobCmd::RecvHave {
+            PeerCmd::RecvHave {
                 addr,
                 index,
                 resp_ch,
             } => self.handle_have(&addr, index, resp_ch),
-            JobCmd::RecvBitfield {
+            PeerCmd::RecvBitfield {
                 addr,
                 bitfield,
                 resp_ch,
             } => self.handle_bitfield(&addr, &bitfield, resp_ch),
-            JobCmd::RecvRequest {
+            PeerCmd::RecvRequest {
                 addr,
                 index,
                 resp_ch,
             } => self.handle_request(&addr, index, resp_ch),
-            JobCmd::PieceDone { addr, resp_ch } => self.handle_piece_done(&addr, resp_ch),
-            JobCmd::SyncStats {
+            PeerCmd::PieceDone { addr, resp_ch } => self.handle_piece_done(&addr, resp_ch),
+            PeerCmd::SyncStats {
                 addr,
                 downloaded_rate,
                 uploaded_rate,
             } => self.handle_sync_stats(&addr, &downloaded_rate, &uploaded_rate),
-            JobCmd::KillReq {
+            PeerCmd::KillReq {
                 addr,
                 index,
                 reason,

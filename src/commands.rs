@@ -31,7 +31,7 @@ pub enum BroadCmd {
     },
 }
 #[derive(Debug)]
-pub enum JobCmd {
+pub enum PeerCmd {
     Init {
         addr: String,
         resp_ch: oneshot::Sender<InitCmd>,

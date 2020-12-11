@@ -1,5 +1,5 @@
 use crate::commands::{
-    BitfieldCmd, BroadCmd, HaveCmd, InitCmd, JobCmd, NotInterestedCmd, PieceDoneCmd, ReqData,
+    BitfieldCmd, BroadCmd, HaveCmd, InitCmd, PeerCmd, NotInterestedCmd, PieceDoneCmd, ReqData,
     RequestCmd, UnchokeCmd,
 };
 use crate::connection::Connection;
@@ -37,7 +37,7 @@ pub struct PeerHandler {
     peer_state: State,
     stats: Stats,
     msg_buff: Vec<Frame>,
-    job_ch: mpsc::Sender<JobCmd>,
+    peer_ch: mpsc::Sender<PeerCmd>,
     broad_ch: broadcast::Receiver<BroadCmd>,
 }
 
@@ -140,7 +140,7 @@ impl PeerHandler {
         peer_id: Option<[u8; PEER_ID_SIZE]>,
         info_hash: [u8; HASH_SIZE],
         pieces_num: usize,
-        job_ch: mpsc::Sender<JobCmd>,
+        peer_ch: mpsc::Sender<PeerCmd>,
         broad_ch: broadcast::Receiver<BroadCmd>,
     ) -> PeerHandler {
         PeerHandler {
@@ -158,7 +158,7 @@ impl PeerHandler {
             },
             stats: Stats::new(),
             msg_buff: vec![],
-            job_ch,
+            peer_ch,
             broad_ch,
         }
     }
@@ -169,18 +169,18 @@ impl PeerHandler {
         peer_id: Option<[u8; PEER_ID_SIZE]>,
         info_hash: [u8; HASH_SIZE],
         pieces_num: usize,
-        mut job_ch: mpsc::Sender<JobCmd>,
+        mut peer_ch: mpsc::Sender<PeerCmd>,
         broad_ch: broadcast::Receiver<BroadCmd>,
     ) {
         match TcpStream::connect(&addr).await {
             Ok(socket) => {
                 let mut handler = PeerHandler::new(
-                    socket, addr, own_id, peer_id, info_hash, pieces_num, job_ch, broad_ch,
+                    socket, addr, own_id, peer_id, info_hash, pieces_num, peer_ch, broad_ch,
                 );
                 handler.run().await;
             }
             Err(_) => {
-                Self::kill_req(&addr, &None, &"Connection fail".to_string(), &mut job_ch).await
+                Self::kill_req(&addr, &None, &"Connection fail".to_string(), &mut peer_ch).await
             }
         }
     }
@@ -192,11 +192,11 @@ impl PeerHandler {
         peer_id: Option<[u8; PEER_ID_SIZE]>,
         info_hash: [u8; HASH_SIZE],
         pieces_num: usize,
-        job_ch: mpsc::Sender<JobCmd>,
+        peer_ch: mpsc::Sender<PeerCmd>,
         broad_ch: broadcast::Receiver<BroadCmd>,
     ) {
         let mut handler = PeerHandler::new(
-            socket, addr, own_id, peer_id, info_hash, pieces_num, job_ch, broad_ch,
+            socket, addr, own_id, peer_id, info_hash, pieces_num, peer_ch, broad_ch,
         );
         handler.run().await;
     }
@@ -211,17 +211,17 @@ impl PeerHandler {
             .piece_rx
             .as_ref()
             .map_or(None, |piece_rx| Some(piece_rx.index));
-        Self::kill_req(&self.connection.addr, &index, &reason, &mut self.job_ch).await;
+        Self::kill_req(&self.connection.addr, &index, &reason, &mut self.peer_ch).await;
     }
 
     async fn kill_req(
         addr: &String,
         index: &Option<usize>,
         reason: &String,
-        job_ch: &mut mpsc::Sender<JobCmd>,
+        peer_ch: &mut mpsc::Sender<PeerCmd>,
     ) {
-        job_ch
-            .send(JobCmd::KillReq {
+        peer_ch
+            .send(PeerCmd::KillReq {
                 addr: addr.clone(),
                 index: *index,
                 reason: reason.clone(),
@@ -459,8 +459,8 @@ impl PeerHandler {
             .await?;
 
         let (resp_tx, resp_rx) = oneshot::channel();
-        self.job_ch
-            .send(JobCmd::Init {
+        self.peer_ch
+            .send(PeerCmd::Init {
                 addr: self.connection.addr.clone(),
                 resp_ch: resp_tx,
             })
@@ -474,8 +474,8 @@ impl PeerHandler {
     }
 
     async fn trigger_cmd_recv_choke(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.job_ch
-            .send(JobCmd::RecvChoke {
+        self.peer_ch
+            .send(PeerCmd::RecvChoke {
                 addr: self.connection.addr.clone(),
             })
             .await?;
@@ -485,8 +485,8 @@ impl PeerHandler {
 
     async fn trigger_cmd_recv_unchoke(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let (resp_tx, resp_rx) = oneshot::channel();
-        self.job_ch
-            .send(JobCmd::RecvUnchoke {
+        self.peer_ch
+            .send(PeerCmd::RecvUnchoke {
                 addr: self.connection.addr.clone(),
                 resp_ch: resp_tx,
             })
@@ -507,8 +507,8 @@ impl PeerHandler {
     }
 
     async fn trigger_cmd_recv_interested(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.job_ch
-            .send(JobCmd::RecvInterested {
+        self.peer_ch
+            .send(PeerCmd::RecvInterested {
                 addr: self.connection.addr.clone(),
             })
             .await?;
@@ -520,8 +520,8 @@ impl PeerHandler {
         &mut self,
     ) -> Result<bool, Box<dyn std::error::Error>> {
         let (resp_tx, resp_rx) = oneshot::channel();
-        self.job_ch
-            .send(JobCmd::RecvNotInterested {
+        self.peer_ch
+            .send(PeerCmd::RecvNotInterested {
                 addr: self.connection.addr.clone(),
                 resp_ch: resp_tx,
             })
@@ -538,8 +538,8 @@ impl PeerHandler {
         have: &Have,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let (resp_tx, resp_rx) = oneshot::channel();
-        self.job_ch
-            .send(JobCmd::RecvHave {
+        self.peer_ch
+            .send(PeerCmd::RecvHave {
                 addr: self.connection.addr.clone(),
                 index: have.index(),
                 resp_ch: resp_tx,
@@ -563,8 +563,8 @@ impl PeerHandler {
         bitfield: Bitfield,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let (resp_tx, resp_rx) = oneshot::channel();
-        self.job_ch
-            .send(JobCmd::RecvBitfield {
+        self.peer_ch
+            .send(PeerCmd::RecvBitfield {
                 addr: self.connection.addr.clone(),
                 bitfield,
                 resp_ch: resp_tx,
@@ -596,8 +596,8 @@ impl PeerHandler {
         request: &Request,
     ) -> Result<(), Box<dyn std::error::Error>> {
         let (resp_tx, resp_rx) = oneshot::channel();
-        self.job_ch
-            .send(JobCmd::RecvRequest {
+        self.peer_ch
+            .send(PeerCmd::RecvRequest {
                 addr: self.connection.addr.clone(),
                 index: request.index(),
                 resp_ch: resp_tx,
@@ -617,8 +617,8 @@ impl PeerHandler {
 
     async fn trigger_cmd_recv_piece(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
         let (resp_tx, resp_rx) = oneshot::channel();
-        self.job_ch
-            .send(JobCmd::PieceDone {
+        self.peer_ch
+            .send(PeerCmd::PieceDone {
                 addr: self.connection.addr.clone(),
                 resp_ch: resp_tx,
             })
@@ -637,8 +637,8 @@ impl PeerHandler {
     }
 
     async fn trigger_cmd_sync_stats(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.job_ch
-            .send(JobCmd::SyncStats {
+        self.peer_ch
+            .send(PeerCmd::SyncStats {
                 addr: self.connection.addr.clone(),
                 downloaded_rate: self.stats.downloaded_rate(),
                 uploaded_rate: self.stats.uploaded_rate(),
