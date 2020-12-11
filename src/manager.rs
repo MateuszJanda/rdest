@@ -31,9 +31,9 @@ pub struct Manager {
     metainfo: Metainfo,
     candidates: Vec<(String, [u8; PEER_ID_SIZE])>,
     view: Option<View>,
-    change_round: u32,
-    ttt: Job<TrackerCmd>,
-    eee: Job<ExtractorCmd>,
+    round: u32,
+    tracker: Job<TrackerCmd>,
+    extractor: Job<ExtractorCmd>,
 }
 
 #[derive(Debug)]
@@ -129,17 +129,17 @@ impl Manager {
             metainfo,
             candidates: vec![],
             view: None,
-            change_round: 0,
-            ttt: Job::new(tracker_tx, tracker_rx),
-            eee: Job::new(extractor_tx, extractor_rx),
+            round: 0,
+            tracker: Job::new(tracker_tx, tracker_rx),
+            extractor: Job::new(extractor_tx, extractor_rx),
         }
     }
 
     pub async fn run(&mut self) {
         self.spawn_view();
 
-        let mut t = TrackerClient::new(&self.own_id, self.metainfo.clone(), self.ttt.tx_ch.clone());
-        self.ttt.job = Some(tokio::spawn(async move { t.run().await }));
+        let mut t = TrackerClient::new(&self.own_id, self.metainfo.clone(), self.tracker.tx_ch.clone());
+        self.tracker.job = Some(tokio::spawn(async move { t.run().await }));
 
         self.event_loop().await;
         // self.spawn_jobs();
@@ -200,7 +200,7 @@ impl Manager {
                 Ok((socket, _)) = listener.accept() => {
                     self.spawn_listen(socket);
                 }
-                Some(cmd) = self.ttt.rx_ch.recv() => {
+                Some(cmd) = self.tracker.rx_ch.recv() => {
                     println!("Tracker resp");
                     match cmd {
                         TrackerCmd::TrackerResp(resp) => {
@@ -213,21 +213,21 @@ impl Manager {
                     }
 
                     // kill tracker client
-                    match &mut self.ttt.job.take() {
+                    match &mut self.tracker.job.take() {
                         Some(job) => {
                             job.await.expect("Can't kill tracker client");
                         }
                         _ => (),
                     }
                 }
-                Some(cmd) = self.eee.rx_ch.recv() => {
+                Some(cmd) = self.extractor.rx_ch.recv() => {
                     match cmd {
                         ExtractorCmd::Done => (),
                         ExtractorCmd::Fail(_) => (), // TODO
                     }
 
                     // kill extractor
-                    match &mut self.eee.job.take() {
+                    match &mut self.extractor.job.take() {
                         Some(job) => {
                             job.await.expect("Can't kill extractor");
                         }
@@ -274,7 +274,7 @@ impl Manager {
     }
 
     fn timeout_change_conn_state(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.change_round = (self.change_round + 1) % OPTIMISTIC_UNCHOKE_ROUND;
+        self.round = (self.round + 1) % OPTIMISTIC_UNCHOKE_ROUND;
 
         // If not all peers reported their state, do nothing
         if self
@@ -285,7 +285,7 @@ impl Manager {
             return Ok(());
         }
 
-        let new_opti = match self.change_round {
+        let new_opti = match self.round {
             0 => self.new_optimistic_peers()?,
             _ => vec![],
         };
@@ -704,8 +704,8 @@ impl Manager {
             self.kill_view().await;
 
             // spawn extractor
-            let mut extractor = Extractor::new(self.metainfo.clone(), self.eee.tx_ch.clone());
-            self.eee.job = Some(tokio::spawn(async move { extractor.run().await }));
+            let mut extractor = Extractor::new(self.metainfo.clone(), self.extractor.tx_ch.clone());
+            self.extractor.job = Some(tokio::spawn(async move { extractor.run().await }));
 
             return Ok(false);
         }
