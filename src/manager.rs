@@ -166,14 +166,7 @@ impl Manager {
                         }
                         TrackerCmd::Fail(_) => (),
                     }
-
-                    // kill tracker client
-                    match &mut self.tracker.job.take() {
-                        Some(job) => {
-                            job.await.expect("Can't kill tracker client");
-                        }
-                        _ => (),
-                    }
+                    self.kill_tracker().await;
                 }
                 Some(cmd) = self.extractor.rx_ch.recv() => {
                     match cmd {
@@ -181,13 +174,7 @@ impl Manager {
                         ExtractorCmd::Fail(_) => (), // TODO
                     }
 
-                    // kill extractor
-                    match &mut self.extractor.job.take() {
-                        Some(job) => {
-                            job.await.expect("Can't kill extractor");
-                        }
-                        _ => (),
-                    }
+                    self.kill_extractor().await;
                 }
                 Some(cmd) = self.peer_channels.rx.recv() => {
                     if self.handle_job_cmd(cmd).await.expect("Can't handle command") == false {
@@ -784,6 +771,24 @@ impl Manager {
         self.peers.remove(addr);
 
         println!("Job killed");
+    }
+
+    async fn kill_tracker(&mut self) {
+        match &mut self.tracker.job.take() {
+            Some(job) => {
+                job.await.expect("Can't kill tracker");
+            }
+            _ => (),
+        }
+    }
+
+    async fn kill_extractor(&mut self) {
+        match &mut self.extractor.job.take() {
+            Some(job) => {
+                job.await.expect("Can't kill extractor");
+            }
+            _ => (),
+        }
     }
 
     async fn send_log(&mut self, text: &String) {
