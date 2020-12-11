@@ -27,17 +27,13 @@ pub struct Manager {
     own_id: [u8; PEER_ID_SIZE],
     pieces_status: Vec<Status>,
     peers: HashMap<String, Peer>,
+    peer_channels: PeerChannels,
     metainfo: Metainfo,
     candidates: Vec<(String, [u8; PEER_ID_SIZE])>,
     view: Option<View>,
     change_round: u32,
     ttt: Job<TrackerCmd>,
-    eee: Option<JoinHandle<()>>,
-    job_tx_ch: mpsc::Sender<JobCmd>,
-    job_rx_ch: mpsc::Receiver<JobCmd>,
-    extractor_tx_ch: mpsc::Sender<ExtractorCmd>,
-    extractor_rx_ch: mpsc::Receiver<ExtractorCmd>,
-    broad_ch: broadcast::Sender<BroadCmd>,
+    eee: Job<ExtractorCmd>,
 }
 
 #[derive(Debug)]
@@ -52,7 +48,6 @@ struct Peer {
     optimistic_unchoke: bool,
     download_rate: Option<u32>,
     uploaded_rate: Option<u32>,
-    rejected_piece: u32,
 }
 
 #[derive(Debug)]
@@ -66,6 +61,13 @@ struct Job<Cmd> {
     job: Option<JoinHandle<()>>,
     tx_ch: mpsc::Sender<Cmd>,
     rx_ch: mpsc::Receiver<Cmd>,
+}
+
+#[derive(Debug)]
+struct PeerChannels {
+    tx: mpsc::Sender<JobCmd>,
+    rx: mpsc::Receiver<JobCmd>,
+    broad: broadcast::Sender<BroadCmd>,
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -85,6 +87,16 @@ impl<Cmd> Job<Cmd> {
     }
 }
 
+impl PeerChannels {
+    fn new(
+        tx: mpsc::Sender<JobCmd>,
+        rx: mpsc::Receiver<JobCmd>,
+        broad: broadcast::Sender<BroadCmd>,
+    ) -> PeerChannels {
+        PeerChannels { tx, rx, broad }
+    }
+}
+
 impl Peer {
     fn new(pieces_num: usize, job: JoinHandle<()>) -> Peer {
         Peer {
@@ -98,7 +110,6 @@ impl Peer {
             optimistic_unchoke: false,
             download_rate: None,
             uploaded_rate: None,
-            rejected_piece: 0,
         }
     }
 }
@@ -114,17 +125,13 @@ impl Manager {
             own_id,
             pieces_status: vec![Status::Missing; metainfo.pieces_num()],
             peers: HashMap::new(),
+            peer_channels: PeerChannels::new(job_tx_ch, job_rx_ch, broad_ch),
             metainfo,
             candidates: vec![],
             view: None,
             change_round: 0,
             ttt: Job::new(tracker_tx_ch, tracker_rx_ch),
-            eee: None,
-            job_tx_ch,
-            job_rx_ch,
-            extractor_tx_ch,
-            extractor_rx_ch,
-            broad_ch,
+            eee: Job::new(extractor_tx_ch, extractor_rx_ch),
         }
     }
 
@@ -157,8 +164,8 @@ impl Manager {
         let own_id = self.own_id.clone();
         let info_hash = *self.metainfo.info_hash();
         let pieces_num = self.metainfo.pieces_num();
-        let job_ch = self.job_tx_ch.clone();
-        let broad_ch = self.broad_ch.subscribe();
+        let job_ch = self.peer_channels.tx.clone();
+        let broad_ch = self.peer_channels.broad.subscribe();
 
         let job = tokio::spawn(async move {
             PeerHandler::run_incoming(
@@ -213,21 +220,21 @@ impl Manager {
                         _ => (),
                     }
                 }
-                Some(cmd) = self.extractor_rx_ch.recv() => {
+                Some(cmd) = self.eee.rx_ch.recv() => {
                     match cmd {
                         ExtractorCmd::Done => (),
                         ExtractorCmd::Fail(_) => (), // TODO
                     }
 
                     // kill extractor
-                    match &mut self.eee.take() {
+                    match &mut self.eee.job.take() {
                         Some(job) => {
                             job.await.expect("Can't kill extractor");
                         }
                         _ => (),
                     }
                 }
-                Some(cmd) = self.job_rx_ch.recv() => {
+                Some(cmd) = self.peer_channels.rx.recv() => {
                     if self.handle_job_cmd(cmd).await.expect("Can't handle command") == false {
                         break;
                     }
@@ -247,8 +254,8 @@ impl Manager {
         let own_id = self.own_id.clone();
         let info_hash = *self.metainfo.info_hash();
         let pieces_num = self.metainfo.pieces_num();
-        let job_ch = self.job_tx_ch.clone();
-        let broad_ch = self.broad_ch.subscribe();
+        let job_ch = self.peer_channels.tx.clone();
+        let broad_ch = self.peer_channels.broad.subscribe();
 
         let job = tokio::spawn(async move {
             PeerHandler::run_outgoing(
@@ -297,7 +304,7 @@ impl Manager {
         };
 
         let cmd = self.change_state_cmd(&mut rate, &new_opti)?;
-        let _ = self.broad_ch.send(cmd);
+        let _ = self.peer_channels.broad.send(cmd);
 
         Ok(())
     }
@@ -635,7 +642,7 @@ impl Manager {
         match self.peers.get(addr).ok_or(Error::PeerNotFound)?.index {
             Some(index) => {
                 self.pieces_status[index] = Status::Have;
-                let _ = self.broad_ch.send(BroadCmd::SendHave { index });
+                let _ = self.peer_channels.broad.send(BroadCmd::SendHave { index });
             }
             None => panic!("Piece downloaded but not requested"),
         }
@@ -697,8 +704,8 @@ impl Manager {
             self.kill_view().await;
 
             // spawn extractor
-            let mut extractor = Extractor::new(self.metainfo.clone(), self.extractor_tx_ch.clone());
-            self.eee = Some(tokio::spawn(async move { extractor.run().await }));
+            let mut extractor = Extractor::new(self.metainfo.clone(), self.eee.tx_ch.clone());
+            self.eee.job = Some(tokio::spawn(async move { extractor.run().await }));
 
             return Ok(false);
         }
