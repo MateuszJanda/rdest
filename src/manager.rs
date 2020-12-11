@@ -190,9 +190,9 @@ impl Manager {
             Some(value) => value,
             None => return,
         };
-        let peer_addr = addr.clone();
 
         // TODO: spawn MAX_UNCHOKED + 1 + 1 jobs
+        let peer_addr = addr.clone();
         let own_id = self.own_id.clone();
         let info_hash = *self.metainfo.info_hash();
         let pieces_num = self.metainfo.pieces_num();
@@ -223,7 +223,6 @@ impl Manager {
         };
 
         let peer_addr = addr.clone();
-
         let own_id = self.own_id.clone();
         let info_hash = *self.metainfo.info_hash();
         let pieces_num = self.metainfo.pieces_num();
@@ -502,10 +501,9 @@ impl Manager {
 
         let peer = self.peers.get(addr).ok_or(Error::PeerNotFound)?;
         let index = self.choose_piece(&peer.pieces);
-        let cmd = if !peer.am_interested && peer.index.is_none() && index.is_none() {
-            NotInterestedCmd::PrepareKill
-        } else {
-            NotInterestedCmd::Ignore
+        let cmd = match !peer.am_interested && peer.index.is_none() && index.is_none() {
+            true => NotInterestedCmd::PrepareKill,
+            false => NotInterestedCmd::Ignore,
         };
 
         let _ = resp_ch.send(cmd);
@@ -570,11 +568,7 @@ impl Manager {
 
         // Change to unchoked or not
         let peer = self.peers.get(addr).ok_or(Error::PeerNotFound)?;
-        let with_am_unchoked = if self.unchoked_num() < MAX_UNCHOKED && peer.am_choked {
-            true
-        } else {
-            false
-        };
+        let with_am_unchoked = self.unchoked_num() < MAX_UNCHOKED && peer.am_choked;
 
         // Update own state
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
