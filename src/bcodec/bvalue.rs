@@ -43,6 +43,7 @@ pub enum BValue {
 }
 
 impl BValue {
+    /// Build vector with `BValues`'s
     pub fn values_vector(
         it: &mut Enumerate<Iter<u8>>,
         with_end: bool,
@@ -92,6 +93,8 @@ impl BValue {
         };
     }
 
+    /// Parse [bncoded](https://en.wikipedia.org/wiki/Bencode) string. It assume that first digit
+    /// was already consumed, so must be explicitly provided as an argument.
     pub fn parse_byte_str(
         it: &mut Enumerate<Iter<u8>>,
         pos: usize,
@@ -128,6 +131,7 @@ impl BValue {
         return Ok((str_value, str_raw));
     }
 
+    /// Parse [bencoded](https://en.wikipedia.org/wiki/Bencode) integer till delimiter "e".
     pub fn parse_int(it: &mut Enumerate<Iter<u8>>, pos: usize) -> Result<(i64, Vec<u8>), Error> {
         let mut it_start = it.clone();
         let num_as_bytes = Self::extract_int(it, pos)?;
