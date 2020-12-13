@@ -225,18 +225,22 @@ impl Metainfo {
         Err(Error::InfoMissing)
     }
 
+    /// Return URL of the tracker
     pub fn tracker_url(&self) -> &String {
         &self.announce
     }
 
+    /// Return SHA-1 hash of specific piece.
     pub fn piece(&self, index: usize) -> &[u8; HASH_SIZE] {
         &self.pieces[index]
     }
 
+    /// Return number of SHA-1 hashes.
     pub fn pieces_num(&self) -> usize {
         self.pieces.len()
     }
 
+    /// Return length of specific piece.
     pub fn piece_length(&self, index: usize) -> usize {
         if index < self.pieces.len() - 1 {
             return self.piece_length as usize;
@@ -250,14 +254,17 @@ impl Metainfo {
         return self.piece_length as usize;
     }
 
+    /// Return length of all files described by torrent.
     pub fn total_length(&self) -> u64 {
-        self.files.iter().map(|f| f.length).sum()
+        self.files.iter().map(|file| file.length).sum()
     }
 
+    /// Return SHA-1 hash of info section.
     pub fn info_hash(&self) -> &[u8; HASH_SIZE] {
         &self.info_hash
     }
 
+    /// Return vector with information which pieces contain which files.
     pub fn file_piece_ranges(&self) -> Vec<(PathBuf, PiecePos, PiecePos)> {
         let dir = match self.files.len() > 1 {
             true => PathBuf::from(&self.name),

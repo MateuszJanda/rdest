@@ -154,8 +154,9 @@ impl DeepFinder {
 }
 
 impl RawFinder for DeepFinder {
-    /// Find first value in [bencoded](https://en.wikipedia.org/wiki/Bencode) array. Look also
-    /// in dictionary keys which also may be dictionaries.
+    /// Find first value by specific dictionary key in
+    /// [bencoded](https://en.wikipedia.org/wiki/Bencode) string. Look also in keys which may be
+    /// dictionaries itself.
     ///
     /// # Example
     /// ```
