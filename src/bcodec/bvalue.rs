@@ -27,11 +27,18 @@ impl From<&u8> for Delimiter {
 
 type Key = Vec<u8>;
 
+/// [Bencode](https://en.wikipedia.org/wiki/Bencode) representation. [BEP3](https://www.bittorrent.org/beps/bep_0003.html#bencoding)
+/// specify four basic types: integer, string (but can be any byte array), list and dictionary.
 #[derive(PartialEq, Clone, Debug)]
 pub enum BValue {
+    /// Integer representation. [BEP3](https://www.bittorrent.org/beps/bep_0003.html#bencoding) doesn't
+    /// specify max/min limit, so in this implementation i64 was used, and should be sufficient.
     Int(i64),
+    /// String representation, more precisely this can be any u8 array.
     ByteStr(Vec<u8>),
+    /// List of `BValue` values
     List(Vec<BValue>),
+    /// Dictionary where, key is `BValue` string and value can be any `BValue`
     Dict(HashMap<Key, BValue>),
 }
 
