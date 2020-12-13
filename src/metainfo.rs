@@ -9,6 +9,8 @@ use std::convert::{TryFrom, TryInto};
 use std::fs;
 use std::path::PathBuf;
 
+/// Metainfo file (also known as .torrent files, check [BEP3](https://www.bittorrent.org/beps/bep_0003.html#metainfo%20files))
+/// describe all data required to find download file/files from peer-to-peer network.
 #[derive(PartialEq, Clone, Debug)]
 pub struct Metainfo {
     announce: String,
@@ -19,9 +21,12 @@ pub struct Metainfo {
     info_hash: [u8; HASH_SIZE],
 }
 
+/// File description in metainfo (.torrent) file
 #[derive(PartialEq, Clone, Debug)]
 pub struct File {
+    /// Total file length
     pub length: u64,
+    /// File name (or path if file is placed in folders)
     pub path: String,
 }
 
@@ -31,6 +36,15 @@ pub struct PiecePos {
 }
 
 impl Metainfo {
+    /// Read metainfo (.torrent) data from file
+    ///
+    /// # Example
+    /// ```
+    /// use rdest::Metainfo;
+    ///
+    /// let path = PathBuf::from("ubuntu-20.04.1-desktop-amd64.iso.torrent");
+    /// let torrent = Metainfo::from_file(path).unwrap();
+    /// ```
     pub fn from_file(path: PathBuf) -> Result<Metainfo, Error> {
         match &fs::read(path) {
             Ok(val) => Self::from_bencode(val),
@@ -38,6 +52,14 @@ impl Metainfo {
         }
     }
 
+    /// Read metainfo (.torrent) data directly from [bencoded](https://en.wikipedia.org/wiki/Bencode) string.
+    ///
+    /// # Example
+    /// ```
+    /// use rdest::Metainfo;
+    /// 
+    /// let torrent = Metainfo::from_bencode(b"d8:announce3:URL4:infod4:name4:NAME12:piece lengthi111e6:pieces20:AAAAABBBBBCCCCCDDDDD6:lengthi222eee").unwrap();
+    /// ```
     pub fn from_bencode(data: &[u8]) -> Result<Metainfo, Error> {
         let bvalues = BDecoder::from_array(data)?;
 

@@ -8,7 +8,8 @@
 //! use rdest::{Metainfo, Manager};
 //! use std::path::PathBuf;
 //!
-//! let torrent_file = Metainfo::from_file(PathBuf::from("ubuntu-20.04.1-desktop-amd64.iso.torrent")).unwrap();
+//! let path = PathBuf::from("ubuntu-20.04.1-desktop-amd64.iso.torrent");
+//! let torrent_file = Metainfo::from_file(path).unwrap();
 //! let peer_id = "AAAAABBBBBCCCCCDDDDD";
 //!
 //! let mut manager = Manager::new(torrent_file, peer_id.into());
