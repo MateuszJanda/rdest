@@ -156,7 +156,7 @@ impl DeepFinder {
 impl RawFinder for DeepFinder {
     /// Find first value by specific dictionary key in
     /// [bencoded](https://en.wikipedia.org/wiki/Bencode) string. Look also in keys which may be
-    /// dictionaries itself.
+    /// dictionaries itself. Value is returned in raw foramt.
     ///
     /// # Example
     /// ```
