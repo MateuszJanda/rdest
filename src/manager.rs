@@ -23,6 +23,7 @@ const CHANGE_STATE_INTERVAL_SEC: u64 = 10;
 const OPTIMISTIC_UNCHOKE_ROUND: u32 = 3;
 const MAX_UNCHOKED: u32 = 3;
 
+/// Peer-to-peer connection manager.
 pub struct Manager {
     own_id: [u8; PEER_ID_SIZE],
     pieces_status: Vec<Status>,
@@ -115,6 +116,19 @@ impl Peer {
 }
 
 impl Manager {
+    /// Create new instance managing peer-to-peer connection. Currently most settings, are set as
+    /// constatns.
+    /// 
+    /// # Example
+    /// ```
+    /// use rdest::{Metainfo, Manager};
+    /// use std::path::PathBuf;
+    ///
+    /// let torrent_file = Metainfo::from_file(PathBuf::from("ubuntu-20.04.1-desktop-amd64.iso.torrent")).unwrap();
+    /// let peer_id = "AAAAABBBBBCCCCCDDDDD";
+    ///
+    /// let mut manager = Manager::new(torrent_file, peer_id.into());
+    /// ```
     pub fn new(metainfo: Metainfo, own_id: [u8; PEER_ID_SIZE]) -> Manager {
         let (peer_tx, peer_rx) = mpsc::channel(CHANNEL_SIZE);
         let (tracker_tx, tracker_rx) = mpsc::channel(CHANNEL_SIZE);
@@ -135,6 +149,19 @@ impl Manager {
         }
     }
 
+    /// Run manager who will try connect to tracker, get list of available peers, and establish
+    /// connection with them
+    ///
+    /// # Example
+    /// ```
+    /// use rdest::{Metainfo, Manager};
+    /// use std::path::PathBuf;
+    ///
+    /// let torrent_file = Metainfo::from_file(PathBuf::from("ubuntu-20.04.1-desktop-amd64.iso.torrent")).unwrap();
+    /// let peer_id = "AAAAABBBBBCCCCCDDDDD";
+    ///
+    /// let mut manager = Manager::new(torrent_file, peer_id.into());
+    /// ```
     pub async fn run(&mut self) {
         self.spawn_view();
         self.spawn_tracker();
