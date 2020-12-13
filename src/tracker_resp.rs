@@ -4,6 +4,7 @@ use crate::{BDecoder, Error};
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 
+/// Response from the tracker.
 #[derive(PartialEq, Clone, Debug)]
 pub struct TrackerResp {
     pub interval: u64,

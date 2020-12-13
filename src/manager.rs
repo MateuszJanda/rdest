@@ -126,9 +126,9 @@ impl Manager {
     ///
     /// let path = PathBuf::from("ubuntu-20.04.1-desktop-amd64.iso.torrent");
     /// let torrent_file = Metainfo::from_file(path).unwrap();
-    /// let peer_id = "AAAAABBBBBCCCCCDDDDD";
+    /// let peer_id = b"AAAAABBBBBCCCCCDDDDD";
     ///
-    /// let mut manager = Manager::new(torrent_file, peer_id.into());
+    /// let mut manager = Manager::new(torrent_file, *peer_id);
     /// ```
     pub fn new(metainfo: Metainfo, own_id: [u8; PEER_ID_SIZE]) -> Manager {
         let (peer_tx, peer_rx) = mpsc::channel(CHANNEL_SIZE);
@@ -160,9 +160,9 @@ impl Manager {
     ///
     /// let path = PathBuf::from("ubuntu-20.04.1-desktop-amd64.iso.torrent");
     /// let torrent_file = Metainfo::from_file(path).unwrap();
-    /// let peer_id = "AAAAABBBBBCCCCCDDDDD";
+    /// let peer_id = b"AAAAABBBBBCCCCCDDDDD";
     ///
-    /// let mut manager = Manager::new(torrent_file, peer_id.into());
+    /// let mut manager = Manager::new(torrent_file, *peer_id);
     /// ```
     pub async fn run(&mut self) {
         self.spawn_view();

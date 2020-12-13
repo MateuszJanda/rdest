@@ -10,9 +10,9 @@
 //!
 //! let path = PathBuf::from("ubuntu-20.04.1-desktop-amd64.iso.torrent");
 //! let torrent_file = Metainfo::from_file(path).unwrap();
-//! let peer_id = "AAAAABBBBBCCCCCDDDDD";
+//! let peer_id = b"AAAAABBBBBCCCCCDDDDD";
 //!
-//! let mut manager = Manager::new(torrent_file, peer_id.into());
+//! let mut manager = Manager::new(torrent_file, *peer_id);
 //! manager.run().await;
 //! ```
 

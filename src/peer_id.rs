@@ -10,8 +10,9 @@ use rand::Rng;
 /// # Example
 /// ```
 /// use rdest::peer_id;
+///
 /// let id = peer_id::generate();
-/// println!("{}", id);
+/// println!("{:?}", id);
 /// ```
 pub fn generate() -> [u8; PEER_ID_SIZE] {
     let mut peer_id: [u8; PEER_ID_SIZE] = [0; PEER_ID_SIZE];

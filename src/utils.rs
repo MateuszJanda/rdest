@@ -4,6 +4,8 @@ use crate::constant::HASH_SIZE;
 ///
 /// # Example
 /// ```
+/// use rdest::hashmap;
+///
 /// let h = hashmap![&"a" => 1, &"b" => 2];
 ///
 /// assert_eq!(h[&"a"], 1);

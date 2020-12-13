@@ -41,6 +41,7 @@ impl Metainfo {
     /// # Example
     /// ```
     /// use rdest::Metainfo;
+    /// use std::path::PathBuf;
     ///
     /// let path = PathBuf::from("ubuntu-20.04.1-desktop-amd64.iso.torrent");
     /// let torrent = Metainfo::from_file(path).unwrap();
