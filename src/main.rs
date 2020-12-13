@@ -7,7 +7,7 @@ use tokio;
 #[structopt(
     name = "rdest",
     author = "Mateusz Janda <mateusz.janda@gmail.com>",
-    about = "A simple BitTorrent Optent"
+    about = "A simple BitTorrent client"
 )]
 struct Opt {
     #[structopt(parse(from_os_str), help = "path to .torrent file")]
