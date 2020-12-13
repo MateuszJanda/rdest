@@ -1,6 +1,6 @@
 use crate::constant::HASH_SIZE;
 
-/// Create new HashMap with elements.
+/// Create new HashMap with emplaced elements.
 ///
 /// # Example
 /// ```

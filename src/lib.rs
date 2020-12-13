@@ -2,6 +2,18 @@
 
 //! Rust is simple BitTorrent client, currently supporting
 //! [BEP3](https://www.bittorrent.org/beps/bep_0003.html#bencoding) specification.
+//!
+//! # Example
+//! ```
+//! use rdest::{Metainfo, Manager};
+//! use std::path::PathBuf;
+//!
+//! let torrent_file = Metainfo::from_file(PathBuf::from("ubuntu-20.04.1-desktop-amd64.iso.torrent")).unwrap();
+//! let peer_id = "AAAAABBBBBCCCCCDDDDD";
+//!
+//! let mut manager = Manager::new(torrent_file, peer_id.into());
+//! manager.run().await;
+//! ```
 
 mod bcodec;
 mod commands;

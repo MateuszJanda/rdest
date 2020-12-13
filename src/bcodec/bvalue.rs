@@ -38,7 +38,7 @@ pub enum BValue {
     ByteStr(Vec<u8>),
     /// List of `BValue` values
     List(Vec<BValue>),
-    /// Dictionary where, key is `BValue` string and value can be any `BValue`
+    /// Dictionary where, key and value are both `BValue` (key can be dictionary itself).
     Dict(HashMap<Key, BValue>),
 }
 

@@ -4,6 +4,7 @@ use crate::Error;
 use std::iter::Enumerate;
 use std::slice::Iter;
 
+/// Find dictionary value by key even if key is also dictionary.
 pub struct DeepFinder {}
 
 impl DeepFinder {
@@ -150,6 +151,16 @@ impl DeepFinder {
 }
 
 impl RawFinder for DeepFinder {
+    /// Find first value in [bencoded](https://en.wikipedia.org/wiki/Bencode) array. Look also
+    /// in dictionary keys which also may be dictionaries.
+    ///
+    /// # Example
+    /// ```
+    /// use rdest::{DeepFinder, RawFinder};
+    ///
+    /// let value = DeepFinder::find_first("1:k", b"d1:k4:spame").unwrap();
+    /// assert_eq!(value, b"4:spam".to_vec());
+    /// ```
     fn find_first(key: &str, arg: &[u8]) -> Option<Vec<u8>> {
         let mut it = arg.iter().enumerate();
         match Self::raw_values_vector(&mut it, Some(key.as_bytes()), false, false) {
