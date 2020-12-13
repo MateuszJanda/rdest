@@ -154,7 +154,7 @@ impl Manager {
     /// connection with them
     ///
     /// # Example
-    /// ```no_run
+    /// ```ignore
     /// use rdest::{Metainfo, Manager};
     /// use std::path::PathBuf;
     ///
@@ -163,6 +163,7 @@ impl Manager {
     /// let peer_id = b"AAAAABBBBBCCCCCDDDDD";
     ///
     /// let mut manager = Manager::new(torrent_file, *peer_id);
+    /// manager.run().await;
     /// ```
     pub async fn run(&mut self) {
         self.spawn_view();
