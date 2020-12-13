@@ -1,0 +1,1 @@
+Rust is simple BitTorrent client, currently supporting [BEP3](https://www.bittorrent.org/beps/bep_0003.html#bencoding) specification.
