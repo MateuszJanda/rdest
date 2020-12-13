@@ -1,3 +1,5 @@
+#![warn(missing_docs)]
+
 mod bcodec;
 mod commands;
 mod connection;
