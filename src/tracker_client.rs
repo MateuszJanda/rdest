@@ -9,6 +9,7 @@ use url::form_urlencoded;
 
 const DELAY_MS: u64 = 500;
 
+/// Tracker client.
 #[derive(Clone, Debug)]
 pub struct TrackerClient {
     own_id: [u8; PEER_ID_SIZE],
@@ -17,6 +18,7 @@ pub struct TrackerClient {
 }
 
 impl TrackerClient {
+    /// Create new tracker client
     pub fn new(
         own_id: &[u8; PEER_ID_SIZE],
         metainfo: Metainfo,
@@ -29,6 +31,9 @@ impl TrackerClient {
         }
     }
 
+    /// Connect to tracker and wait for response.
+    ///
+    /// If tracker respond with failure caller is informed and new connection is made after 0.5 sec.
     pub async fn run(&mut self) {
         let params = [
             ("peer_id", String::from_utf8(self.own_id.to_vec()).unwrap()),

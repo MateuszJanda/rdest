@@ -118,7 +118,7 @@ impl Peer {
 impl Manager {
     /// Create new instance managing peer-to-peer connection. Currently most settings, are set as
     /// constatns.
-    /// 
+    ///
     /// # Example
     /// ```
     /// use rdest::{Metainfo, Manager};
