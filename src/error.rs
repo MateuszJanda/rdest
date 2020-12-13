@@ -1,6 +1,6 @@
 use std::fmt;
 
-/// Rdest lib errors
+/// rdest lib errors
 #[derive(PartialEq, Clone, Debug)]
 pub enum Error {
     /// To avoid DDoS and exhaustion of RAM by peer, maximal size of message is limited to 65536 bytes.

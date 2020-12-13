@@ -4,7 +4,10 @@ use crate::Error;
 use std::iter::Enumerate;
 use std::slice::Iter;
 
-/// Find dictionary value by key even if key is also dictionary.
+/// Deep finder class looking for dictionary key in [bencoded](https://en.wikipedia.org/wiki/Bencode)
+/// string.
+///
+/// It's looking deep finding - looking for key in other keys (because dictionary can be key itself).
 pub struct DeepFinder {}
 
 impl DeepFinder {

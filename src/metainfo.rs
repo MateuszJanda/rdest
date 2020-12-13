@@ -9,7 +9,7 @@ use std::convert::{TryFrom, TryInto};
 use std::fs;
 use std::path::PathBuf;
 
-/// Metainfo file (also known as .torrent files, check [BEP3](https://www.bittorrent.org/beps/bep_0003.html#metainfo%20files))
+/// Metainfo file (also known as .torrent, check [BEP3](https://www.bittorrent.org/beps/bep_0003.html#metainfo%20files))
 /// describe all data required to find download file/files from peer-to-peer network.
 #[derive(PartialEq, Clone, Debug)]
 pub struct Metainfo {
@@ -21,7 +21,7 @@ pub struct Metainfo {
     info_hash: [u8; HASH_SIZE],
 }
 
-/// File description in metainfo (.torrent) file
+/// File description in metainfo (.torrent) file.
 #[derive(PartialEq, Clone, Debug)]
 pub struct File {
     /// Total file length
@@ -36,7 +36,7 @@ pub struct PiecePos {
 }
 
 impl Metainfo {
-    /// Read metainfo (.torrent) data from file
+    /// Read metainfo (.torrent) data from file.
     ///
     /// # Example
     /// ```
@@ -57,7 +57,7 @@ impl Metainfo {
     /// # Example
     /// ```
     /// use rdest::Metainfo;
-    /// 
+    ///
     /// let torrent = Metainfo::from_bencode(b"d8:announce3:URL4:infod4:name4:NAME12:piece lengthi111e6:pieces20:AAAAABBBBBCCCCCDDDDD6:lengthi222eee").unwrap();
     /// ```
     pub fn from_bencode(data: &[u8]) -> Result<Metainfo, Error> {
@@ -115,6 +115,7 @@ impl Metainfo {
         Ok(metainfo)
     }
 
+    /// Find value for "announce" key in pre-parsed dictionary (converted to HashMap).
     pub fn find_announce(dict: &HashMap<Vec<u8>, BValue>) -> Result<String, Error> {
         match dict.get(&b"announce".to_vec()) {
             Some(BValue::ByteStr(val)) => {
@@ -124,6 +125,7 @@ impl Metainfo {
         }
     }
 
+    /// Find value for "info:name" key in pre-parsed dictionary (converted to HashMap).
     pub fn find_name(dict: &HashMap<Vec<u8>, BValue>) -> Result<String, Error> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"name".to_vec()) {
@@ -136,6 +138,7 @@ impl Metainfo {
         }
     }
 
+    /// Find value for "info:piece length" key in pre-parsed dictionary (converted to HashMap).
     pub fn find_piece_length(dict: &HashMap<Vec<u8>, BValue>) -> Result<u64, Error> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"piece length".to_vec()) {
@@ -148,6 +151,7 @@ impl Metainfo {
         }
     }
 
+    /// Find value for "info:pieces" key in pre-parsed dictionary (converted to HashMap).
     pub fn find_pieces(dict: &HashMap<Vec<u8>, BValue>) -> Result<Vec<[u8; HASH_SIZE]>, Error> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"pieces".to_vec()) {
@@ -166,6 +170,7 @@ impl Metainfo {
         }
     }
 
+    /// Find value for "info:length" key in pre-parsed dictionary (converted to HashMap).
     pub fn find_length(dict: &HashMap<Vec<u8>, BValue>) -> Option<u64> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"length".to_vec()) {
@@ -176,6 +181,7 @@ impl Metainfo {
         }
     }
 
+    /// Find value for "info:files" key in pre-parsed dictionary (converted to HashMap).
     pub fn find_files(dict: &HashMap<Vec<u8>, BValue>) -> Option<Vec<File>> {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"files".to_vec()) {
