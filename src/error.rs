@@ -59,19 +59,31 @@ pub enum Error {
     DecodeOddNumOfElements(&'static str, u32, usize),
     /// Key not string in dictionary
     DecodeKeyNotString(&'static str, u32, usize),
+    /// Missing [bencoded](https://en.wikipedia.org/wiki/Bencode) data to decode tracker response.
     TrackerBEncodeMissing,
+    /// Not enough data in tracker response.
     TrackerDataMissing,
+    /// Incorrect or missing fields in tracker response.
     TrackerIncorrectOrMissing(String),
+    /// Tracker replay with error.
     TrackerRespFail(String),
-    TrackerInvalidU64(String),
+    /// Missing metainfo file.
     MetaFileNotFound,
+    /// Missing [bencoded](https://en.wikipedia.org/wiki/Bencode) data in metainfo.
     MetaBEncodeMissing,
+    /// Missing data in metainfo.
     MetaDataMissing,
+    /// Mutually exclusive length and files in metafile.
     MetaLenAndFilesConflict,
+    /// Missing length or files in metafile.
     MetaLenOrFilesMissing,
+    /// Can't convert metainfo fields to UTF-8.
     MetaInvalidUtf8(String),
+    /// Missing field in metainfo.
     MetaIncorrectOrMissing(String),
+    /// Can't convert metainfo field to u64
     MetaInvalidU64(String),
+    /// Not enough data to extract SHA-1 hashes.
     MetaNotDivisible(String),
 }
 
@@ -132,7 +144,6 @@ impl fmt::Display for Error {
                 write!(f, "Tracker, incorrect or missing '{}' value", name)
             }
             Error::TrackerRespFail(reason) => write!(f, "Tracker fail: {}", reason),
-            Error::TrackerInvalidU64(name) => write!(f, "Tracker, can't convert '{}' to u64", name),
             Error::MetaFileNotFound => write!(f, "Metainfo, file not found"),
             Error::MetaBEncodeMissing => write!(f, "Metainfo, bencode is missing"),
             Error::MetaDataMissing => write!(f, "Metainfo, data is missing"),
