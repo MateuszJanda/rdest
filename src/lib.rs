@@ -4,7 +4,7 @@
 //! [BEP3](https://www.bittorrent.org/beps/bep_0003.html) specification.
 //!
 //! # Example
-//! ```no_run
+//! ```ignore
 //! use rdest::{Metainfo, Manager};
 //! use std::path::PathBuf;
 //!
