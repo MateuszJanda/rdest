@@ -5,38 +5,60 @@ use std::fmt;
 pub enum Error {
     /// To avoid DDoS and exhaustion of RAM by peer, maximal size of message is limited to 65536 bytes.
     MsgToLarge,
-    /// Not supported ID message (probably from not supported standard extension)
+    /// Not supported ID message (probably from not supported standard extension).
     UnknownId(u8),
-    /// Incomplete message (details as argument e.g: message name)
+    /// Incomplete message (details as argument e.g: message name).
     Incomplete(String),
-    /// Invalid protocol ID in Handshake message. Check [BEP3](https://www.bittorrent.org/beps/bep_0003.html#peer%20protocol)
+    /// Invalid protocol ID in Handshake message. Check [BEP3](https://www.bittorrent.org/beps/bep_0003.html#peer%20protocol).
     InvalidProtocolId,
     /// Peer return invalid info hash in Handshake message.
     InvalidInfoHash,
+    /// Invalid length of Piece or Request message (different than requested peer).
     InvalidLength(String),
+    /// Invalid index (different than requested by peer).
     InvalidIndex(String),
+    /// Can't load piece file.
     FileNotFound,
+    /// Peer not found in manager.
     PeerNotFound,
+    /// Piece not requested by client.
     PieceNotRequested,
+    /// Piece not loaded by handler.
     PieceNotLoaded,
+    /// Piece block out of range.
     PieceOutOfRange,
+    /// Missing piece buffer on requested message.
     PieceBuffMissing,
+    /// Piece hash mismatch.
     PieceHashMismatch,
+    /// Peer send not requested block.
     BlockNotRequested,
+    /// Peer doesn't send any message, keep-alive trigger.
     KeepAliveTimeout,
+    /// Missing info field to calculate hash.
     InfoMissing,
+    /// Can't read from socket.
     CantReadFromSocket,
+    /// Connection reset.
     ConnectionReset,
+    /// Connection closed.
     ConnectionClosed,
+    /// Decoder encountered unexpected char.
     DecodeUnexpectedChar(&'static str, u32, usize),
+    /// Decoder encountered incorrect char.
     DecodeIncorrectChar(&'static str, u32, usize),
+    /// Decoder was unable to convert to `BValue`.
     DecodeUnableConvert(&'static str, u32, &'static str, usize),
+    /// Not enough chars to decode.
     DecodeNotEnoughChars(&'static str, u32, usize),
+    /// Decoder encountered missing terminal character "e".
     DecodeMissingTerminalChars(&'static str, u32, usize),
+    /// Incorrect integer with leading zero.
     DecodeLeadingZero(&'static str, u32, usize),
+    /// Odd number of elements in dictionary.
     DecodeOddNumOfElements(&'static str, u32, usize),
+    /// Key not string in dictionary
     DecodeKeyNotString(&'static str, u32, usize),
-    TrackerFileNotFound,
     TrackerBEncodeMissing,
     TrackerDataMissing,
     TrackerIncorrectOrMissing(String),
@@ -104,7 +126,6 @@ impl fmt::Display for Error {
             Error::DecodeKeyNotString(file, line, pos) => {
                 write!(f, "{}:{}, key is not string at {}", file, line, pos)
             }
-            Error::TrackerFileNotFound => write!(f, "Tracker, file not found"),
             Error::TrackerBEncodeMissing => write!(f, "Tracker, bencode is missing"),
             Error::TrackerDataMissing => write!(f, "Tracker, data is missing"),
             Error::TrackerIncorrectOrMissing(name) => {

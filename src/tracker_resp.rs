@@ -3,7 +3,6 @@ use crate::constant::HASH_SIZE;
 use crate::{BDecoder, Error};
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
-use std::fs;
 
 #[derive(PartialEq, Clone, Debug)]
 pub struct TrackerResp {
@@ -19,13 +18,6 @@ pub struct Peer {
 }
 
 impl TrackerResp {
-    pub fn from_file(path: String) -> Result<TrackerResp, Error> {
-        match &fs::read(path) {
-            Ok(val) => Self::from_bencode(val),
-            Err(_) => Err(Error::TrackerFileNotFound),
-        }
-    }
-
     pub fn from_bencode(data: &[u8]) -> Result<TrackerResp, Error> {
         let bvalues = BDecoder::from_array(data)?;
 
