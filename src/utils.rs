@@ -9,7 +9,7 @@ use crate::constant::HASH_SIZE;
 /// let h = hashmap![&"a" => 1, &"b" => 2];
 ///
 /// assert_eq!(h[&"a"], 1);
-/// assert_eq!(h[&"b"], 3);
+/// assert_ne!(h[&"b"], 3);
 /// ```
 #[allow(unused_macros)]
 #[macro_export]

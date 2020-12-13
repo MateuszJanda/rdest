@@ -120,7 +120,7 @@ impl Manager {
     /// constatns.
     ///
     /// # Example
-    /// ```
+    /// ```no_run
     /// use rdest::{Metainfo, Manager};
     /// use std::path::PathBuf;
     ///
@@ -154,7 +154,7 @@ impl Manager {
     /// connection with them
     ///
     /// # Example
-    /// ```
+    /// ```no_run
     /// use rdest::{Metainfo, Manager};
     /// use std::path::PathBuf;
     ///

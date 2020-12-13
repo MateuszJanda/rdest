@@ -14,7 +14,7 @@ impl BDecoder {
     /// use rdest::{BDecoder, BValue};
     /// let val = BDecoder::from_array("i44e".as_bytes()).unwrap();
     ///
-    /// assert_eq!(val, BValue::Int(44));
+    /// assert_eq!(val, vec![BValue::Int(44)]);
     /// ```
     pub fn from_array(arg: &[u8]) -> Result<Vec<BValue>, Error> {
         let mut it = arg.iter().enumerate();
