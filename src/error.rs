@@ -1,13 +1,18 @@
 use std::fmt;
 
+/// Rdest lin errors
 #[derive(PartialEq, Clone, Debug)]
 pub enum Error {
+    /// To avoid DDoS and exhaustion of RAM by peer, maximal size of message is limited to 65536 bytes.
     MsgToLarge,
+    /// Not supported ID message (probably from not supported standard extension)
     UnknownId(u8),
+    /// Incomplete message (details as argument e.g: message name)
     Incomplete(String),
+    /// Invalid protocol ID in Handshake message. Check [BEP3](https://www.bittorrent.org/beps/bep_0003.html#peer%20protocol)
     InvalidProtocolId,
+    /// Peer return invalid info hash in Handshake message.
     InvalidInfoHash,
-    InvalidPeerId,
     InvalidLength(String),
     InvalidIndex(String),
     FileNotFound,
@@ -56,7 +61,6 @@ impl fmt::Display for Error {
             Error::Incomplete(msg) => write!(f, "Incomplete {}", msg),
             Error::InvalidProtocolId => write!(f, "Invalid protocol Id"),
             Error::InvalidInfoHash => write!(f, "Invalid info hash"),
-            Error::InvalidPeerId => write!(f, "Invalid peer ID"),
             Error::InvalidLength(msg) => write!(f, "Invalid length in {}", msg),
             Error::InvalidIndex(msg) => write!(f, "Invalid index in {}", msg),
             Error::FileNotFound => write!(f, "File not found"),

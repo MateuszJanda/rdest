@@ -63,7 +63,7 @@ impl Handshake {
             return Ok(Handshake::FULL_SIZE);
         }
 
-        return Err(Error::InvalidProtocolId);
+        return Err(Error:: InvalidProtocolId);
     }
 
     pub fn peer_id(&self) -> &[u8; PEER_ID_SIZE] {
