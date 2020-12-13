@@ -7,8 +7,8 @@ use std::convert::{TryFrom, TryInto};
 /// Response from the tracker.
 #[derive(PartialEq, Clone, Debug)]
 pub struct TrackerResp {
-    pub interval: u64,
-    pub peers: Vec<Peer>,
+    interval: u64,
+    peers: Vec<Peer>,
 }
 
 #[derive(PartialEq, Clone, Debug)]
@@ -19,6 +19,7 @@ pub struct Peer {
 }
 
 impl TrackerResp {
+    /// Parse tracker response from [bencoded](https://en.wikipedia.org/wiki/Bencode) string.
     pub fn from_bencode(data: &[u8]) -> Result<TrackerResp, Error> {
         let bvalues = BDecoder::from_array(data)?;
 
@@ -109,6 +110,7 @@ impl TrackerResp {
             .collect()
     }
 
+    /// Return addresses and peer ID's.
     pub fn peers(&self) -> Vec<(String, [u8; HASH_SIZE])> {
         self.peers
             .iter()
