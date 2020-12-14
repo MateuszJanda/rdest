@@ -2,43 +2,66 @@ use crate::commands::ViewCmd;
 use std::io;
 use std::io::Write;
 use tokio::sync::mpsc;
-use tokio::time::{interval_at, Duration, Instant};
+use tokio::time;
+use tokio::time::{Duration, Instant, Interval};
+
+const CHANNEL_SIZE: usize = 32;
+const DELAY_MS: u64 = 100;
+const PROGRESS_SIZE: usize = 10;
 
 pub struct Progress {
     pos: usize,
-    dir: i32,
-    cmd_rx: mpsc::Receiver<ViewCmd>,
+    direction: Direction,
+    channel: mpsc::Receiver<ViewCmd>,
+}
+
+#[derive(PartialEq)]
+enum Direction {
+    Left,
+    Right,
 }
 
 impl Progress {
     pub fn new() -> (Progress, mpsc::Sender<ViewCmd>) {
-        let (cmd_tx, cmd_rx) = mpsc::channel(32);
+        let (channel_tx, channel_rx) = mpsc::channel(CHANNEL_SIZE);
 
-        let p = Progress {
+        let view = Progress {
             pos: 1,
-            dir: 1,
-            cmd_rx,
+            direction: Direction::Right,
+            channel: channel_rx,
         };
 
-        (p, cmd_tx)
+        (view, channel_tx)
     }
 
     pub async fn run(&mut self) {
-        let start = Instant::now() + Duration::from_millis(0);
-        let mut interval = interval_at(start, Duration::from_millis(100));
+        let mut animation_timer = self.start_animation_timer();
 
         loop {
             tokio::select! {
-                 _ = interval.tick() => self.animation().await,
-                 cmd = self.cmd_rx.recv() => {
-                     match cmd {
-                        Some(ViewCmd::Log(text)) => self.log(&text),
-                        Some(ViewCmd::Kill) => break,
-                        _ => (),
+                 _ = animation_timer.tick() => self.animation().await,
+                 cmd = self.channel.recv() => {
+                    if !self.handle_cmd(cmd) {
+                        break;
                     }
                 }
             }
         }
+    }
+
+    fn start_animation_timer(&self) -> Interval {
+        let start = Instant::now() + Duration::from_millis(0);
+        time::interval_at(start, Duration::from_millis(DELAY_MS))
+    }
+
+    fn handle_cmd(&self, cmd: Option<ViewCmd>) -> bool {
+        match cmd {
+            Some(ViewCmd::Log(text)) => self.log(&text),
+            Some(ViewCmd::Kill) => return false,
+            _ => (),
+        }
+
+        true
     }
 
     async fn animation(&mut self) {
@@ -47,16 +70,15 @@ impl Progress {
 
         io::stdout().flush().unwrap();
 
-        if self.dir > 0 && self.pos + 1 > 10 {
-            self.dir = -1;
-        } else if self.dir < 0 && self.pos - 1 < 1 {
-            self.dir = 1;
+        if self.direction == Direction::Right && self.pos + 1 > PROGRESS_SIZE {
+            self.direction = Direction::Left;
+        } else if self.direction == Direction::Left && self.pos - 1 < 1 {
+            self.direction = Direction::Right;
         }
 
-        if self.dir > 0 {
-            self.pos += 1;
-        } else {
-            self.pos -= 1;
+        match self.direction {
+            Direction::Right => self.pos += 1,
+            Direction::Left => self.pos -= 1,
         }
     }
 
