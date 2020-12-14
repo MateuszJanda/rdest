@@ -19,7 +19,7 @@ async fn main() {
     let args = Opt::from_args();
     let path = args.path;
 
-    let metainfo = match Metainfo::from_file(path) {
+    let metainfo = match Metainfo::from_file(path.as_path()) {
         Ok(metainfo) => metainfo,
         Err(e) => panic!("[-] Can't read metafile. Error: {}", e),
     };

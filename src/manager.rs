@@ -125,7 +125,7 @@ impl Manager {
     /// use std::path::PathBuf;
     ///
     /// let path = PathBuf::from("ubuntu-20.04.1-desktop-amd64.iso.torrent");
-    /// let torrent_file = Metainfo::from_file(path).unwrap();
+    /// let torrent_file = Metainfo::from_file(path.as_path()).unwrap();
     /// let peer_id = b"AAAAABBBBBCCCCCDDDDD";
     ///
     /// let mut manager = Manager::new(torrent_file, *peer_id);

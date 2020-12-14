@@ -1,13 +1,15 @@
+use crate::bcodec::bencoder::BEncoder;
 use crate::bcodec::bvalue::BValue;
 use crate::bcodec::raw_finder::RawFinder;
 use crate::constant::HASH_SIZE;
+use crate::hashmap;
 use crate::Error;
 use crate::{BDecoder, DeepFinder};
 use sha1;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Metainfo file (also known as .torrent, check [BEP3](https://www.bittorrent.org/beps/bep_0003.html#metainfo%20files))
 /// describe all data required to find download file/files from peer-to-peer network.
@@ -36,6 +38,40 @@ pub struct PiecePos {
 }
 
 impl Metainfo {
+    pub fn save_file(path: &Path, tracker_addr: &String) {
+        let metadata = fs::metadata(path).unwrap();
+
+        if metadata.is_dir() {}
+
+        // let mut pieces = vec![];
+        let mut m = sha1::Sha1::new();
+
+        let data = fs::read(path).unwrap();
+        let mut pieces = vec![];
+        data.chunks(262144).map(|x| {
+            m.update(x);
+            pieces.extend_from_slice(m.digest().bytes().as_ref());
+        });
+
+        let length = metadata.len() as i64;
+
+        let d = hashmap![
+        b"piece length".to_vec() => BValue::Int(262144),
+        // b"pieces".to_vec() => BValue::ByteStr(pieces),
+        b"length".to_vec() => BValue::Int(length)
+        ];
+
+        // let v = path.to_string_lossy().as_bytes().to_vec();
+        let a = tracker_addr.to_owned().into_bytes();
+        let h = hashmap![b"announce".to_vec() => BValue::ByteStr(a),
+        b"info".to_vec() => BValue::Dict(d)];
+
+        let output = BEncoder::new().add_dict(&h).encode().clone();
+
+        let file_name = path.with_extension("torrent");
+        fs::write(file_name, output);
+    }
+
     /// Read metainfo (.torrent) data from file.
     ///
     /// # Example
@@ -44,9 +80,9 @@ impl Metainfo {
     /// use std::path::PathBuf;
     ///
     /// let path = PathBuf::from("ubuntu-20.04.1-desktop-amd64.iso.torrent");
-    /// let torrent = Metainfo::from_file(path).unwrap();
+    /// let torrent = Metainfo::from_file(path.as_path()).unwrap();
     /// ```
-    pub fn from_file(path: PathBuf) -> Result<Metainfo, Error> {
+    pub fn from_file(path: &Path) -> Result<Metainfo, Error> {
         match &fs::read(path) {
             Ok(val) => Self::from_bencode(val),
             Err(_) => Err(Error::MetaFileNotFound),
