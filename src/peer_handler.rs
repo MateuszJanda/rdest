@@ -444,7 +444,7 @@ impl PeerHandler {
         // Send new request or call manager to decide
         if piece_rx.left.is_empty() && piece_rx.requested.is_empty() {
             self.verify_piece_hash()?;
-            self.save_piece_to_file();
+            self.save_piece_to_file()?;
             return Ok(self.trigger_cmd_recv_piece().await?);
         } else {
             self.send_request().await?;
@@ -733,13 +733,16 @@ impl PeerHandler {
         }
     }
 
-    fn save_piece_to_file(&mut self) {
+    fn save_piece_to_file(&mut self) -> Result<(), Error> {
         let piece_rx = self
             .piece_rx
             .take()
             .ok_or(Error::PieceBuffMissing)
             .expect("Saving to file: piece data not exist after validation");
         let name = utils::hash_to_string(&piece_rx.hash) + ".piece";
-        fs::write(name, &piece_rx.buff).unwrap();
+        match fs::write(name, &piece_rx.buff) {
+            Ok(()) => Ok(()),
+            Err(_) => Err(Error::FileCanNotWrite),
+        }
     }
 }

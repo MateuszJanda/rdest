@@ -48,15 +48,19 @@ impl Metainfo {
     /// Metainfo::create_file(Path::new("wallet.dat"), &"127.0.0.1".to_string()).unwrap();
     /// ```
     pub fn create_file(path: &Path, tracker_addr: &String) -> Result<(), Error> {
-        let metadata = fs::metadata(path).unwrap();
-
-        if metadata.is_dir() {
-            return Err(Error::MetaFileNotFound);
-        }
+        let metadata = match fs::metadata(path) {
+            Ok(metadata) => {
+                if metadata.is_dir() {
+                    return Err(Error::FileNotFound);
+                }
+                metadata
+            }
+            Err(_) => Err(Error::FileNotFound),
+        };
 
         let data = match fs::read(path) {
             Ok(data) => data,
-            Err(_) => return Err(Error::MetaFileNotFound),
+            Err(_) => return Err(Error::FileNotFound),
         };
 
         let mut hasher = sha1::Sha1::new();
@@ -83,7 +87,7 @@ impl Metainfo {
         let file_name = path.with_extension("torrent");
         match fs::write(file_name, BEncoder::new().add_dict(&torrent).encode()) {
             Ok(()) => Ok(()),
-            Err(_) => Err(Error::MetaFileNotFound),
+            Err(_) => Err(Error::FileCanNotWrite),
         }
     }
 
