@@ -4,16 +4,19 @@
 //! [BEP3](https://www.bittorrent.org/beps/bep_0003.html) specification.
 //!
 //! # Example
-//! ```ignore
+//! ```no_run
 //! use rdest::{Metainfo, Manager};
-//! use std::path::PathBuf;
+//! use std::path::Path;
 //!
-//! let path = PathBuf::from("ubuntu-20.04.1-desktop-amd64.iso.torrent");
+//! # #[tokio::main]
+//! # async fn main() {
+//! let path = Path::new("ubuntu-20.04.1-desktop-amd64.iso.torrent");
 //! let torrent_file = Metainfo::from_file(path).unwrap();
 //! let peer_id = b"AAAAABBBBBCCCCCDDDDD";
 //!
 //! let mut manager = Manager::new(torrent_file, *peer_id);
 //! manager.run().await;
+//! # }
 //! ```
 
 mod bcodec;

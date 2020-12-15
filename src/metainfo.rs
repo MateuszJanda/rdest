@@ -41,7 +41,7 @@ impl Metainfo {
     /// Create new torrent file.
     ///
     /// # Example
-    /// ```
+    /// ```no_run
     /// use rdest::Metainfo;
     /// use std::path::Path;
     ///
