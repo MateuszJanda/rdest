@@ -38,6 +38,15 @@ pub struct PiecePos {
 }
 
 impl Metainfo {
+    /// Create new torrent file.
+    ///
+    /// # Example
+    /// ```
+    /// use rdest::Metainfo;
+    /// use std::path::Path;
+    ///
+    /// Metainfo::create_file(Path::new("wallet.dat"), &"127.0.0.1".to_string()).unwrap();
+    /// ```
     pub fn create_file(path: &Path, tracker_addr: &String) -> Result<(), Error> {
         let metadata = fs::metadata(path).unwrap();
 
@@ -260,9 +269,9 @@ impl Metainfo {
 
     fn calculate_hash(data: &[u8]) -> Result<[u8; HASH_SIZE], Error> {
         if let Some(info) = DeepFinder::find_first("4:info", data) {
-            let mut m = sha1::Sha1::new();
-            m.update(info.as_ref());
-            return Ok(m.digest().bytes());
+            let mut hasher = sha1::Sha1::new();
+            hasher.update(info.as_ref());
+            return Ok(hasher.digest().bytes());
         }
 
         Err(Error::InfoMissing)
