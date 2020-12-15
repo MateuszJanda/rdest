@@ -55,7 +55,7 @@ impl Metainfo {
                 }
                 metadata
             }
-            Err(_) => Err(Error::FileNotFound),
+            Err(_) => return Err(Error::FileNotFound),
         };
 
         let data = match fs::read(path) {

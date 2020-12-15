@@ -24,13 +24,15 @@ impl DeepFinder {
                 Delimiter::Num => values.append(&mut Self::raw_byte_str(it, pos, b, extract)?),
                 Delimiter::Int => values.append(&mut Self::raw_int(it, pos, extract)?),
                 Delimiter::List => values.append(&mut Self::raw_list(it, extract)?),
-                Delimiter::Dict if key.is_some() => {
-                    let val = Self::traverse_dict(it, key.unwrap())?;
-                    if val.len() > 0 {
-                        return Ok(val);
+                Delimiter::Dict => match key {
+                    Some(key) => {
+                        let val = Self::traverse_dict(it, key)?;
+                        if val.len() > 0 {
+                            return Ok(val);
+                        }
                     }
-                }
-                Delimiter::Dict => values.append(&mut Self::raw_dict(it, extract)?),
+                    None => values.append(&mut Self::raw_dict(it, extract)?),
+                },
                 Delimiter::End if with_end => return Ok(values),
                 Delimiter::End => return Err(Error::DecodeUnexpectedChar(file!(), line!(), pos)),
                 Delimiter::Unknown => {
