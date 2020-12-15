@@ -1,7 +1,7 @@
 use crate::bcodec::bencoder::BEncoder;
 use crate::bcodec::bvalue::BValue;
 use crate::bcodec::raw_finder::RawFinder;
-use crate::constant::HASH_SIZE;
+use crate::constant::{HASH_SIZE, PIECE_LENGTH};
 use crate::hashmap;
 use crate::Error;
 use crate::{BDecoder, DeepFinder};
@@ -53,7 +53,7 @@ impl Metainfo {
         let mut hasher = sha1::Sha1::new();
 
         let pieces = data
-            .chunks(262144)
+            .chunks(PIECE_LENGTH)
             .flat_map(|chunk| {
                 hasher.update(chunk);
                 hasher.digest().bytes().as_ref().to_vec()
@@ -61,7 +61,7 @@ impl Metainfo {
             .collect::<Vec<u8>>();
 
         let info = hashmap![
-            b"piece length".to_vec() => BValue::Int(262144),
+            b"piece length".to_vec() => BValue::Int(PIECE_LENGTH as i64),
             b"pieces".to_vec() => BValue::ByteStr(pieces),
             b"length".to_vec() => BValue::Int(metadata.len() as i64)
         ];
@@ -71,10 +71,8 @@ impl Metainfo {
             b"info".to_vec() => BValue::Dict(info)
         ];
 
-        let encoded_torrent = BEncoder::new().add_dict(&torrent).encode().clone();
-
         let file_name = path.with_extension("torrent");
-        match fs::write(file_name, encoded_torrent) {
+        match fs::write(file_name, BEncoder::new().add_dict(&torrent).encode()) {
             Ok(()) => Ok(()),
             Err(_) => Err(Error::MetaFileNotFound),
         }
