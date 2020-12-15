@@ -11,7 +11,7 @@ use std::convert::{TryFrom, TryInto};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Metainfo file (also known as .torrent, check [BEP3](https://www.bittorrent.org/beps/bep_0003.html#metainfo%20files))
+/// Metainfo file (also known as .torrent; see [BEP3](https://www.bittorrent.org/beps/bep_0003.html#metainfo%20files))
 /// describe all data required to find download file/files from peer-to-peer network.
 #[derive(PartialEq, Clone, Debug)]
 pub struct Metainfo {
@@ -38,38 +38,46 @@ pub struct PiecePos {
 }
 
 impl Metainfo {
-    pub fn save_file(path: &Path, tracker_addr: &String) {
+    pub fn create_file(path: &Path, tracker_addr: &String) -> Result<(), Error> {
         let metadata = fs::metadata(path).unwrap();
 
-        if metadata.is_dir() {}
+        if metadata.is_dir() {
+            return Err(Error::MetaFileNotFound);
+        }
 
-        // let mut pieces = vec![];
-        let mut m = sha1::Sha1::new();
+        let data = match fs::read(path) {
+            Ok(data) => data,
+            Err(_) => return Err(Error::MetaFileNotFound),
+        };
 
-        let data = fs::read(path).unwrap();
-        let mut pieces = vec![];
-        data.chunks(262144).map(|x| {
-            m.update(x);
-            pieces.extend_from_slice(m.digest().bytes().as_ref());
-        });
+        let mut hasher = sha1::Sha1::new();
 
-        let length = metadata.len() as i64;
+        let pieces = data
+            .chunks(262144)
+            .flat_map(|chunk| {
+                hasher.update(chunk);
+                hasher.digest().bytes().as_ref().to_vec()
+            })
+            .collect::<Vec<u8>>();
 
-        let d = hashmap![
-        b"piece length".to_vec() => BValue::Int(262144),
-        // b"pieces".to_vec() => BValue::ByteStr(pieces),
-        b"length".to_vec() => BValue::Int(length)
+        let info = hashmap![
+            b"piece length".to_vec() => BValue::Int(262144),
+            b"pieces".to_vec() => BValue::ByteStr(pieces),
+            b"length".to_vec() => BValue::Int(metadata.len() as i64)
         ];
 
-        // let v = path.to_string_lossy().as_bytes().to_vec();
-        let a = tracker_addr.to_owned().into_bytes();
-        let h = hashmap![b"announce".to_vec() => BValue::ByteStr(a),
-        b"info".to_vec() => BValue::Dict(d)];
+        let torrent = hashmap![
+            b"announce".to_vec() => BValue::ByteStr(tracker_addr.to_owned().into_bytes()),
+            b"info".to_vec() => BValue::Dict(info)
+        ];
 
-        let output = BEncoder::new().add_dict(&h).encode().clone();
+        let encoded_torrent = BEncoder::new().add_dict(&torrent).encode().clone();
 
         let file_name = path.with_extension("torrent");
-        fs::write(file_name, output);
+        match fs::write(file_name, encoded_torrent) {
+            Ok(()) => Ok(()),
+            Err(_) => Err(Error::MetaFileNotFound),
+        }
     }
 
     /// Read metainfo (.torrent) data from file.
