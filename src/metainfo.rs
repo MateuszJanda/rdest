@@ -58,13 +58,20 @@ impl Metainfo {
             Err(_) => return Err(Error::FileNotFound),
         };
 
+        let name = match path.file_name() {
+            Some(name) => match name.to_str() {
+                Some(name) => name.as_bytes().to_vec(),
+                None => return Err(Error::FileNotFound),
+            },
+            None => return Err(Error::FileNotFound),
+        };
+
         let data = match fs::read(path) {
             Ok(data) => data,
             Err(_) => return Err(Error::FileNotFound),
         };
 
         let mut hasher = sha1::Sha1::new();
-
         let pieces = data
             .chunks(PIECE_LENGTH)
             .flat_map(|chunk| {
@@ -74,6 +81,7 @@ impl Metainfo {
             .collect::<Vec<u8>>();
 
         let info = hashmap![
+            b"name".to_vec() => BValue::ByteStr(name),
             b"piece length".to_vec() => BValue::Int(PIECE_LENGTH as i64),
             b"pieces".to_vec() => BValue::ByteStr(pieces),
             b"length".to_vec() => BValue::Int(metadata.len() as i64)
