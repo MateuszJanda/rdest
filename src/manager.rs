@@ -407,19 +407,11 @@ impl Manager {
         let cmd = match index {
             Some(index) if !peer.am_interested => {
                 self.pieces_status[index] = Status::Reserved;
-                UnchokeCmd::SendInterestedAndRequest(ReqData {
-                    index,
-                    piece_length: self.metainfo.piece_length(index),
-                    piece_hash: *self.metainfo.piece(index),
-                })
+                UnchokeCmd::SendInterestedAndRequest(self.req_data(index))
             }
             Some(index) => {
                 self.pieces_status[index] = Status::Reserved;
-                UnchokeCmd::SendRequest(ReqData {
-                    index,
-                    piece_length: self.metainfo.piece_length(index),
-                    piece_hash: *self.metainfo.piece(index),
-                })
+                UnchokeCmd::SendRequest(self.req_data(index))
             }
             None if peer.am_interested => UnchokeCmd::SendNotInterested,
             None => UnchokeCmd::Ignore,
@@ -475,11 +467,7 @@ impl Manager {
                 self.pieces_status[index] = Status::Reserved;
                 peer.index = Some(index);
                 peer.am_interested = true;
-                HaveCmd::SendInterestedAndRequest(ReqData {
-                    index,
-                    piece_length: self.metainfo.piece_length(index),
-                    piece_hash: *self.metainfo.piece(index),
-                })
+                HaveCmd::SendInterestedAndRequest(self.req_data(index))
             } else {
                 peer.am_interested = true;
                 HaveCmd::SendInterested
@@ -594,11 +582,7 @@ impl Manager {
                 println!("Some index {:?}", index);
                 let peer = self.peers.get(addr).ok_or(Error::PeerNotFound)?;
                 if !peer.choked {
-                    PieceDoneCmd::SendRequest(ReqData {
-                        index,
-                        piece_length: self.metainfo.piece_length(index),
-                        piece_hash: *self.metainfo.piece(index),
-                    })
+                    PieceDoneCmd::SendRequest(self.req_data(index))
                 } else {
                     PieceDoneCmd::Ignore
                 }
@@ -646,6 +630,14 @@ impl Manager {
         }
 
         Ok(true)
+    }
+
+    fn req_data(&self, index: usize) -> ReqData {
+        ReqData {
+            index,
+            piece_length: self.metainfo.piece_length(index),
+            piece_hash: *self.metainfo.piece(index),
+        }
     }
 
     fn choose_piece(&self, pieces: &Vec<bool>) -> Option<usize> {
