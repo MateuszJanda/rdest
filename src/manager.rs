@@ -318,8 +318,8 @@ impl Manager {
 
     async fn handle_extractor_cmd(&mut self, cmd: ExtractorCmd) {
         match cmd {
-            ExtractorCmd::Done => (),
-            ExtractorCmd::Fail(_) => (), // TODO
+            ExtractorCmd::Done => self.log("Extractor done".to_string()).await,
+            ExtractorCmd::Fail(e) => self.log("Extractor fail: ".to_string() + &e).await,
         }
 
         self.kill_extractor().await;
@@ -373,7 +373,7 @@ impl Manager {
         );
 
         let _ = resp_ch.send(InitCmd::SendBitfield { bitfield });
-        self.log(addr, &"Handshake with peer".to_string()).await;
+        self.peer_log(addr, "Handshake with peer".to_string()).await;
 
         Ok(true)
     }
@@ -611,7 +611,8 @@ impl Manager {
     }
 
     async fn handle_kill_req(&mut self, addr: &String, reason: &String) -> Result<bool, Error> {
-        self.log(addr, &format!("Kill reason {}", reason)).await;
+        self.peer_log(addr, "Kill reason: ".to_string() + reason)
+            .await;
         self.kill_peer(&addr).await;
 
         if self.peers.is_empty() {
@@ -789,7 +790,13 @@ impl Manager {
         }
     }
 
-    async fn log(&mut self, addr: &String, text: &String) {
+    async fn log(&mut self, text: String) {
+        if let Some(view) = &mut self.view {
+            let _ = view.channel.send(ViewCmd::Log(text)).await;
+        }
+    }
+
+    async fn peer_log(&mut self, addr: &String, text: String) {
         if let Some(view) = &mut self.view {
             let line = format!("[{}] {}", addr, text);
             let _ = view.channel.send(ViewCmd::Log(line)).await;

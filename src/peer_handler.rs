@@ -315,9 +315,7 @@ impl PeerHandler {
                     return Ok(false);
                 }
             }
-            None => {
-                return Err(Error::ConnectionClosed.into());
-            }
+            None => return Err(Error::ConnectionClosed.into()),
         }
 
         return Ok(true);
@@ -693,11 +691,10 @@ impl PeerHandler {
     fn verify_piece_hash(&self) -> Result<(), Error> {
         match self.piece_rx.as_ref() {
             Some(piece_rx) => {
-                let mut m = sha1::Sha1::new();
-                m.update(piece_rx.buff.as_ref());
-                println!("Checksum: {:?} {:?}", m.digest().bytes(), piece_rx.hash);
+                let mut hasher = sha1::Sha1::new();
+                hasher.update(piece_rx.buff.as_ref());
 
-                match m.digest().bytes() == piece_rx.hash {
+                match hasher.digest().bytes() == piece_rx.hash {
                     true => Ok(()),
                     false => Err(Error::PieceHashMismatch),
                 }
