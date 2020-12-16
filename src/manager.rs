@@ -377,8 +377,7 @@ impl Manager {
         );
 
         let _ = resp_ch.send(InitCmd::SendBitfield { bitfield });
-        self.send_log(&format!("Handshake with peer: {}", addr))
-            .await;
+        self.log(addr, &"Handshake with peer".to_string()).await;
 
         Ok(true)
     }
@@ -729,7 +728,7 @@ impl Manager {
                 peer_ch,
                 broad_ch,
             )
-                .await
+            .await
         });
 
         let peer = Peer::new(self.metainfo.pieces_num(), job);
@@ -753,7 +752,7 @@ impl Manager {
             PeerHandler::run_outgoing(
                 socket, addr, own_id, None, info_hash, pieces_num, job_ch, broad_ch,
             )
-                .await
+            .await
         });
 
         let peer = Peer::new(self.metainfo.pieces_num(), job);
@@ -808,12 +807,10 @@ impl Manager {
         }
     }
 
-    async fn send_log(&mut self, text: &String) {
-        match &mut self.view {
-            Some(view) => {
-                let _ = view.channel.send(ViewCmd::Log(text.clone())).await;
-            }
-            _ => (),
+    async fn log(&mut self, addr: &String, text: &String) {
+        if let Some(view) = &mut self.view {
+            let line = format!("[{}] {}", addr, text);
+            let _ = view.channel.send(ViewCmd::Log(line)).await;
         }
     }
 }
