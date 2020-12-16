@@ -615,6 +615,7 @@ impl Manager {
             .await;
         self.kill_peer(&addr).await;
 
+        // TODO: spawn extractor only when all pieces downloaded
         if self.peers.is_empty() {
             self.kill_view().await;
             self.spawn_extractor();
