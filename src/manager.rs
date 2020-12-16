@@ -620,7 +620,7 @@ impl Manager {
         index: &Option<usize>,
         reason: &String,
     ) -> Result<bool, Error> {
-        println!("Kill reason: {}", reason);
+        self.log(addr, &format!("Kill reason {}", reason)).await;
         self.kill_peer(&addr, &index).await;
 
         if self.peers.is_empty() {
@@ -771,7 +771,7 @@ impl Manager {
             _ => (),
         }
 
-        // Wait fot the task to finish
+        // Wait for task to finish
         match self.peers.get_mut(addr) {
             Some(peer) => match peer.job.take() {
                 Some(job) => job.await.expect("Can't kill peer job"),
