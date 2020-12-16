@@ -76,7 +76,6 @@ pub enum PeerCmd {
     },
     KillReq {
         addr: String,
-        index: Option<usize>,
         reason: String,
     },
 }

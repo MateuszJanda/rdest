@@ -355,11 +355,7 @@ impl Manager {
                 downloaded_rate,
                 uploaded_rate,
             } => self.handle_sync_stats(&addr, &downloaded_rate, &uploaded_rate),
-            PeerCmd::KillReq {
-                addr,
-                index,
-                reason,
-            } => self.handle_kill_req(&addr, &index, &reason).await,
+            PeerCmd::KillReq { addr, reason } => self.handle_kill_req(&addr, &reason).await,
         }
     }
 
@@ -614,14 +610,9 @@ impl Manager {
         Ok(true)
     }
 
-    async fn handle_kill_req(
-        &mut self,
-        addr: &String,
-        index: &Option<usize>,
-        reason: &String,
-    ) -> Result<bool, Error> {
+    async fn handle_kill_req(&mut self, addr: &String, reason: &String) -> Result<bool, Error> {
         self.log(addr, &format!("Kill reason {}", reason)).await;
-        self.kill_peer(&addr, &index).await;
+        self.kill_peer(&addr).await;
 
         if self.peers.is_empty() {
             self.kill_view().await;
@@ -762,27 +753,26 @@ impl Manager {
         }
     }
 
-    async fn kill_peer(&mut self, addr: &String, index: &Option<usize>) {
-        // Reset piece status
-        match index {
-            Some(index) if self.pieces_status[*index] != Status::Have => {
-                self.pieces_status[*index] = Status::Missing
-            }
-            _ => (),
-        }
-
-        // Wait for task to finish
+    async fn kill_peer(&mut self, addr: &String) {
         match self.peers.get_mut(addr) {
-            Some(peer) => match peer.job.take() {
-                Some(job) => job.await.expect("Can't kill peer job"),
-                None => (),
-            },
+            Some(peer) => {
+                // Reset piece status
+                if let Some(index) = peer.index {
+                    if self.pieces_status[index] != Status::Have {
+                        self.pieces_status[index] = Status::Missing
+                    }
+                }
+
+                // Wait for task to finish
+                if let Some(job) = peer.job.take() {
+                    job.await.expect("Can't kill peer job")
+                }
+            }
             None => (),
         }
 
         // Remove peer data from map
         self.peers.remove(addr);
-        println!("Job killed");
     }
 
     async fn kill_tracker(&mut self) {

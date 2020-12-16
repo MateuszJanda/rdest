@@ -179,9 +179,7 @@ impl PeerHandler {
                 );
                 handler.run().await;
             }
-            Err(_) => {
-                Self::kill_req(&addr, &None, &"Connection fail".to_string(), &mut peer_ch).await
-            }
+            Err(_) => Self::kill_req(&addr, &"Connection fail".to_string(), &mut peer_ch).await,
         }
     }
 
@@ -207,23 +205,13 @@ impl PeerHandler {
             Err(e) => e.to_string(),
         };
 
-        let index = self
-            .piece_rx
-            .as_ref()
-            .map_or(None, |piece_rx| Some(piece_rx.index));
-        Self::kill_req(&self.connection.addr, &index, &reason, &mut self.peer_ch).await;
+        Self::kill_req(&self.connection.addr, &reason, &mut self.peer_ch).await;
     }
 
-    async fn kill_req(
-        addr: &String,
-        index: &Option<usize>,
-        reason: &String,
-        peer_ch: &mut mpsc::Sender<PeerCmd>,
-    ) {
+    async fn kill_req(addr: &String, reason: &String, peer_ch: &mut mpsc::Sender<PeerCmd>) {
         peer_ch
             .send(PeerCmd::KillReq {
                 addr: addr.clone(),
-                index: *index,
                 reason: reason.clone(),
             })
             .await
