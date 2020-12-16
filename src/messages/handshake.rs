@@ -1,4 +1,4 @@
-use crate::constant::{HASH_SIZE, PEER_ID_SIZE};
+use crate::constants::{HASH_SIZE, PEER_ID_SIZE};
 use crate::serializer::Serializer;
 use crate::Error;
 use std::io::Cursor;

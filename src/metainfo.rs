@@ -1,7 +1,7 @@
 use crate::bcodec::bencoder::BEncoder;
 use crate::bcodec::bvalue::BValue;
 use crate::bcodec::raw_finder::RawFinder;
-use crate::constant::{HASH_SIZE, PIECE_LENGTH};
+use crate::constants::{HASH_SIZE, PIECE_LENGTH};
 use crate::hashmap;
 use crate::Error;
 use crate::{BDecoder, DeepFinder};

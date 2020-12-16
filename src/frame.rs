@@ -1,4 +1,4 @@
-use crate::constant::{MSG_ID_POS, MSG_ID_SIZE, MSG_LEN_SIZE};
+use crate::constants::{MSG_ID_POS, MSG_ID_SIZE, MSG_LEN_SIZE};
 use crate::messages::bitfield::Bitfield;
 use crate::messages::cancel::Cancel;
 use crate::messages::choke::Choke;

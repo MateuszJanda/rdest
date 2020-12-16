@@ -1,4 +1,4 @@
-use crate::constant::HASH_SIZE;
+use crate::constants::HASH_SIZE;
 
 /// Create new HashMap with emplaced elements.
 ///

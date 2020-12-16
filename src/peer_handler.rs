@@ -3,7 +3,7 @@ use crate::commands::{
     RequestCmd, UnchokeCmd,
 };
 use crate::connection::Connection;
-use crate::constant::{HASH_SIZE, PEER_ID_SIZE, PIECE_BLOCK_SIZE};
+use crate::constants::{HASH_SIZE, PEER_ID_SIZE, PIECE_BLOCK_SIZE};
 use crate::frame::Frame;
 use crate::messages::bitfield::Bitfield;
 use crate::messages::have::Have;

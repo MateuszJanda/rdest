@@ -1,4 +1,4 @@
-use crate::constant::HASH_SIZE;
+use crate::constants::HASH_SIZE;
 use crate::messages::bitfield::Bitfield;
 use crate::TrackerResp;
 use std::collections::HashMap;

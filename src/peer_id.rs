@@ -1,6 +1,6 @@
 //! Peer ID utilities.
 
-use crate::constant::PEER_ID_SIZE;
+use crate::constants::PEER_ID_SIZE;
 use num_traits::AsPrimitive;
 use rand::distributions::Alphanumeric;
 use rand::Rng;

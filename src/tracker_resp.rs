@@ -1,5 +1,5 @@
 use crate::bcodec::bvalue::BValue;
-use crate::constant::HASH_SIZE;
+use crate::constants::HASH_SIZE;
 use crate::{BDecoder, Error};
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};

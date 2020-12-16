@@ -22,7 +22,7 @@
 mod bcodec;
 mod commands;
 mod connection;
-mod constant;
+mod constants;
 mod error;
 mod extractor;
 mod frame;

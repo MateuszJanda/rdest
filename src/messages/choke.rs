@@ -1,4 +1,4 @@
-use crate::constant::MSG_LEN_SIZE;
+use crate::constants::MSG_LEN_SIZE;
 use crate::serializer::Serializer;
 use crate::Error;
 

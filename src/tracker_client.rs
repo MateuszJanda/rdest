@@ -1,5 +1,5 @@
 use crate::commands::TrackerCmd;
-use crate::constant::{PEER_ID_SIZE, PORT};
+use crate::constants::{PEER_ID_SIZE, PORT};
 use crate::{Metainfo, TrackerResp};
 use reqwest::Response;
 use tokio::sync::mpsc;

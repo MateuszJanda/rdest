@@ -2,7 +2,7 @@ use crate::commands::{
     BitfieldCmd, BroadCmd, ExtractorCmd, HaveCmd, InitCmd, NotInterestedCmd, PeerCmd, PieceDoneCmd,
     ReqData, RequestCmd, TrackerCmd, UnchokeCmd, ViewCmd,
 };
-use crate::constant::{PEER_ID_SIZE, PORT};
+use crate::constants::{PEER_ID_SIZE, PORT};
 use crate::extractor::Extractor;
 use crate::messages::bitfield::Bitfield;
 use crate::peer_handler::PeerHandler;

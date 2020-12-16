@@ -1,8 +1,8 @@
 use rdest::peer_id;
 use rdest::{Manager, Metainfo};
+use std::path::PathBuf;
 use structopt::StructOpt;
 use tokio;
-use std::path::PathBuf;
 
 #[derive(StructOpt)]
 #[structopt(
