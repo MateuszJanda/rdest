@@ -1,3 +1,4 @@
+use crate::constants::MAX_FRAME_SIZE;
 use crate::frame::Frame;
 use crate::serializer::Serializer;
 use crate::Error;
@@ -12,14 +13,12 @@ pub struct Connection {
     pub buffer: BytesMut,
 }
 
-const BUFFER_SIZE: usize = 65536;
-
 impl Connection {
     pub fn new(addr: String, socket: TcpStream) -> Connection {
         Connection {
             addr,
             socket,
-            buffer: BytesMut::with_capacity(BUFFER_SIZE),
+            buffer: BytesMut::with_capacity(MAX_FRAME_SIZE),
         }
     }
 
@@ -78,24 +77,22 @@ impl Connection {
 
         // Check whether a full frame is available
         match Frame::parse(&mut crs) {
+            // Discard the frame from the buffer
             Ok(frame) => {
-                // Discard the frame from the buffer
                 let len = crs.position() as usize;
                 self.buffer.advance(len);
 
                 Ok(Some(frame))
             }
+            // Discard the frame for unknown message from the buffer
             Err(Error::UnknownId(_)) => {
-                // Discard the frame for unknown message from the buffer
                 let len = crs.position() as usize;
                 self.buffer.advance(len);
 
                 Ok(None)
             }
-            Err(Error::Incomplete(_)) => {
-                // Not enough data has been buffered
-                Ok(None)
-            }
+            // Not enough data has been buffered
+            Err(Error::Incomplete(_)) => Ok(None),
             Err(e) => Err(e.into()),
         }
     }

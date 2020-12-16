@@ -749,7 +749,7 @@ impl Manager {
                 let job = &mut view.job;
                 job.await.expect("Can't kill view");
             }
-            _ => (),
+            None => (),
         }
     }
 
@@ -778,14 +778,14 @@ impl Manager {
     async fn kill_tracker(&mut self) {
         match &mut self.tracker.job.take() {
             Some(job) => job.await.expect("Can't kill tracker"),
-            _ => (),
+            None => (),
         }
     }
 
     async fn kill_extractor(&mut self) {
         match &mut self.extractor.job.take() {
             Some(job) => job.await.expect("Can't kill extractor"),
-            _ => (),
+            None => (),
         }
     }
 

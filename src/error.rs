@@ -3,7 +3,7 @@ use std::fmt;
 /// rdest lib errors
 #[derive(PartialEq, Clone, Debug)]
 pub enum Error {
-    /// To avoid DDoS and exhaustion of RAM by peer, maximal size of message is limited to 65536 bytes.
+    /// To avoid DDoS and exhaustion of RAM by peer, maximal size of message is limited to MAX_FRAME_SIZE bytes.
     MsgToLarge,
     /// Not supported ID message (probably from not supported standard extension).
     UnknownId(u8),

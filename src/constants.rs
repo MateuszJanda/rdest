@@ -9,6 +9,8 @@ pub const PIECE_LENGTH: usize = 262144;
 /// Default port
 pub const PORT: u16 = 6881;
 
+/// Maximal buffer size for frame
+pub const MAX_FRAME_SIZE: usize = 65536;
 pub const MSG_LEN_SIZE: usize = 4;
 pub const MSG_ID_POS: usize = MSG_LEN_SIZE;
 pub const MSG_ID_SIZE: usize = 1;

@@ -1,4 +1,4 @@
-use crate::constants::{MSG_ID_POS, MSG_ID_SIZE, MSG_LEN_SIZE};
+use crate::constants::{MAX_FRAME_SIZE, MSG_ID_POS, MSG_ID_SIZE, MSG_LEN_SIZE};
 use crate::messages::bitfield::Bitfield;
 use crate::messages::cancel::Cancel;
 use crate::messages::choke::Choke;
@@ -55,9 +55,7 @@ impl Frame {
 
         let msg_id = Self::get_message_id(crs)?;
 
-        // TODO: check buffer auto expand and change size to 2**17 or 2**18
-        if FromPrimitive::from_u8(msg_id) != Some(MsgId::HandshakeId) && length > 65536 {
-            println!("len {}", length);
+        if FromPrimitive::from_u8(msg_id) != Some(MsgId::HandshakeId) && length > MAX_FRAME_SIZE {
             return Err(Error::MsgToLarge);
         }
 
