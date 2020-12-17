@@ -388,15 +388,20 @@ impl PeerHandler {
         request: Request,
     ) -> Result<bool, Box<dyn std::error::Error>> {
         match &self.piece_tx {
-            Some(piece_tx) => request.validate(Some(piece_tx.buff.len()), self.pieces_num)?,
-            None => request.validate(None, self.pieces_num)?,
-        }
+            Some(piece_tx) => {
+                if piece_tx.index != request.index() {
+                    self.trigger_cmd_recv_request(&request).await?;
+                }
+            }
+            None => self.trigger_cmd_recv_request(&request).await?,
+        };
 
         match &self.piece_tx {
-            Some(piece_tx) if piece_tx.index == request.index() => {
-                self.send_piece(&request).await?;
+            Some(piece_tx) => {
+                request.validate(piece_tx.index, self.pieces_num, piece_tx.buff.len())?;
+                self.send_piece(&request).await?
             }
-            _ => self.trigger_cmd_recv_request(&request).await?,
+            None => ()
         }
 
         Ok(true)
@@ -593,10 +598,9 @@ impl PeerHandler {
         match resp_rx.await? {
             RequestCmd::LoadAndSendPiece { index, piece_hash } => {
                 self.load_piece_from_file(index, &piece_hash)?;
-                self.send_piece(request).await?;
             }
-            RequestCmd::Ignore => (),
-        }
+            RequestCmd::Ignore => self.piece_tx = None,
+        };
 
         Ok(())
     }
@@ -668,11 +672,6 @@ impl PeerHandler {
             Some(piece_tx) => {
                 let block_begin = request.block_begin();
                 let block_end = block_begin + request.block_length();
-
-                // TODO: Move validation to handle_request
-                if block_end >= piece_tx.buff.len() {
-                    return Err(Error::PieceOutOfRange.into());
-                }
 
                 self.stats.update_uploaded(request.block_length());
                 self.connection

@@ -27,8 +27,6 @@ pub enum Error {
     PieceNotRequested,
     /// Piece not loaded by handler.
     PieceNotLoaded,
-    /// Piece block out of range.
-    PieceOutOfRange,
     /// Missing piece buffer on requested message.
     PieceBuffMissing,
     /// Piece hash mismatch.
@@ -104,7 +102,6 @@ impl fmt::Display for Error {
             Error::PeerNotFound => write!(f, "Peer not found"),
             Error::PieceNotRequested => write!(f, "Piece not requested"),
             Error::PieceNotLoaded => write!(f, "Piece not loaded"),
-            Error::PieceOutOfRange => write!(f, "Piece out of range"),
             Error::PieceBuffMissing => write!(f, "Piece buff missing"),
             Error::PieceHashMismatch => write!(f, "Piece hash mismatch"),
             Error::BlockNotRequested => write!(f, "Block not requested"),

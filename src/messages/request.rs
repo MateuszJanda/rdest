@@ -68,8 +68,13 @@ impl Request {
         self.block_length as usize
     }
 
-    pub fn validate(&self, piece_length: Option<usize>, pieces_num: usize) -> Result<(), Error> {
-        if self.index >= pieces_num as u32 {
+    pub fn validate(
+        &self,
+        index: usize,
+        pieces_num: usize,
+        piece_length: usize,
+    ) -> Result<(), Error> {
+        if self.index >= pieces_num as u32 || self.index != index as u32 {
             return Err(Error::InvalidIndex("Request".into()));
         }
 
@@ -77,10 +82,8 @@ impl Request {
             return Err(Error::InvalidLength("Request".into()));
         }
 
-        if let Some(piece_length) = piece_length {
-            if self.block_begin + self.block_length > piece_length as u32 {
-                return Err(Error::InvalidLength("Request".into()));
-            }
+        if self.block_begin + self.block_length > piece_length as u32 {
+            return Err(Error::InvalidLength("Request".into()));
         }
 
         Ok(())
