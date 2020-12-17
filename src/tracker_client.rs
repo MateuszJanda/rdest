@@ -7,7 +7,7 @@ use tokio::time;
 use tokio::time::Duration;
 use url::form_urlencoded;
 
-const DELAY_MS: u64 = 500;
+const DELAY_MS: u64 = 1000;
 
 /// Tracker client.
 #[derive(Clone, Debug)]

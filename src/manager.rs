@@ -21,6 +21,7 @@ use tokio::time::{Duration, Instant, Interval};
 const CHANNEL_SIZE: usize = 64;
 const BROADCAST_CHANNEL_SIZE: usize = 32;
 const CHANGE_STATE_INTERVAL_SEC: u64 = 10;
+const MAX_NOT_INTERESTED: usize = 4;
 const MAX_OPTIMISTIC_ROUNDS: u32 = 3;
 const MAX_OPTIMISTIC: u32 = 1;
 const MAX_UNCHOKED: u32 = 3;
@@ -737,9 +738,18 @@ impl Manager {
     }
 
     fn spawn_peer_listener(&mut self, socket: TcpStream) {
+        let am_not_interested = self
+            .peers
+            .iter()
+            .filter(|(_, peer)| !peer.am_interested)
+            .count();
+        if am_not_interested >= MAX_NOT_INTERESTED {
+            return;
+        }
+
         let addr = match socket.peer_addr() {
             Ok(addr) => addr.to_string(),
-            Err(_) => return (),
+            Err(_) => return,
         };
 
         let peer_addr = addr.clone();
