@@ -413,16 +413,17 @@ impl Manager {
 
         let peer = self.peers.get(addr).ok_or(Error::PeerNotFound)?;
         let cmd = match index {
-            Some(index) if !peer.am_interested => {
-                self.pieces_status[index] = Status::Reserved;
-                UnchokeCmd::SendInterestedAndRequest(self.req_data(index))
-            }
             Some(index) => {
                 self.pieces_status[index] = Status::Reserved;
-                UnchokeCmd::SendRequest(self.req_data(index))
+                match peer.am_interested {
+                    true => UnchokeCmd::SendRequest(self.req_data(index)),
+                    false => UnchokeCmd::SendInterestedAndRequest(self.req_data(index)),
+                }
             }
-            None if peer.am_interested => UnchokeCmd::SendNotInterested,
-            None => UnchokeCmd::Ignore,
+            None => match peer.am_interested {
+                true => UnchokeCmd::SendNotInterested,
+                false => UnchokeCmd::Ignore,
+            },
         };
 
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
@@ -589,19 +590,17 @@ impl Manager {
             Some(index) => {
                 println!("Some index {:?}", index);
                 let peer = self.peers.get(addr).ok_or(Error::PeerNotFound)?;
-                if !peer.choked {
-                    PieceDoneCmd::SendRequest(self.req_data(index))
-                } else {
-                    PieceDoneCmd::Ignore
+                match peer.choked {
+                    true => PieceDoneCmd::Ignore,
+                    false => PieceDoneCmd::SendRequest(self.req_data(index)),
                 }
             }
             None => {
                 let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
                 peer.am_interested = false;
-                if peer.interested {
-                    PieceDoneCmd::SendNotInterested
-                } else {
-                    PieceDoneCmd::PrepareKill
+                match peer.interested {
+                    true => PieceDoneCmd::SendNotInterested,
+                    false => PieceDoneCmd::PrepareKill,
                 }
             }
         };
