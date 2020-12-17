@@ -401,7 +401,7 @@ impl PeerHandler {
                 request.validate(piece_tx.index, self.pieces_num, piece_tx.buff.len())?;
                 self.send_piece(&request).await?
             }
-            None => ()
+            None => (),
         }
 
         Ok(true)
@@ -597,7 +597,7 @@ impl PeerHandler {
 
         match resp_rx.await? {
             RequestCmd::LoadAndSendPiece { index, piece_hash } => {
-                self.load_piece_from_file(index, &piece_hash)?;
+                self.load_piece_from_file(index, &piece_hash)?
             }
             RequestCmd::Ignore => self.piece_tx = None,
         };
