@@ -20,7 +20,8 @@ use tokio::time::{Duration, Instant, Interval};
 const CHANNEL_SIZE: usize = 64;
 const BROADCAST_CHANNEL_SIZE: usize = 32;
 const CHANGE_STATE_INTERVAL_SEC: u64 = 10;
-const OPTIMISTIC_UNCHOKE_ROUND: u32 = 3;
+const MAX_OPTIMISTIC_ROUNDS: u32 = 3;
+const MAX_OPTIMISTIC: u32 = 1;
 const MAX_UNCHOKED: u32 = 3;
 
 /// Peer-to-peer connection manager.
@@ -189,6 +190,7 @@ impl Manager {
                 Some(cmd) = self.extractor.rx_ch.recv() => self.handle_extractor_cmd(cmd).await,
                 Some(cmd) = self.peer_channels.rx.recv() => {
                     if self.handle_peer_cmd(cmd).await.expect("Can't handle command") == false {
+                        self.kill_view().await;
                         break;
                     }
                 }
@@ -202,7 +204,7 @@ impl Manager {
     }
 
     fn timeout_change_conn_state(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        self.round = (self.round + 1) % OPTIMISTIC_UNCHOKE_ROUND;
+        self.round = (self.round + 1) % MAX_OPTIMISTIC_ROUNDS;
 
         // If not all peers reported their state, do nothing
         if self
@@ -303,15 +305,15 @@ impl Manager {
     }
 
     async fn handle_tracker_cmd(&mut self, cmd: TrackerCmd) {
-        println!("Tracker resp");
         match cmd {
             TrackerCmd::TrackerResp(resp) => {
                 self.candidates.extend_from_slice(&resp.peers());
+                // for _ in 0..(self.peers.len() - MAX_UNCHOKED + MAX_OPTIMISTIC) { // TODO
                 for _ in 0..1 {
                     self.spawn_peer_handler();
                 }
             }
-            TrackerCmd::Fail(_) => (),
+            TrackerCmd::Fail(_) => self.log("Tracker fail".to_string()).await,
         }
         self.kill_tracker().await;
     }
@@ -615,11 +617,14 @@ impl Manager {
             .await;
         self.kill_peer(&addr).await;
 
-        // TODO: spawn extractor only when all pieces downloaded
-        if self.peers.is_empty() {
-            self.kill_view().await;
+        let all = self.pieces_status.iter().all(|status| *status == Status::Have);
+
+        if all {
             self.spawn_extractor();
-            return Ok(false);
+        } else if self.candidates.is_empty() {
+            self.spawn_tracker();
+        } else {
+            self.spawn_peer_handler();
         }
 
         Ok(true)
@@ -695,7 +700,6 @@ impl Manager {
             None => return,
         };
 
-        // TODO: spawn MAX_UNCHOKED + 1 + 1 jobs
         let peer_addr = addr.clone();
         let own_id = self.own_id.clone();
         let info_hash = *self.metainfo.info_hash();
