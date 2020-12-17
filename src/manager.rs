@@ -6,7 +6,7 @@ use crate::constants::{PEER_ID_SIZE, PORT};
 use crate::extractor::Extractor;
 use crate::messages::bitfield::Bitfield;
 use crate::peer_handler::PeerHandler;
-use crate::progress::Progress;
+use crate::progress_view::ProgressView;
 use crate::{Error, Metainfo, TrackerClient};
 use rand::seq::SliceRandom;
 use std::cmp::max;
@@ -686,7 +686,7 @@ impl Manager {
     }
 
     fn spawn_view(&mut self) {
-        let (mut view, channel) = Progress::new();
+        let (mut view, channel) = ProgressView::new();
         self.view = Some(View {
             channel,
             job: tokio::spawn(async move { view.run().await }),

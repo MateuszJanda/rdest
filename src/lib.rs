@@ -31,7 +31,7 @@ mod messages;
 mod metainfo;
 mod peer_handler;
 pub mod peer_id;
-mod progress;
+mod progress_view;
 mod serializer;
 mod tracker_client;
 mod tracker_resp;

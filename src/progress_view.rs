@@ -9,7 +9,7 @@ const CHANNEL_SIZE: usize = 32;
 const DELAY_MS: u64 = 100;
 const PROGRESS_SIZE: usize = 10;
 
-pub struct Progress {
+pub struct ProgressView {
     pos: usize,
     direction: Direction,
     channel: mpsc::Receiver<ViewCmd>,
@@ -21,11 +21,11 @@ enum Direction {
     Right,
 }
 
-impl Progress {
-    pub fn new() -> (Progress, mpsc::Sender<ViewCmd>) {
+impl ProgressView {
+    pub fn new() -> (ProgressView, mpsc::Sender<ViewCmd>) {
         let (channel_tx, channel_rx) = mpsc::channel(CHANNEL_SIZE);
 
-        let view = Progress {
+        let view = ProgressView {
             pos: 1,
             direction: Direction::Right,
             channel: channel_rx,
