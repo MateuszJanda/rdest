@@ -685,7 +685,7 @@ impl Manager {
     }
 
     fn spawn_view(&mut self) {
-        let (mut view, channel) = ProgressView::new();
+        let (mut view, channel) = ProgressView::new(self.pieces_status.len());
         self.view = Some(View {
             channel,
             job: tokio::spawn(async move { view.run().await }),

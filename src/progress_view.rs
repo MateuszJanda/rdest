@@ -1,6 +1,7 @@
 use crate::commands::ViewCmd;
 use std::io;
 use std::io::Write;
+use tokio::io::Error;
 use tokio::sync::mpsc;
 use tokio::time;
 use tokio::time::{Duration, Instant, Interval};
@@ -8,9 +9,12 @@ use tokio::time::{Duration, Instant, Interval};
 const CHANNEL_SIZE: usize = 32;
 const DELAY_MS: u64 = 100;
 const PROGRESS_SIZE: usize = 10;
+const PROGRESS_START_POS: usize = 1;
 
 pub struct ProgressView {
     pos: usize,
+    pieces_num: usize,
+    pieces: usize,
     direction: Direction,
     channel: mpsc::Receiver<ViewCmd>,
 }
@@ -22,11 +26,13 @@ enum Direction {
 }
 
 impl ProgressView {
-    pub fn new() -> (ProgressView, mpsc::Sender<ViewCmd>) {
+    pub fn new(pieces_num: usize) -> (ProgressView, mpsc::Sender<ViewCmd>) {
         let (channel_tx, channel_rx) = mpsc::channel(CHANNEL_SIZE);
 
         let view = ProgressView {
-            pos: 1,
+            pos: PROGRESS_START_POS,
+            pieces_num,
+            pieces: 0,
             direction: Direction::Right,
             channel: channel_rx,
         };
@@ -58,21 +64,24 @@ impl ProgressView {
         match cmd {
             Some(ViewCmd::Log(text)) => self.log(&text),
             Some(ViewCmd::Kill) => return false,
-            _ => (),
+            None => (),
         }
 
         true
     }
 
     async fn animation(&mut self) {
-        let _text = " ".repeat(self.pos) + "a";
-        // print!("\r{}", text);
+        let text = " ".repeat(self.pos) + "a";
+        print!("\r[{}/{}]:{}", self.pieces, self.pieces_num, text);
 
-        io::stdout().flush().unwrap();
+        match io::stdout().flush() {
+            Ok(_) => (),
+            Err(_) => (),
+        }
 
-        if self.direction == Direction::Right && self.pos + 1 > PROGRESS_SIZE {
+        if self.direction == Direction::Right && self.pos + 1 > PROGRESS_START_POS + PROGRESS_SIZE {
             self.direction = Direction::Left;
-        } else if self.direction == Direction::Left && self.pos - 1 < 1 {
+        } else if self.direction == Direction::Left && self.pos - 1 < PROGRESS_START_POS {
             self.direction = Direction::Right;
         }
 
