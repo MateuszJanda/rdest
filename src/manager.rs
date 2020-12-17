@@ -9,6 +9,7 @@ use crate::peer_handler::PeerHandler;
 use crate::progress::Progress;
 use crate::{Error, Metainfo, TrackerClient};
 use rand::seq::SliceRandom;
+use std::cmp::max;
 use std::collections::HashMap;
 use std::net::Ipv4Addr;
 use tokio::net::{TcpListener, TcpStream};
@@ -308,7 +309,15 @@ impl Manager {
         match cmd {
             TrackerCmd::TrackerResp(resp) => {
                 self.candidates.extend_from_slice(&resp.peers());
-                // for _ in 0..(self.peers.len() - MAX_UNCHOKED + MAX_OPTIMISTIC) { // TODO
+
+                let all_am_interested = self
+                    .peers
+                    .iter()
+                    .filter(|(_, peer)| peer.am_interested)
+                    .count() as i32;
+                let spawn_num = (MAX_UNCHOKED + MAX_OPTIMISTIC) as i32 - all_am_interested;
+
+                // for _ in 0..max(0, spawn_num) {
                 for _ in 0..1 {
                     self.spawn_peer_handler();
                 }
@@ -617,7 +626,10 @@ impl Manager {
             .await;
         self.kill_peer(&addr).await;
 
-        let all = self.pieces_status.iter().all(|status| *status == Status::Have);
+        let all = self
+            .pieces_status
+            .iter()
+            .all(|status| *status == Status::Have);
 
         if all {
             self.spawn_extractor();
