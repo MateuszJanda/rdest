@@ -31,7 +31,7 @@ pub struct PeerManager {
     own_id: [u8; PEER_ID_SIZE],
     pieces_status: Vec<Status>,
     peers: HashMap<String, Peer>,
-    peer_channels: PeerChannels,
+    general_channels: GeneralChannels,
     metainfo: Metainfo,
     candidates: Vec<(String, [u8; PEER_ID_SIZE])>,
     view: Option<View>,
@@ -68,7 +68,7 @@ struct Job<Cmd> {
 }
 
 #[derive(Debug)]
-struct PeerChannels {
+struct GeneralChannels {
     tx: mpsc::Sender<PeerCmd>,
     rx: mpsc::Receiver<PeerCmd>,
     broad: broadcast::Sender<BroadCmd>,
@@ -91,13 +91,13 @@ impl<Cmd> Job<Cmd> {
     }
 }
 
-impl PeerChannels {
+impl GeneralChannels {
     fn new(
         tx: mpsc::Sender<PeerCmd>,
         rx: mpsc::Receiver<PeerCmd>,
         broad: broadcast::Sender<BroadCmd>,
-    ) -> PeerChannels {
-        PeerChannels { tx, rx, broad }
+    ) -> GeneralChannels {
+        GeneralChannels { tx, rx, broad }
     }
 }
 
@@ -143,7 +143,7 @@ impl PeerManager {
             own_id,
             pieces_status: vec![Status::Missing; metainfo.pieces_num()],
             peers: HashMap::new(),
-            peer_channels: PeerChannels::new(peer_tx, peer_rx, broad),
+            general_channels: GeneralChannels::new(peer_tx, peer_rx, broad),
             metainfo,
             candidates: vec![],
             view: None,
@@ -190,7 +190,7 @@ impl PeerManager {
                 Ok((socket, _)) = listener.accept() => self.spawn_peer_listener(socket),
                 Some(cmd) = self.tracker.rx_ch.recv() => self.handle_tracker_cmd(cmd).await,
                 Some(cmd) = self.extractor.rx_ch.recv() => self.handle_extractor_cmd(cmd).await,
-                Some(cmd) = self.peer_channels.rx.recv() => {
+                Some(cmd) = self.general_channels.rx.recv() => {
                     if self.handle_peer_cmd(cmd).await.expect("Can't handle command") == false {
                         self.kill_view().await;
                         break;
@@ -239,7 +239,7 @@ impl PeerManager {
             .collect::<Vec<(String, u32)>>();
 
         let cmd = self.change_state_cmd(&mut rate, &new_optimistic)?;
-        let _ = self.peer_channels.broad.send(cmd);
+        let _ = self.general_channels.broad.send(cmd);
         Ok(())
     }
 
@@ -309,6 +309,7 @@ impl PeerManager {
     async fn handle_tracker_cmd(&mut self, cmd: TrackerCmd) {
         match cmd {
             TrackerCmd::TrackerResp(resp) => {
+                self.log("Ok, got peers from tracker".to_string()).await;
                 self.candidates.extend_from_slice(&resp.peers());
 
                 let all_am_interested = self
@@ -575,7 +576,10 @@ impl PeerManager {
                 self.peer_log(addr, format!("New piece downloaded: {}", index))
                     .await;
                 self.pieces_status[index] = Status::Have;
-                let _ = self.peer_channels.broad.send(BroadCmd::SendHave { index });
+                let _ = self
+                    .general_channels
+                    .broad
+                    .send(BroadCmd::SendHave { index });
             }
             None => panic!("Piece downloaded but not requested"),
         }
@@ -691,7 +695,7 @@ impl PeerManager {
     }
 
     fn spawn_view(&mut self) {
-        let broad_ch = self.peer_channels.broad.subscribe();
+        let broad_ch = self.general_channels.broad.subscribe();
         let (mut view, channel) = ProgressView::new(self.pieces_status.len(), broad_ch);
         self.view = Some(View {
             channel,
@@ -723,8 +727,8 @@ impl PeerManager {
         let own_id = self.own_id.clone();
         let info_hash = *self.metainfo.info_hash();
         let pieces_num = self.metainfo.pieces_num();
-        let peer_ch = self.peer_channels.tx.clone();
-        let broad_ch = self.peer_channels.broad.subscribe();
+        let peer_ch = self.general_channels.tx.clone();
+        let broad_ch = self.general_channels.broad.subscribe();
 
         let job = tokio::spawn(async move {
             PeerHandler::run_incoming(
@@ -762,8 +766,8 @@ impl PeerManager {
         let own_id = self.own_id.clone();
         let info_hash = *self.metainfo.info_hash();
         let pieces_num = self.metainfo.pieces_num();
-        let job_ch = self.peer_channels.tx.clone();
-        let broad_ch = self.peer_channels.broad.subscribe();
+        let job_ch = self.general_channels.tx.clone();
+        let broad_ch = self.general_channels.broad.subscribe();
 
         let job = tokio::spawn(async move {
             PeerHandler::run_outgoing(
