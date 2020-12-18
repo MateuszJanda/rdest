@@ -131,7 +131,7 @@ impl PeerManager {
     /// let torrent_file = Metainfo::from_file(path.as_path()).unwrap();
     /// let peer_id = b"AAAAABBBBBCCCCCDDDDD";
     ///
-    /// let mut PeerManager = PeerManager::new(torrent_file, *peer_id);
+    /// let mut manager = PeerManager::new(torrent_file, *peer_id);
     /// ```
     pub fn new(metainfo: Metainfo, own_id: [u8; PEER_ID_SIZE]) -> PeerManager {
         let (peer_tx, peer_rx) = mpsc::channel(CHANNEL_SIZE);
@@ -167,8 +167,8 @@ impl PeerManager {
     /// let torrent_file = Metainfo::from_file(path).unwrap();
     /// let peer_id = b"AAAAABBBBBCCCCCDDDDD";
     ///
-    /// let mut PeerManager = PeerManager::new(torrent_file, *peer_id);
-    /// PeerManager.run().await;
+    /// let mut manager = PeerManager::new(torrent_file, *peer_id);
+    /// manager.run().await;
     /// # }
     /// ```
     pub async fn run(&mut self) {
@@ -309,8 +309,10 @@ impl PeerManager {
     async fn handle_tracker_cmd(&mut self, cmd: TrackerCmd) {
         match cmd {
             TrackerCmd::TrackerResp(resp) => {
-                self.log("Ok, got peers from tracker".to_string()).await;
-                self.candidates.extend_from_slice(&resp.peers());
+                let peers = resp.peers();
+                self.log(format!("Ok, got {} peers from tracker", peers.len()))
+                    .await;
+                self.candidates.extend_from_slice(&peers);
 
                 let all_am_interested = self
                     .peers
@@ -318,9 +320,9 @@ impl PeerManager {
                     .filter(|(_, peer)| peer.am_interested)
                     .count() as i32;
                 let spawn_num = (MAX_UNCHOKED + MAX_OPTIMISTIC) as i32 - all_am_interested;
+                // let spawn_num = 1;
 
-                // for _ in 0..max(0, spawn_num) {
-                for _ in 0..1 {
+                for _ in 0..max(0, spawn_num) {
                     self.spawn_peer_handler();
                 }
             }
