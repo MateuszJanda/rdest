@@ -8,7 +8,12 @@ use tokio;
 #[structopt(
     name = "rdest",
     author = "Mateusz Janda <mateusz.janda@gmail.com>",
-    about = "A simple BitTorrent client"
+    about = r#"
+   _i_i_     rdest is a simple BitTorrent client, currently supporting BEP3
+⸝⸍/     \⸌⸜  specification. If you are interested, you can name origin at
+||\  ¬  /||  youtu.be/4el6qQ40BQw?t=4200
+\_,"" ""._/
+"#
 )]
 enum Opt {
     /// Get torrent files from p2p network
