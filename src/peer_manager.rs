@@ -355,13 +355,13 @@ impl PeerManager {
                 addr,
                 bitfield,
                 resp_ch,
-            } => self.handle_bitfield(&addr, &bitfield, resp_ch),
+            } => self.handle_bitfield(&addr, &bitfield, resp_ch).await,
             PeerCmd::RecvRequest {
                 addr,
                 index,
                 resp_ch,
             } => self.handle_request(&addr, index, resp_ch),
-            PeerCmd::PieceDone { addr, resp_ch } => self.handle_piece_done(&addr, resp_ch),
+            PeerCmd::PieceDone { addr, resp_ch } => self.handle_piece_done(&addr, resp_ch).await,
             PeerCmd::SyncStats {
                 addr,
                 downloaded_rate,
@@ -492,12 +492,13 @@ impl PeerManager {
     // Sending NotInterested explicitly (this is default state) is mandatory according BEP3, but
     // Interested should be send only after Unchoke. It appears that many clients unfortunately
     // wait for this message (doesn't send Unchoke and send KeepAlive instead).
-    fn handle_bitfield(
+    async fn handle_bitfield(
         &mut self,
         addr: &String,
         bitfield: &Bitfield,
         resp_ch: oneshot::Sender<BitfieldCmd>,
     ) -> Result<bool, Error> {
+        self.peer_log(addr, format!("Received a bitfield")).await;
         // Update peer pieces bitfield
         {
             let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
@@ -570,7 +571,7 @@ impl PeerManager {
         Ok(true)
     }
 
-    fn handle_piece_done(
+    async fn handle_piece_done(
         &mut self,
         addr: &String,
         resp_ch: oneshot::Sender<PieceDoneCmd>,
@@ -588,7 +589,8 @@ impl PeerManager {
 
         let cmd = match index {
             Some(index) => {
-                println!("Some index {:?}", index);
+                self.peer_log(addr, format!("Request new piece: {}", index))
+                    .await;
                 let peer = self.peers.get(addr).ok_or(Error::PeerNotFound)?;
                 match peer.choked {
                     true => PieceDoneCmd::Ignore,

@@ -52,7 +52,7 @@ impl Connection {
     pub async fn recv_frame(&mut self) -> Result<Option<Frame>, Error> {
         loop {
             if let Some(frame) = self.parse_frame()? {
-                println!("Now ramka {:?}", frame);
+                // println!("Now ramka {:?}", frame);
                 return Ok(Some(frame));
             }
 
@@ -62,11 +62,10 @@ impl Connection {
             };
 
             if n == 0 {
-                return if self.buffer.is_empty() {
-                    println!("Peer zamknął połączenie");
-                    Ok(None)
-                } else {
-                    Err(Error::ConnectionReset)
+                return match self.buffer.is_empty() {
+                    // Connection closed by peer
+                    true => Ok(None),
+                    false => Err(Error::ConnectionReset),
                 };
             }
         }

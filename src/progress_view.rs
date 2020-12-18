@@ -92,6 +92,6 @@ impl ProgressView {
     }
 
     fn log(&self, text: &String) {
-        println!("[+] {}", text);
+        println!("\r[+] {}", text);
     }
 }
