@@ -624,7 +624,7 @@ impl PeerManager {
     }
 
     async fn handle_kill_req(&mut self, addr: &String, reason: &String) -> Result<bool, Error> {
-        self.peer_log(addr, "Kill reason: ".to_string() + reason)
+        self.peer_log(addr, "Killed, reason: ".to_string() + reason)
             .await;
         self.kill_peer(&addr).await;
 
