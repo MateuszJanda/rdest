@@ -186,7 +186,7 @@ impl PeerManager {
 
         loop {
             tokio::select! {
-                _ = change_state_timer.tick() => self.timeout_change_conn_state().expect("Can't change connection state").await,
+                _ = change_state_timer.tick() => self.timeout_change_conn_state().await.expect("Can't change connection state"),
                 Ok((socket, _)) = listener.accept() => self.spawn_peer_listener(socket).await,
                 Some(cmd) = self.tracker.rx_ch.recv() => self.handle_tracker_cmd(cmd).await,
                 Some(cmd) = self.extractor.rx_ch.recv() => self.handle_extractor_cmd(cmd).await,
@@ -639,7 +639,7 @@ impl PeerManager {
             .all(|status| *status == Status::Have);
 
         if all {
-            self.spawn_extractor();
+            self.spawn_extractor().await;
         } else if self.candidates.is_empty() {
             self.spawn_tracker();
         } else {
@@ -716,7 +716,8 @@ impl PeerManager {
         self.tracker.job = Some(tokio::spawn(async move { tracker.run().await }));
     }
 
-    fn spawn_extractor(&mut self) {
+    async fn spawn_extractor(&mut self) {
+        self.log("Running file extractor".to_string()).await;
         let mut extractor = Extractor::new(self.metainfo.clone(), self.extractor.tx_ch.clone());
         self.extractor.job = Some(tokio::spawn(async move { extractor.run().await }));
     }
@@ -784,7 +785,8 @@ impl PeerManager {
             .await
         });
 
-        self.log(format!("New peer connect from: {}", &addr)).await;
+        self.log("New peer connect from: ".to_string() + &peer_addr.as_str())
+            .await;
         let peer = Peer::new(self.metainfo.pieces_num(), job);
         self.peers.insert(peer_addr, peer);
     }
