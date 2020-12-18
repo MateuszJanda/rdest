@@ -24,7 +24,7 @@ const CHANGE_STATE_INTERVAL_SEC: u64 = 10;
 const MAX_NOT_INTERESTED: usize = 4;
 const MAX_OPTIMISTIC_ROUNDS: u32 = 3;
 const MAX_OPTIMISTIC: u32 = 1;
-const MAX_UNCHOKED: u32 = 3;
+const MAX_UNCHOKED: u32 = 10;
 
 /// Peer manager.
 pub struct PeerManager {
@@ -724,6 +724,10 @@ impl PeerManager {
             Some(value) => value,
             None => return,
         };
+
+        if self.peers.contains_key(&addr) {
+            return;
+        }
 
         let peer_addr = addr.clone();
         let own_id = self.own_id.clone();
