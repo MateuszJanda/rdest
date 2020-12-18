@@ -5,7 +5,7 @@
 //!
 //! # Example
 //! ```no_run
-//! use rdest::{Metainfo, Manager};
+//! use rdest::{Metainfo, PeerManager};
 //! use std::path::Path;
 //!
 //! # #[tokio::main]
@@ -14,7 +14,7 @@
 //! let torrent_file = Metainfo::from_file(path).unwrap();
 //! let peer_id = b"AAAAABBBBBCCCCCDDDDD";
 //!
-//! let mut manager = Manager::new(torrent_file, *peer_id);
+//! let mut manager = PeerManager::new(torrent_file, *peer_id);
 //! manager.run().await;
 //! # }
 //! ```
@@ -26,11 +26,11 @@ mod constants;
 mod error;
 mod extractor;
 mod frame;
-mod peer_manager;
 mod messages;
 mod metainfo;
 mod peer_handler;
 pub mod peer_id;
+mod peer_manager;
 mod progress_view;
 mod serializer;
 mod tracker_client;

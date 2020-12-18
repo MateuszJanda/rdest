@@ -1,5 +1,5 @@
 use rdest::peer_id;
-use rdest::{PeerManager, Metainfo};
+use rdest::{Metainfo, PeerManager};
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tokio;
