@@ -10,8 +10,8 @@ use tokio;
     author = "Mateusz Janda <mateusz.janda@gmail.com>",
     about = r#"
    _i_i_     rdest is a simple BitTorrent client, currently supporting BEP3
-⸝⸍/     \⸌⸜  specification. If you are interested, you can name origin at
-||\  ¬  /||  youtu.be/4el6qQ40BQw?t=4200
+⸝⸍/     \⸌⸜  specification. If you are interested, you can find name origin
+||\  ¬  /||  at youtu.be/4el6qQ40BQw?t=4200
 \_,"" ""._/
 "#
 )]
