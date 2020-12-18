@@ -13,8 +13,7 @@ const PROGRESS_START_POS: usize = 1;
 
 pub struct ProgressView {
     pos: usize,
-    pieces_num: usize,
-    pieces: usize,
+    pieces: Vec<bool>,
     direction: Direction,
     channel: mpsc::Receiver<ViewCmd>,
     broad_ch: broadcast::Receiver<BroadCmd>,
@@ -35,8 +34,7 @@ impl ProgressView {
 
         let view = ProgressView {
             pos: PROGRESS_START_POS,
-            pieces_num,
-            pieces: 0,
+            pieces: vec![false; pieces_num],
             direction: Direction::Right,
             channel: channel_rx,
             broad_ch,
@@ -77,7 +75,7 @@ impl ProgressView {
 
     fn handle_manager_cmd(&mut self, cmd: BroadCmd) {
         match cmd {
-            BroadCmd::SendHave { index } => self.pieces += 1,
+            BroadCmd::SendHave { index } => self.pieces[index] = true,
             _ => (),
         }
     }
@@ -94,7 +92,9 @@ impl ProgressView {
 
     async fn animation(&mut self) {
         let text = " ".repeat(self.pos) + "a";
-        print!("\r[{}/{}]:{}", self.pieces, self.pieces_num, text);
+        let downloaded = self.pieces.iter().filter(|&val| *val).count();
+
+        print!("\r[{}/{}]:{}", downloaded, self.pieces.len(), text);
 
         match io::stdout().flush() {
             Ok(_) => (),
