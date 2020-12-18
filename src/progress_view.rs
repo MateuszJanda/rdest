@@ -41,6 +41,15 @@ impl ProgressView {
     }
 
     pub async fn run(&mut self) {
+        println!(
+            r#"
+   _i_i_     .----
+⸝⸍/     \⸌⸜  / Ok, let's go with it...
+||\  ¬  /||                  ~rdest~
+\_,"" ""._/
+        "#
+        );
+
         let mut animation_timer = self.start_animation_timer();
 
         loop {
