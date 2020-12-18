@@ -1,5 +1,5 @@
 use rdest::peer_id;
-use rdest::{Manager, Metainfo};
+use rdest::{PeerManager, Metainfo};
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tokio;
@@ -47,7 +47,7 @@ async fn get_torrent(path: &PathBuf) {
         Ok(metainfo) => metainfo,
         Err(e) => panic!("[-] Can't read metafile. Error: {}", e),
     };
-    let mut manager = Manager::new(metainfo, peer_id::generate());
+    let mut manager = PeerManager::new(metainfo, peer_id::generate());
     manager.run().await;
 
     println!("-==[ koniec ]==-");

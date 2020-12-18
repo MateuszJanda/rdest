@@ -26,8 +26,8 @@ const MAX_OPTIMISTIC_ROUNDS: u32 = 3;
 const MAX_OPTIMISTIC: u32 = 1;
 const MAX_UNCHOKED: u32 = 3;
 
-/// Peer-to-peer connection manager.
-pub struct Manager {
+/// Peer-to-peer connection PeerManager.
+pub struct PeerManager {
     own_id: [u8; PEER_ID_SIZE],
     pieces_status: Vec<Status>,
     peers: HashMap<String, Peer>,
@@ -118,28 +118,28 @@ impl Peer {
     }
 }
 
-impl Manager {
+impl PeerManager {
     /// Create new instance managing peer-to-peer connection. Currently most settings, are set as
     /// constatns.
     ///
     /// # Example
     /// ```no_run
-    /// use rdest::{Metainfo, Manager};
+    /// use rdest::{Metainfo, PeerManager};
     /// use std::path::PathBuf;
     ///
     /// let path = PathBuf::from("ubuntu-20.04.1-desktop-amd64.iso.torrent");
     /// let torrent_file = Metainfo::from_file(path.as_path()).unwrap();
     /// let peer_id = b"AAAAABBBBBCCCCCDDDDD";
     ///
-    /// let mut manager = Manager::new(torrent_file, *peer_id);
+    /// let mut PeerManager = PeerManager::new(torrent_file, *peer_id);
     /// ```
-    pub fn new(metainfo: Metainfo, own_id: [u8; PEER_ID_SIZE]) -> Manager {
+    pub fn new(metainfo: Metainfo, own_id: [u8; PEER_ID_SIZE]) -> PeerManager {
         let (peer_tx, peer_rx) = mpsc::channel(CHANNEL_SIZE);
         let (tracker_tx, tracker_rx) = mpsc::channel(CHANNEL_SIZE);
         let (extractor_tx, extractor_rx) = mpsc::channel(CHANNEL_SIZE);
         let (broad, _) = broadcast::channel(BROADCAST_CHANNEL_SIZE);
 
-        Manager {
+        PeerManager {
             own_id,
             pieces_status: vec![Status::Missing; metainfo.pieces_num()],
             peers: HashMap::new(),
@@ -153,12 +153,12 @@ impl Manager {
         }
     }
 
-    /// Run manager who will try connect to tracker, get list of available peers, and establish
+    /// Run PeerManager who will try connect to tracker, get list of available peers, and establish
     /// connection with them
     ///
     /// # Example
     /// ```no_run
-    /// use rdest::{Metainfo, Manager};
+    /// use rdest::{Metainfo, PeerManager};
     /// use std::path::Path;
     ///
     /// # #[tokio::main]
@@ -167,8 +167,8 @@ impl Manager {
     /// let torrent_file = Metainfo::from_file(path).unwrap();
     /// let peer_id = b"AAAAABBBBBCCCCCDDDDD";
     ///
-    /// let mut manager = Manager::new(torrent_file, *peer_id);
-    /// manager.run().await;
+    /// let mut PeerManager = PeerManager::new(torrent_file, *peer_id);
+    /// PeerManager.run().await;
     /// # }
     /// ```
     pub async fn run(&mut self) {

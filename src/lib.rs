@@ -26,7 +26,7 @@ mod constants;
 mod error;
 mod extractor;
 mod frame;
-mod manager;
+mod peer_manager;
 mod messages;
 mod metainfo;
 mod peer_handler;
@@ -50,4 +50,4 @@ pub use crate::metainfo::Metainfo;
 pub use crate::tracker_client::TrackerClient;
 pub use crate::tracker_resp::TrackerResp;
 
-pub use crate::manager::Manager;
+pub use crate::peer_manager::PeerManager;
