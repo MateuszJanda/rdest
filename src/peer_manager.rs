@@ -26,7 +26,7 @@ const MAX_OPTIMISTIC_ROUNDS: u32 = 3;
 const MAX_OPTIMISTIC: u32 = 1;
 const MAX_UNCHOKED: u32 = 3;
 
-/// Peer-to-peer connection PeerManager.
+/// Peer manager.
 pub struct PeerManager {
     own_id: [u8; PEER_ID_SIZE],
     pieces_status: Vec<Status>,
@@ -489,9 +489,6 @@ impl PeerManager {
         Ok(true)
     }
 
-    // Sending NotInterested explicitly (this is default state) is mandatory according BEP3, but
-    // Interested should be send only after Unchoke. It appears that many clients unfortunately
-    // wait for this message (doesn't send Unchoke and send KeepAlive instead).
     async fn handle_bitfield(
         &mut self,
         addr: &String,
@@ -505,8 +502,12 @@ impl PeerManager {
             peer.pieces.copy_from_slice(&bitfield.to_vec());
         }
 
-        // BEP3 "whenever a downloader doesn't have something they currently would ask a peer for
-        // in unchoked, they must express lack of interest, despite being choked"
+        // BEP3 says "whenever a downloader doesn't have something they currently would ask a peer
+        // for in unchoked, they must express lack of interest, despite being choked"
+        //
+        // Sending NotInterested explicitly (this is default state) is mandatory according BEP3, but
+        // Interested should be send only after Unchoke. It appears, unfortunately, that many
+        // clients wait for this message (doesn't send Unchoke and send KeepAlive instead).
         let index = self.choose_piece(&bitfield.to_vec());
         let am_interested = match index {
             Some(_) => true,
@@ -532,13 +533,6 @@ impl PeerManager {
         let _ = &resp_ch.send(cmd);
 
         Ok(true)
-    }
-
-    fn unchoked_num(&self) -> u32 {
-        self.peers
-            .iter()
-            .filter(|(_, peer)| peer.am_choked == false && peer.optimistic_unchoke == true)
-            .count() as u32
     }
 
     fn handle_request(
@@ -642,6 +636,13 @@ impl PeerManager {
         }
 
         Ok(true)
+    }
+
+    fn unchoked_num(&self) -> u32 {
+        self.peers
+            .iter()
+            .filter(|(_, peer)| peer.am_choked == false && peer.optimistic_unchoke == true)
+            .count() as u32
     }
 
     fn req_data(&self, index: usize) -> ReqData {
