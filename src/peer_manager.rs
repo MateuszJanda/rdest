@@ -335,8 +335,8 @@ impl PeerManager {
 
     async fn handle_extractor_cmd(&mut self, cmd: ExtractorCmd) {
         match cmd {
-            ExtractorCmd::Done => self.log("Extractor done".to_string()).await,
-            ExtractorCmd::Fail(e) => self.log("Extractor fail: ".to_string() + &e).await,
+            ExtractorCmd::Done => self.log("File extractor finish".to_string()).await,
+            ExtractorCmd::Fail(e) => self.log("File extractor fail: ".to_string() + &e).await,
         }
 
         self.kill_extractor().await;
@@ -345,11 +345,11 @@ impl PeerManager {
     async fn handle_peer_cmd(&mut self, cmd: PeerCmd) -> Result<bool, Error> {
         match cmd {
             PeerCmd::Init { addr, resp_ch } => self.handle_init(&addr, resp_ch).await,
-            PeerCmd::RecvChoke { addr } => self.handle_choke(&addr),
-            PeerCmd::RecvUnchoke { addr, resp_ch } => self.handle_unchoke(&addr, resp_ch),
-            PeerCmd::RecvInterested { addr } => self.handle_interested(&addr),
+            PeerCmd::RecvChoke { addr } => self.handle_choke(&addr).await,
+            PeerCmd::RecvUnchoke { addr, resp_ch } => self.handle_unchoke(&addr, resp_ch).await,
+            PeerCmd::RecvInterested { addr } => self.handle_interested(&addr).await,
             PeerCmd::RecvNotInterested { addr, resp_ch } => {
-                self.handle_not_interested(&addr, resp_ch)
+                self.handle_not_interested(&addr, resp_ch).await
             }
             PeerCmd::RecvHave {
                 addr,
@@ -395,7 +395,10 @@ impl PeerManager {
         Ok(true)
     }
 
-    fn handle_choke(&mut self, addr: &String) -> Result<bool, Error> {
+    async fn handle_choke(&mut self, addr: &String) -> Result<bool, Error> {
+        self.peer_log(addr, "Peer change state to Choke".to_string())
+            .await;
+
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.choked = true;
 
@@ -408,11 +411,14 @@ impl PeerManager {
         Ok(true)
     }
 
-    fn handle_unchoke(
+    async fn handle_unchoke(
         &mut self,
         addr: &String,
         resp_ch: oneshot::Sender<UnchokeCmd>,
     ) -> Result<bool, Error> {
+        self.peer_log(addr, "Peer change state to Unchoke".to_string())
+            .await;
+
         let pieces = &self.peers[addr].pieces;
         let index = self.choose_piece(pieces);
 
@@ -440,17 +446,22 @@ impl PeerManager {
         Ok(true)
     }
 
-    fn handle_interested(&mut self, addr: &String) -> Result<bool, Error> {
+    async fn handle_interested(&mut self, addr: &String) -> Result<bool, Error> {
+        self.peer_log(addr, "Peer change state to Interested".to_string())
+            .await;
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.interested = true;
         Ok(true)
     }
 
-    fn handle_not_interested(
+    async fn handle_not_interested(
         &mut self,
         addr: &String,
         resp_ch: oneshot::Sender<NotInterestedCmd>,
     ) -> Result<bool, Error> {
+        self.peer_log(addr, "Peer change state to NotInterested".to_string())
+            .await;
+
         {
             let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
             peer.interested = false;
@@ -629,7 +640,7 @@ impl PeerManager {
     }
 
     async fn handle_kill_req(&mut self, addr: &String, reason: &String) -> Result<bool, Error> {
-        self.peer_log(addr, "Killed, reason: ".to_string() + reason)
+        self.peer_log(addr, "Peer killed, reason: ".to_string() + reason)
             .await;
         self.kill_peer(&addr).await;
 
@@ -717,7 +728,7 @@ impl PeerManager {
     }
 
     async fn spawn_extractor(&mut self) {
-        self.log("Running file extractor".to_string()).await;
+        self.log("Starting file extractor".to_string()).await;
         let mut extractor = Extractor::new(self.metainfo.clone(), self.extractor.tx_ch.clone());
         self.extractor.job = Some(tokio::spawn(async move { extractor.run().await }));
     }
