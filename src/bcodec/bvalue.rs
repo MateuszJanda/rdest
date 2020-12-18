@@ -206,3 +206,31 @@ impl BValue {
             .collect()
     }
 }
+
+// impl fmt::Display for BValue {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         match self {
+//             BValue::Int(i) => write!(f, "Int={}", i),
+//             BValue::ByteStr(vec) => {
+//                 match String::from_utf8(vec.clone()) {
+//                     Ok(s) => write!(f, "Str={}", s),
+//                     Err(_) => write!(f, "Str={:?}", vec),
+//                 }
+//             },
+//             BValue::List(list) => {
+//                 for val in list {
+//                     write!(f, "    {},", val);
+//                 }
+//                 Ok(())
+//             }
+//             BValue::Dict(dict) => {
+//                 write!(f, "Dict=[");
+//                 for (key, val) in dict {
+//                     write!(f, "    {} => {},", BValue::ByteStr(key.to_vec()), val);
+//                 }
+//                 write!(f, "]");
+//                 Ok(())
+//             }
+//         }
+//     }
+// }

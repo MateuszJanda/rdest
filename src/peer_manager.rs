@@ -323,7 +323,7 @@ impl PeerManager {
                     self.spawn_peer_handler();
                 }
             }
-            TrackerCmd::Fail(_) => self.log("Tracker fail".to_string()).await,
+            TrackerCmd::Fail(e) => self.log(format!("Tracker fail: {}", e)).await,
         }
         self.kill_tracker().await;
     }
