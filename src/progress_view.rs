@@ -1,8 +1,8 @@
-use crate::commands::ViewCmd;
+use crate::commands::{BroadCmd, ViewCmd};
 use std::io;
 use std::io::Write;
 use tokio::io::Error;
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc};
 use tokio::time;
 use tokio::time::{Duration, Instant, Interval};
 
@@ -17,6 +17,7 @@ pub struct ProgressView {
     pieces: usize,
     direction: Direction,
     channel: mpsc::Receiver<ViewCmd>,
+    broad_ch: broadcast::Receiver<BroadCmd>,
 }
 
 #[derive(PartialEq)]
@@ -26,7 +27,10 @@ enum Direction {
 }
 
 impl ProgressView {
-    pub fn new(pieces_num: usize) -> (ProgressView, mpsc::Sender<ViewCmd>) {
+    pub fn new(
+        pieces_num: usize,
+        broad_ch: broadcast::Receiver<BroadCmd>,
+    ) -> (ProgressView, mpsc::Sender<ViewCmd>) {
         let (channel_tx, channel_rx) = mpsc::channel(CHANNEL_SIZE);
 
         let view = ProgressView {
@@ -35,6 +39,7 @@ impl ProgressView {
             pieces: 0,
             direction: Direction::Right,
             channel: channel_rx,
+            broad_ch,
         };
 
         (view, channel_tx)
@@ -47,7 +52,7 @@ impl ProgressView {
 ⸝⸍/     \⸌⸜  / Ok, let's go with it...
 ||\  ¬  /||                  ~rdest~
 \_,"" ""._/
-        "#
+"#
         );
 
         let mut animation_timer = self.start_animation_timer();
@@ -55,6 +60,7 @@ impl ProgressView {
         loop {
             tokio::select! {
                  _ = animation_timer.tick() => self.animation().await,
+                 Ok(cmd) = self.broad_ch.recv() => self.handle_manager_cmd(cmd),
                  cmd = self.channel.recv() => {
                     if !self.handle_cmd(cmd) {
                         break;
@@ -67,6 +73,13 @@ impl ProgressView {
     fn start_animation_timer(&self) -> Interval {
         let start = Instant::now() + Duration::from_millis(0);
         time::interval_at(start, Duration::from_millis(DELAY_MS))
+    }
+
+    fn handle_manager_cmd(&mut self, cmd: BroadCmd) {
+        match cmd {
+            BroadCmd::SendHave { index } => self.pieces += 1,
+            _ => (),
+        }
     }
 
     fn handle_cmd(&self, cmd: Option<ViewCmd>) -> bool {

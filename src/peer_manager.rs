@@ -572,6 +572,8 @@ impl PeerManager {
     ) -> Result<bool, Error> {
         match self.peers.get(addr).ok_or(Error::PeerNotFound)?.index {
             Some(index) => {
+                self.peer_log(addr, format!("New piece downloaded: {}", index))
+                    .await;
                 self.pieces_status[index] = Status::Have;
                 let _ = self.peer_channels.broad.send(BroadCmd::SendHave { index });
             }
@@ -583,9 +585,9 @@ impl PeerManager {
 
         let cmd = match index {
             Some(index) => {
-                self.peer_log(addr, format!("Request new piece: {}", index))
-                    .await;
-                let peer = self.peers.get(addr).ok_or(Error::PeerNotFound)?;
+                let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
+                self.pieces_status[index] = Status::Reserved;
+                peer.index = Some(index);
                 match peer.choked {
                     true => PieceDoneCmd::Ignore,
                     false => PieceDoneCmd::SendRequest(self.req_data(index)),
@@ -593,6 +595,7 @@ impl PeerManager {
             }
             None => {
                 let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
+                peer.index = None;
                 peer.am_interested = false;
                 match peer.interested {
                     true => PieceDoneCmd::SendNotInterested,
@@ -688,7 +691,8 @@ impl PeerManager {
     }
 
     fn spawn_view(&mut self) {
-        let (mut view, channel) = ProgressView::new(self.pieces_status.len());
+        let broad_ch = self.peer_channels.broad.subscribe();
+        let (mut view, channel) = ProgressView::new(self.pieces_status.len(), broad_ch);
         self.view = Some(View {
             channel,
             job: tokio::spawn(async move { view.run().await }),
