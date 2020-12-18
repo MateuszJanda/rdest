@@ -186,8 +186,8 @@ impl PeerManager {
 
         loop {
             tokio::select! {
-                _ = change_state_timer.tick() => self.timeout_change_conn_state().expect("Can't change connection state"),
-                Ok((socket, _)) = listener.accept() => self.spawn_peer_listener(socket),
+                _ = change_state_timer.tick() => self.timeout_change_conn_state().expect("Can't change connection state").await,
+                Ok((socket, _)) = listener.accept() => self.spawn_peer_listener(socket).await,
                 Some(cmd) = self.tracker.rx_ch.recv() => self.handle_tracker_cmd(cmd).await,
                 Some(cmd) = self.extractor.rx_ch.recv() => self.handle_extractor_cmd(cmd).await,
                 Some(cmd) = self.general_channels.rx.recv() => {
@@ -205,7 +205,7 @@ impl PeerManager {
         time::interval_at(start, Duration::from_secs(CHANGE_STATE_INTERVAL_SEC))
     }
 
-    fn timeout_change_conn_state(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn timeout_change_conn_state(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         self.round = (self.round + 1) % MAX_OPTIMISTIC_ROUNDS;
 
         // If not all peers reported their state, do nothing
@@ -216,6 +216,8 @@ impl PeerManager {
         {
             return Ok(());
         }
+
+        self.log(format!("Peers: {}", self.peers.len())).await;
 
         let new_optimistic = match self.round {
             0 => self.new_optimistic_peers()?,
@@ -753,7 +755,7 @@ impl PeerManager {
         self.peers.insert(peer_addr, peer);
     }
 
-    fn spawn_peer_listener(&mut self, socket: TcpStream) {
+    async fn spawn_peer_listener(&mut self, socket: TcpStream) {
         let am_not_interested = self
             .peers
             .iter()
@@ -782,6 +784,7 @@ impl PeerManager {
             .await
         });
 
+        self.log(format!("New peer connect from: {}", &addr)).await;
         let peer = Peer::new(self.metainfo.pieces_num(), job);
         self.peers.insert(peer_addr, peer);
     }

@@ -52,12 +52,14 @@ impl Extractor {
             }
 
             // Write last chunk
-            let name = utils::hash_to_string(&self.metainfo.piece(end.file_index)) + ".piece";
-            let reader = &mut BufReader::new(File::open(name)?);
+            if end.byte_index > 0 {
+                let name = utils::hash_to_string(&self.metainfo.piece(end.file_index)) + ".piece";
+                let reader = &mut BufReader::new(File::open(name)?);
 
-            let mut buffer = vec![0; end.byte_index];
-            reader.read_exact(buffer.as_mut_slice())?;
-            writer.write_all(buffer.as_slice())?;
+                let mut buffer = vec![0; end.byte_index];
+                reader.read_exact(buffer.as_mut_slice())?;
+                writer.write_all(buffer.as_slice())?;
+            }
         }
 
         Ok(())
