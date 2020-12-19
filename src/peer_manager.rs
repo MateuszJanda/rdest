@@ -35,9 +35,10 @@ pub struct PeerManager {
     metainfo: Metainfo,
     candidates: Vec<(String, [u8; PEER_ID_SIZE])>,
     view: Option<View>,
-    round: u32,
     tracker: Job<TrackerCmd>,
     extractor: Job<ExtractorCmd>,
+    round: u32,
+    files_extracted: bool,
 }
 
 #[derive(Debug)]
@@ -147,9 +148,10 @@ impl PeerManager {
             metainfo,
             candidates: vec![],
             view: None,
-            round: 0,
             tracker: Job::new(tracker_tx, tracker_rx),
             extractor: Job::new(extractor_tx, extractor_rx),
+            round: 0,
+            files_extracted: false,
         }
     }
 
@@ -672,14 +674,16 @@ impl PeerManager {
             .await;
         self.kill_peer(&addr).await;
 
-        let all = self
+        let have_all = self
             .pieces_status
             .iter()
             .all(|status| *status == Status::Have);
 
-        if all {
-            // TODO: ensure to call this only one, not every time kill_req was send
-            self.spawn_extractor().await;
+        if have_all {
+            if !self.files_extracted {
+                self.spawn_extractor().await;
+            }
+            self.files_extracted = true;
         } else if self.candidates.is_empty() {
             self.spawn_tracker();
         } else {
