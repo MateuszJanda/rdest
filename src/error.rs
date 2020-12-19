@@ -44,21 +44,21 @@ pub enum Error {
     /// Connection closed.
     ConnectionClosed,
     /// Decoder encountered unexpected char.
-    DecodeUnexpectedChar(&'static str, u32, usize),
+    DecodeUnexpectedChar(&'static str, usize),
     /// Decoder encountered incorrect char.
-    DecodeIncorrectChar(&'static str, u32, usize),
+    DecodeIncorrectChar(&'static str, usize),
     /// Decoder was unable to convert to `BValue`.
-    DecodeUnableConvert(&'static str, u32, &'static str, usize),
+    DecodeUnableConvert(&'static str, &'static str, usize),
     /// Not enough chars to decode.
-    DecodeNotEnoughChars(&'static str, u32, usize),
+    DecodeNotEnoughChars(&'static str, usize),
     /// Decoder encountered missing terminal character "e".
-    DecodeMissingTerminalChars(&'static str, u32, usize),
+    DecodeMissingTerminalChars(&'static str, usize),
     /// Incorrect integer with leading zero.
-    DecodeLeadingZero(&'static str, u32, usize),
+    DecodeLeadingZero(&'static str, usize),
     /// Odd number of elements in dictionary.
-    DecodeOddNumOfElements(&'static str, u32, usize),
+    DecodeOddNumOfElements(&'static str, usize),
     /// Key not string in dictionary
-    DecodeKeyNotString(&'static str, u32, usize),
+    DecodeKeyNotString(&'static str, usize),
     /// Missing [bencoded](https://en.wikipedia.org/wiki/Bencode) data to decode tracker response.
     TrackerBEncodeMissing,
     /// Not enough data in tracker response.
@@ -110,33 +110,27 @@ impl fmt::Display for Error {
             Error::InfoMissing => write!(f, "Info field missing"),
             Error::ConnectionReset => write!(f, "Connection reset by peer"),
             Error::ConnectionClosed => write!(f, "Connection closed by peer"),
-            Error::DecodeUnexpectedChar(file, line, pos) => {
-                write!(f, "{}:{}, unexpected end character at {}", file, line, pos)
+            Error::DecodeUnexpectedChar(fun, pos) => {
+                write!(f, "{}: unexpected end character at {}", fun, pos)
             }
-            Error::DecodeIncorrectChar(file, line, pos) => {
-                write!(f, "{}:{}, incorrect character at {}", file, line, pos)
+            Error::DecodeIncorrectChar(fun, pos) => {
+                write!(f, "{}: incorrect character at {}", fun, pos)
             }
-            Error::DecodeUnableConvert(file, line, name, pos) => write!(
-                f,
-                "{}:{}, unable convert to {} at {}",
-                file, line, name, pos
-            ),
-            Error::DecodeNotEnoughChars(file, line, pos) => {
-                write!(f, "{}:{}, not enough characters at {}", file, line, pos)
+            Error::DecodeUnableConvert(fun, name, pos) => {
+                write!(f, "{}: unable convert to {} at {}", fun, name, pos)
             }
-            Error::DecodeMissingTerminalChars(file, line, pos) => write!(
-                f,
-                "{}:{}, missing terminate character at {}",
-                file, line, pos
-            ),
-            Error::DecodeLeadingZero(file, line, pos) => {
-                write!(f, "{}:{}, leading zero at {}", file, line, pos)
+            Error::DecodeNotEnoughChars(fun, pos) => {
+                write!(f, "{}: not enough characters at {}", fun, pos)
             }
-            Error::DecodeOddNumOfElements(file, line, pos) => {
-                write!(f, "{}:{}, odd number of elements at {}", file, line, pos)
+            Error::DecodeMissingTerminalChars(fun, pos) => {
+                write!(f, "{}: missing terminate character at {}", fun, pos)
             }
-            Error::DecodeKeyNotString(file, line, pos) => {
-                write!(f, "{}:{}, key is not string at {}", file, line, pos)
+            Error::DecodeLeadingZero(fun, pos) => write!(f, "{}: leading zero at {}", fun, pos),
+            Error::DecodeOddNumOfElements(fun, pos) => {
+                write!(f, "{}: odd number of elements at {}", fun, pos)
+            }
+            Error::DecodeKeyNotString(fun, pos) => {
+                write!(f, "{}: key is not string at {}", fun, pos)
             }
             Error::TrackerBEncodeMissing => write!(f, "Tracker, bencode is missing"),
             Error::TrackerDataMissing => write!(f, "Tracker, data is missing"),

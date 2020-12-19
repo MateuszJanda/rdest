@@ -7,7 +7,7 @@ use std::slice::Iter;
 /// Deep finder class looking for dictionary key in [bencoded](https://en.wikipedia.org/wiki/Bencode)
 /// string.
 ///
-/// It's looking deep finding - looking for key in other keys (because dictionary can be key itself).
+/// Perform deep search, by looking for keys in dictionary values (that can be dictionaries itself).
 pub struct DeepFinder {}
 
 impl DeepFinder {
@@ -33,10 +33,14 @@ impl DeepFinder {
                     }
                     None => values.append(&mut Self::raw_dict(it, extract)?),
                 },
-                Delimiter::End if with_end => return Ok(values),
-                Delimiter::End => return Err(Error::DecodeUnexpectedChar(file!(), line!(), pos)),
+                Delimiter::End => {
+                    return match with_end {
+                        true => Ok(values),
+                        false => Err(Error::DecodeUnexpectedChar("raw_values_vector", pos)),
+                    }
+                }
                 Delimiter::Unknown => {
-                    return Err(Error::DecodeIncorrectChar(file!(), line!(), pos))
+                    return Err(Error::DecodeIncorrectChar("raw_values_vector", pos))
                 }
             }
         }
@@ -100,7 +104,7 @@ impl DeepFinder {
                     }
                     Delimiter::End => break,
                     Delimiter::Unknown => {
-                        return Err(Error::DecodeIncorrectChar(file!(), line!(), pos))
+                        return Err(Error::DecodeIncorrectChar("traverse_dict", pos))
                     }
                 };
             } else if !key_turn {
@@ -134,8 +138,12 @@ impl DeepFinder {
             Delimiter::Int => values.append(&mut Self::raw_int(it, pos, extract)?),
             Delimiter::List => values.append(&mut Self::raw_list(it, extract)?),
             Delimiter::Dict => values.append(&mut Self::raw_dict(it, extract)?),
-            Delimiter::End => return Err(Error::DecodeUnexpectedChar(file!(), line!(), pos)),
-            Delimiter::Unknown => return Err(Error::DecodeIncorrectChar(file!(), line!(), pos)),
+            Delimiter::End => {
+                return Err(Error::DecodeUnexpectedChar("extract_dict_raw_value", pos))
+            }
+            Delimiter::Unknown => {
+                return Err(Error::DecodeIncorrectChar("extract_dict_raw_value", pos))
+            }
         }
 
         Ok(values)
@@ -157,8 +165,8 @@ impl DeepFinder {
 
 impl RawFinder for DeepFinder {
     /// Find first value by specific dictionary key in
-    /// [bencoded](https://en.wikipedia.org/wiki/Bencode) string. Look also in keys which may be
-    /// dictionaries itself. Value is returned in raw foramt.
+    /// [bencoded](https://en.wikipedia.org/wiki/Bencode) string. Look also in dictionary values
+    /// which may be dictionaries itself. Value is returned in raw foramt.
     ///
     /// # Example
     /// ```

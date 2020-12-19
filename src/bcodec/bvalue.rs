@@ -1,4 +1,5 @@
 use crate::Error;
+use core::fmt;
 use std::collections::HashMap;
 use std::iter::Enumerate;
 use std::slice::Iter;
@@ -57,10 +58,8 @@ impl BValue {
                 Delimiter::List => values.push(Self::value_list(it)?),
                 Delimiter::Dict => values.push(Self::value_dict(it, pos)?),
                 Delimiter::End if with_end => return Ok(values),
-                Delimiter::End => return Err(Error::DecodeUnexpectedChar(file!(), line!(), pos)),
-                Delimiter::Unknown => {
-                    return Err(Error::DecodeIncorrectChar(file!(), line!(), pos))
-                }
+                Delimiter::End => return Err(Error::DecodeUnexpectedChar("values_vector", pos)),
+                Delimiter::Unknown => return Err(Error::DecodeIncorrectChar("values_vector", pos)),
             }
         }
 
@@ -110,21 +109,21 @@ impl BValue {
         str_raw.push(b':');
 
         if !len_bytes.iter().all(|b| (b'0'..=b'9').contains(b)) {
-            return Err(Error::DecodeIncorrectChar(file!(), line!(), pos));
+            return Err(Error::DecodeIncorrectChar("parse_byte_str", pos));
         }
 
         let len_str = match String::from_utf8(len_bytes) {
             Ok(v) => v,
-            Err(_) => return Err(Error::DecodeUnableConvert(file!(), line!(), &"string", pos)),
+            Err(_) => return Err(Error::DecodeUnableConvert("parse_byte_str", &"string", pos)),
         };
         let len: usize = match len_str.parse() {
             Ok(v) => v,
-            Err(_) => return Err(Error::DecodeUnableConvert(file!(), line!(), &"int", pos)),
+            Err(_) => return Err(Error::DecodeUnableConvert("parse_byte_str", &"int", pos)),
         };
 
         let str_value: Vec<_> = it.take(len).map(|(_, &b)| b).collect();
         if str_value.len() != len {
-            return Err(Error::DecodeNotEnoughChars(file!(), line!(), pos));
+            return Err(Error::DecodeNotEnoughChars("parse_byte_str", pos));
         }
 
         str_raw.append(&mut str_value.clone());
@@ -141,25 +140,20 @@ impl BValue {
         raw_num.push(b'e');
 
         if let None = it_start.nth(num_as_bytes.len()) {
-            return Err(Error::DecodeMissingTerminalChars(file!(), line!(), pos));
+            return Err(Error::DecodeMissingTerminalChars("parse_int", pos));
         }
         let num_as_str = match String::from_utf8(num_as_bytes) {
             Ok(v) => v,
-            Err(_) => return Err(Error::DecodeUnableConvert(file!(), line!(), &"string", pos)),
+            Err(_) => return Err(Error::DecodeUnableConvert("parse_int", &"string", pos)),
         };
 
         if num_as_str.len() >= 2 && num_as_str.starts_with("0") || num_as_str.starts_with("-0") {
-            return Err(Error::DecodeLeadingZero(file!(), line!(), pos));
+            return Err(Error::DecodeLeadingZero("parse_int", pos));
         }
 
         let num = num_as_str
             .parse::<i64>()
-            .or(Err(Error::DecodeUnableConvert(
-                file!(),
-                line!(),
-                &"int",
-                pos,
-            )))?;
+            .or(Err(Error::DecodeUnableConvert("parse_int", &"int", pos)))?;
 
         Ok((num, raw_num))
     }
@@ -174,7 +168,7 @@ impl BValue {
     ) -> Result<HashMap<Vec<u8>, BValue>, Error> {
         let list = Self::values_vector(it, true)?;
         if list.len() % 2 != 0 {
-            return Err(Error::DecodeOddNumOfElements(file!(), line!(), pos));
+            return Err(Error::DecodeOddNumOfElements("parse_dict", pos));
         }
 
         let keys = Self::keys_from_list(&list, pos)?;
@@ -192,7 +186,7 @@ impl BValue {
             .step_by(2)
             .map(|v| match v {
                 BValue::ByteStr(vec) => Ok(vec.clone()),
-                _ => Err(Error::DecodeKeyNotString(file!(), line!(), pos)),
+                _ => Err(Error::DecodeKeyNotString("keys_from_list", pos)),
             })
             .collect()
     }
@@ -201,36 +195,34 @@ impl BValue {
         it.take_while(|(_, &b)| b != b'e')
             .map(|(_, b)| match (b'0'..=b'9').contains(b) || *b == b'-' {
                 true => Ok(*b),
-                false => Err(Error::DecodeIncorrectChar(file!(), line!(), pos)),
+                false => Err(Error::DecodeIncorrectChar("extract_int", pos)),
             })
             .collect()
     }
 }
 
-// impl fmt::Display for BValue {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         match self {
-//             BValue::Int(i) => write!(f, "Int={}", i),
-//             BValue::ByteStr(vec) => {
-//                 match String::from_utf8(vec.clone()) {
-//                     Ok(s) => write!(f, "Str={}", s),
-//                     Err(_) => write!(f, "Str={:?}", vec),
-//                 }
-//             },
-//             BValue::List(list) => {
-//                 for val in list {
-//                     write!(f, "    {},", val);
-//                 }
-//                 Ok(())
-//             }
-//             BValue::Dict(dict) => {
-//                 write!(f, "Dict=[");
-//                 for (key, val) in dict {
-//                     write!(f, "    {} => {},", BValue::ByteStr(key.to_vec()), val);
-//                 }
-//                 write!(f, "]");
-//                 Ok(())
-//             }
-//         }
-//     }
-// }
+impl fmt::Display for BValue {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            BValue::Int(i) => write!(f, "Int: {}", i),
+            BValue::ByteStr(vec) => match String::from_utf8(vec.clone()) {
+                Ok(s) => write!(f, "Str: {}", s),
+                Err(_) => write!(f, "Str={:?}", vec),
+            },
+            BValue::List(list) => {
+                let _ = write!(f, "List: [");
+                for val in list {
+                    let _ = write!(f, "{}, ", val);
+                }
+                write!(f, "]")
+            }
+            BValue::Dict(dict) => {
+                let _ = write!(f, "Dict: [");
+                for (key, val) in dict {
+                    let _ = write!(f, "{} => {}, ", BValue::ByteStr(key.to_vec()), val);
+                }
+                write!(f, "]")
+            }
+        }
+    }
+}
