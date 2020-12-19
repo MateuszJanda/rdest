@@ -678,6 +678,7 @@ impl PeerManager {
             .all(|status| *status == Status::Have);
 
         if all {
+            // TODO: ensure to call this only one, not every time kill_req was send
             self.spawn_extractor().await;
         } else if self.candidates.is_empty() {
             self.spawn_tracker();
