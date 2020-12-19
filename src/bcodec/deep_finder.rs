@@ -1,6 +1,6 @@
-use crate::bcodec::bvalue::{BValue, Delimiter};
+use crate::bcodec::bvalue::Delimiter;
 use crate::bcodec::raw_finder::RawFinder;
-use crate::Error;
+use crate::{BDecoder, Error};
 use std::iter::Enumerate;
 use std::slice::Iter;
 
@@ -48,7 +48,7 @@ impl DeepFinder {
     }
 
     fn raw_int(it: &mut Enumerate<Iter<u8>>, pos: usize, extract: bool) -> Result<Vec<u8>, Error> {
-        let val = BValue::parse_int(it, pos)?.1;
+        let val = BDecoder::parse_int(it, pos)?.1;
         match extract {
             true => Ok(val),
             false => Ok(vec![]),
@@ -134,7 +134,7 @@ impl DeepFinder {
         let mut values = vec![];
         let extract = true;
         match b.into() {
-            Delimiter::Num => values.append(&mut BValue::parse_byte_str(it, pos, b)?.1),
+            Delimiter::Num => values.append(&mut BDecoder::parse_byte_str(it, pos, b)?.1),
             Delimiter::Int => values.append(&mut Self::raw_int(it, pos, extract)?),
             Delimiter::List => values.append(&mut Self::raw_list(it, extract)?),
             Delimiter::Dict => values.append(&mut Self::raw_dict(it, extract)?),
@@ -155,7 +155,7 @@ impl DeepFinder {
         first_num: &u8,
         extract: bool,
     ) -> Result<Vec<u8>, Error> {
-        let val = BValue::parse_byte_str(it, pos, first_num)?.1;
+        let val = BDecoder::parse_byte_str(it, pos, first_num)?.1;
         match extract {
             true => Ok(val),
             false => Ok(vec![]),

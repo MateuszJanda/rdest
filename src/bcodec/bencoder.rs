@@ -47,6 +47,7 @@ impl BEncoder {
     }
 
     pub fn add_dict(&mut self, values: &HashMap<Vec<u8>, BValue>) -> &mut Self {
+        // TODO: dict value should be in sorted order
         self.data.extend_from_slice("d".as_bytes());
         let mut out = BEncoder::new();
         for (key, value) in values {
