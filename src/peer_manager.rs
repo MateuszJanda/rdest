@@ -352,7 +352,6 @@ impl PeerManager {
                     .filter(|(_, peer)| peer.am_interested)
                     .count() as i32;
                 let spawn_num = (MAX_UNCHOKED + MAX_OPTIMISTIC) as i32 - all_am_interested;
-                // let spawn_num = 1;
 
                 for _ in 0..max(0, spawn_num) {
                     self.spawn_peer_handler();

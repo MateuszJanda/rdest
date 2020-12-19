@@ -31,8 +31,8 @@ impl BEncoder {
     }
 
     pub fn add_list(&mut self, values: &Vec<BValue>) -> &mut Self {
-        self.data.extend_from_slice("l".as_bytes());
         let mut out = BEncoder::new();
+        self.data.extend_from_slice("l".as_bytes());
         for value in values {
             match value {
                 BValue::Int(i) => out.add_int(*i),
@@ -47,10 +47,12 @@ impl BEncoder {
     }
 
     pub fn add_dict(&mut self, values: &HashMap<Vec<u8>, BValue>) -> &mut Self {
-        // TODO: dict value should be in sorted order
-        self.data.extend_from_slice("d".as_bytes());
         let mut out = BEncoder::new();
-        for (key, value) in values {
+        self.data.extend_from_slice("d".as_bytes());
+
+        let mut sorted_values: Vec<_>  = values.iter().collect();
+        sorted_values.sort_by(|a, b| a.0.cmp(b.0));
+        for (key, value) in sorted_values {
             match value {
                 BValue::Int(i) => out.add_byte_str(key.as_slice()).add_int(*i),
                 BValue::ByteStr(b) => out.add_byte_str(key.as_slice()).add_byte_str(b.as_slice()),
