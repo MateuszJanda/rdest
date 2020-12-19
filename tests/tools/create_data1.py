@@ -11,7 +11,7 @@ def main():
     piece1 = data[:PIECE_SIZE]
     piece2 = data[PIECE_SIZE:]
 
-    with open("file-data.iso", "wb") as f:
+    with open("file-data1.iso", "wb") as f:
         f.write(data)
 
     save_piece(piece1)
