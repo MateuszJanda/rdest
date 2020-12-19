@@ -54,8 +54,6 @@ async fn get_torrent(path: &PathBuf) {
     };
     let mut manager = PeerManager::new(metainfo, peer_id::generate());
     manager.run().await;
-
-    println!("-==[ koniec ]==-");
 }
 
 async fn create_torrent(path: &PathBuf, tracker_addr: &String) {
