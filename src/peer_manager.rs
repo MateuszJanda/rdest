@@ -217,8 +217,6 @@ impl PeerManager {
             return Ok(());
         }
 
-        self.log(format!("Peers: {}", self.peers.len())).await;
-
         let new_optimistic = match self.round {
             0 => self.new_optimistic_peers()?,
             _ => vec![],
@@ -240,9 +238,39 @@ impl PeerManager {
             .map(|param| make_pair(param))
             .collect::<Vec<(String, u32)>>();
 
+        let state_before = self.conn_state_text();
         let cmd = self.change_state_cmd(&mut rate, &new_optimistic)?;
+        let state_after = self.conn_state_text();
+
+        self.log(format!(
+            "Peers: {}, connection state {} -> {}",
+            self.peers.len(),
+            state_before,
+            state_after
+        ))
+        .await;
         let _ = self.general_channels.broad.send(cmd);
         Ok(())
+    }
+
+    fn conn_state_text(&self) -> String {
+        self.peers
+            .iter()
+            .map(|(_, peer)| {
+                let letter = if peer.optimistic_unchoke {
+                    "o"
+                } else if peer.choked {
+                    "c"
+                } else {
+                    "u"
+                };
+
+                match peer.interested {
+                    true => letter.to_uppercase(),
+                    false => letter.to_string(),
+                }
+            })
+            .collect()
     }
 
     fn new_optimistic_peers(&mut self) -> Result<Vec<String>, Box<dyn std::error::Error>> {
