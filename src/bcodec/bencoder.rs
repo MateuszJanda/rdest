@@ -50,7 +50,7 @@ impl BEncoder {
         let mut out = BEncoder::new();
         self.data.extend_from_slice("d".as_bytes());
 
-        let mut sorted_values: Vec<_>  = values.iter().collect();
+        let mut sorted_values: Vec<_> = values.iter().collect();
         sorted_values.sort_by(|a, b| a.0.cmp(b.0));
         for (key, value) in sorted_values {
             match value {

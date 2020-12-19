@@ -1,6 +1,7 @@
 use crate::commands::{BroadCmd, ViewCmd};
 use std::io;
 use std::io::Write;
+use termion::{color, cursor};
 use tokio::sync::{broadcast, mpsc};
 use tokio::time;
 use tokio::time::{Duration, Instant, Interval};
@@ -43,6 +44,7 @@ impl ProgressView {
     }
 
     pub async fn run(&mut self) {
+        println!("{}", cursor::Hide);
         println!(
             r#"
    _i_i_     .----
@@ -93,7 +95,13 @@ impl ProgressView {
         let text = " ".repeat(self.pos) + "a";
         let downloaded = self.pieces.iter().filter(|&val| *val).count();
 
-        print!("\r[{}/{}]:{}", downloaded, self.pieces.len(), text);
+        print!(
+            "\r{}[{}/{}]:{}",
+            color::Fg(color::Red),
+            downloaded,
+            self.pieces.len(),
+            text
+        );
 
         match io::stdout().flush() {
             Ok(_) => (),
@@ -113,6 +121,6 @@ impl ProgressView {
     }
 
     fn log(&self, text: &String) {
-        println!("\r[+] {}", text);
+        println!("\r{}[+] {}", color::Fg(color::Reset), text);
     }
 }
