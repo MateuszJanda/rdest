@@ -219,8 +219,8 @@ impl PeerHandler {
     }
 
     async fn event_loop(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if self.peer_id.is_some() {
-            self.init_handshake().await?;
+        if let Some(peer_id) = self.peer_id {
+            self.init_handshake(peer_id).await?;
         }
 
         let mut keep_alive_timer = self.start_keep_alive_timer();
@@ -331,7 +331,7 @@ impl PeerHandler {
         self.peer_id = Some(*handshake.peer_id());
 
         if peer_init_handshake {
-            self.init_handshake().await?;
+            self.init_handshake(*handshake.peer_id()).await?;
         }
 
         Ok(true)
@@ -444,7 +444,10 @@ impl PeerHandler {
         Ok(true)
     }
 
-    async fn init_handshake(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+    async fn init_handshake(
+        &mut self,
+        peer_id: [u8; PEER_ID_SIZE],
+    ) -> Result<(), Box<dyn std::error::Error>> {
         self.connection
             .send_msg(&Handshake::new(&self.info_hash, &self.own_id))
             .await?;
@@ -453,6 +456,7 @@ impl PeerHandler {
         self.peer_ch
             .send(PeerCmd::Init {
                 addr: self.connection.addr.clone(),
+                peer_id,
                 resp_ch: resp_tx,
             })
             .await?;

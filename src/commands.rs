@@ -1,4 +1,4 @@
-use crate::constants::HASH_SIZE;
+use crate::constants::{HASH_SIZE, PEER_ID_SIZE};
 use crate::messages::bitfield::Bitfield;
 use crate::TrackerResp;
 use std::collections::HashMap;
@@ -34,6 +34,7 @@ pub enum BroadCmd {
 pub enum PeerCmd {
     Init {
         addr: String,
+        peer_id: [u8; PEER_ID_SIZE],
         resp_ch: oneshot::Sender<InitCmd>,
     },
     RecvChoke {

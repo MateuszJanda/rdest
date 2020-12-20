@@ -7,6 +7,7 @@ use crate::extractor::Extractor;
 use crate::messages::bitfield::Bitfield;
 use crate::peer_handler::PeerHandler;
 use crate::progress_view::ProgressView;
+use crate::utils::hash_to_string;
 use crate::{Error, Metainfo, TrackerClient};
 use rand::seq::SliceRandom;
 use std::cmp::max;
@@ -43,6 +44,7 @@ pub struct PeerManager {
 
 #[derive(Debug)]
 struct Peer {
+    id: Option<[u8; PEER_ID_SIZE]>,
     pieces: Vec<bool>,
     job: Option<JoinHandle<()>>,
     index: Option<usize>,
@@ -103,8 +105,9 @@ impl GeneralChannels {
 }
 
 impl Peer {
-    fn new(pieces_num: usize, job: JoinHandle<()>) -> Peer {
+    fn new(id: Option<[u8; PEER_ID_SIZE]>, pieces_num: usize, job: JoinHandle<()>) -> Peer {
         Peer {
+            id,
             pieces: vec![false; pieces_num],
             job: Some(job),
             index: None,
@@ -373,7 +376,11 @@ impl PeerManager {
 
     async fn handle_peer_cmd(&mut self, cmd: PeerCmd) -> Result<bool, Error> {
         match cmd {
-            PeerCmd::Init { addr, resp_ch } => self.handle_init(&addr, resp_ch).await,
+            PeerCmd::Init {
+                addr,
+                peer_id,
+                resp_ch,
+            } => self.handle_init(&addr, peer_id, resp_ch).await,
             PeerCmd::RecvChoke { addr } => self.handle_choke(&addr).await,
             PeerCmd::RecvUnchoke { addr, resp_ch } => self.handle_unchoke(&addr, resp_ch).await,
             PeerCmd::RecvInterested { addr } => self.handle_interested(&addr).await,
@@ -408,8 +415,12 @@ impl PeerManager {
     async fn handle_init(
         &mut self,
         addr: &String,
+        peer_id: [u8; PEER_ID_SIZE],
         resp_ch: oneshot::Sender<InitCmd>,
     ) -> Result<bool, Error> {
+        let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
+        peer.id = Some(peer_id);
+
         let bitfield = Bitfield::from_vec(
             &self
                 .pieces_status
@@ -419,14 +430,15 @@ impl PeerManager {
         );
 
         let _ = resp_ch.send(InitCmd::SendBitfield { bitfield });
-        self.peer_log(addr, "Handshake with peer".to_string()).await;
+        self.peer_log(addr, "Handshake with peer".to_string())
+            .await?;
 
         Ok(true)
     }
 
     async fn handle_choke(&mut self, addr: &String) -> Result<bool, Error> {
         self.peer_log(addr, "Peer change state to Choke".to_string())
-            .await;
+            .await?;
 
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.choked = true;
@@ -446,7 +458,7 @@ impl PeerManager {
         resp_ch: oneshot::Sender<UnchokeCmd>,
     ) -> Result<bool, Error> {
         self.peer_log(addr, "Peer change state to Unchoke".to_string())
-            .await;
+            .await?;
 
         let pieces = &self.peers[addr].pieces;
         let index = self.choose_piece(pieces);
@@ -477,7 +489,7 @@ impl PeerManager {
 
     async fn handle_interested(&mut self, addr: &String) -> Result<bool, Error> {
         self.peer_log(addr, "Peer change state to Interested".to_string())
-            .await;
+            .await?;
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.interested = true;
         Ok(true)
@@ -489,7 +501,7 @@ impl PeerManager {
         resp_ch: oneshot::Sender<NotInterestedCmd>,
     ) -> Result<bool, Error> {
         self.peer_log(addr, "Peer change state to NotInterested".to_string())
-            .await;
+            .await?;
 
         {
             let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
@@ -540,7 +552,7 @@ impl PeerManager {
         bitfield: &Bitfield,
         resp_ch: oneshot::Sender<BitfieldCmd>,
     ) -> Result<bool, Error> {
-        self.peer_log(addr, format!("Received a bitfield")).await;
+        self.peer_log(addr, format!("Received a bitfield")).await?;
         // Update peer pieces bitfield
         {
             let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
@@ -670,7 +682,7 @@ impl PeerManager {
 
     async fn handle_kill_req(&mut self, addr: &String, reason: &String) -> Result<bool, Error> {
         self.peer_log(addr, "Peer killed, reason: ".to_string() + reason)
-            .await;
+            .await?;
         self.kill_peer(&addr).await;
 
         let have_all = self
@@ -766,7 +778,7 @@ impl PeerManager {
     }
 
     fn spawn_peer_handler(&mut self) {
-        let (addr, peer_id) = match self.candidates.pop() {
+        let (addr, id) = match self.candidates.pop() {
             Some(value) => value,
             None => return,
         };
@@ -775,6 +787,7 @@ impl PeerManager {
             return;
         }
 
+        let peer_id = Some(id.clone());
         let peer_addr = addr.clone();
         let own_id = self.own_id.clone();
         let info_hash = *self.metainfo.info_hash();
@@ -786,7 +799,7 @@ impl PeerManager {
             PeerHandler::run_incoming(
                 addr,
                 own_id,
-                Some(peer_id),
+                Some(id),
                 info_hash,
                 pieces_num,
                 peer_ch,
@@ -795,7 +808,7 @@ impl PeerManager {
             .await
         });
 
-        let peer = Peer::new(self.metainfo.pieces_num(), job);
+        let peer = Peer::new(peer_id, self.metainfo.pieces_num(), job);
         self.peers.insert(peer_addr, peer);
     }
 
@@ -830,7 +843,7 @@ impl PeerManager {
 
         self.log("New peer connect from: ".to_string() + &peer_addr.as_str())
             .await;
-        let peer = Peer::new(self.metainfo.pieces_num(), job);
+        let peer = Peer::new(None, self.metainfo.pieces_num(), job);
         self.peers.insert(peer_addr, peer);
     }
 
@@ -887,10 +900,21 @@ impl PeerManager {
         }
     }
 
-    async fn peer_log(&mut self, addr: &String, text: String) {
+    async fn peer_log(&mut self, addr: &String, text: String) -> Result<(), Error> {
         if let Some(view) = &mut self.view {
-            let line = format!("[{}] {}", addr, text);
+            let peer = self.peers.get(addr).ok_or(Error::PeerNotFound)?;
+
+            let peer_id = match peer.id {
+                None => "".to_string(),
+                Some(id) => match String::from_utf8(id.to_vec()) {
+                    Ok(s) => s,
+                    Err(_) => hash_to_string(&id),
+                },
+            };
+
+            let line = format!("[{}]:[{}] {}", peer_id, addr, text);
             let _ = view.channel.send(ViewCmd::Log(line)).await;
         }
+        Ok(())
     }
 }

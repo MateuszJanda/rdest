@@ -157,7 +157,7 @@ impl ProgressView {
 
     fn log(&self, text: &String) {
         println!(
-            "\r{}{}[+] {}",
+            "\r{}{}{}",
             color::Fg(color::Reset),
             color::Bg(color::Reset),
             text
