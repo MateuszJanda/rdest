@@ -1,13 +1,13 @@
 use crate::commands::{BroadCmd, ViewCmd};
+use num_traits::abs;
+use std::convert::TryInto;
 use std::io;
 use std::io::Write;
+use termion::color::Color;
 use termion::{color, cursor};
 use tokio::sync::{broadcast, mpsc};
 use tokio::time;
 use tokio::time::{Duration, Instant, Interval};
-use termion::color::Color;
-use std::convert::TryInto;
-use num_traits::abs;
 
 const CHANNEL_SIZE: usize = 32;
 const DELAY_MS: u64 = 100;
@@ -95,10 +95,7 @@ impl ProgressView {
     }
 
     async fn animation(&mut self) {
-        // let text = "▄".repeat(self.pos) + "a";
-
         let downloaded = self.pieces.iter().filter(|&val| *val).count();
-
         print!(
             "\r{}{}[{}/{}]: ",
             color::Fg(color::Red),
@@ -107,14 +104,10 @@ impl ProgressView {
             self.pieces.len(),
         );
 
-        for (ch, fg, bg) in self.ttt2() {
-            // let c = fg.try_into();
-            // let c = fg.into();
-            // let c: Color = fg;
-            // let c= fg.as_ref();
-            // print!("{} x", color::Fg(c));
+        for (ch, fg, bg) in self.progress_bar() {
             print!("{}{}{}", color::Fg(fg.as_ref()), color::Bg(bg.as_ref()), ch)
         }
+
         match io::stdout().flush() {
             Ok(_) => (),
             Err(_) => (),
@@ -132,84 +125,92 @@ impl ProgressView {
         }
     }
 
-    fn ttt(&self) -> Vec<(char, Box<    dyn Color>, Box<dyn Color>)> {
-        let mut r:Vec<(char, Box<dyn Color>, Box<dyn Color>)> = vec![];
-        for i in 0..self.pos {
-            r.push((' ', Box::new(color::Reset), Box::new(color::Reset)));
-        }
+    fn progress_bar(&self) -> Vec<(char, Box<dyn Color>, Box<dyn Color>)> {
+        let mut bar: Vec<(char, Box<dyn Color>, Box<dyn Color>)> = vec![];
 
-        r.push(('█', Box::new(color::Rgb(255, 0, 0)), Box::new(color::Rgb(255, 0, 0))));
+        let colors = self.color();
 
-
-        for i in (self.pos + 1)..PROGRESS_SIZE {
-            r.push((' ', Box::new(color::Reset), Box::new(color::Reset)));
-        }
-
-        r
-    }
-
-    fn ttt2(&self) -> Vec<(char, Box<    dyn Color>, Box<dyn Color>)> {
-        let mut r:Vec<(char, Box<dyn Color>, Box<dyn Color>)> = vec![];
         for i in 0..PROGRESS_SIZE {
-            r.push((' ', Box::new(color::Reset), Box::new(color::Reset)));
+            let (ch, fg): (char, Box<dyn Color>) = if colors[i * 2] == 0.0 {
+                (' ', Box::new(color::Reset))
+            } else {
+                ('▄', Box::new(color::Rgb(0, (255.0 * 1.0) as u8, 0)))
+            };
+
+            let bg: Box<dyn Color> = if colors[i * 2 + 1] == 0.0 {
+                Box::new(color::Reset)
+            } else {
+                Box::new(color::Rgb(0, (255.0 * colors[i * 2]) as u8, 0))
+            };
+
+            bar.push((ch, fg, bg));
         }
 
-
-
-        // match self.direction {
-        //     Direction::Left => {
-        //         if self.pos >= PROGRESS_SIZE - TAIL_SIZE {
-        //
-        //         } else {
-        //             for _ self.pos
-        //         }
-        //     }
-        //     Direction::Right => {}
+        // for segment in 1..=TAIL_SIZE {
+        //     let pos = self.segment_pos(segment as i32);
+        //     bar[pos] = (
+        //         '▄',
+        //         Box::new(color::Rgb(255 / (segment as u8 + 1), 0, 0)),
+        //         Box::new(color::Rgb(255 / (segment as u8 + 1), 0, 0)),
+        //     );
         // }
 
-        for p in (1..=TAIL_SIZE).rev() {
-            let pp = self.dir(p as i32);
-            r[pp] = ('█', Box::new(color::Rgb(255/ (p as u8+ 1), 0, 0)), Box::new(color::Rgb(255/(p as u8+ 1), 0, 0)));
-        }
+        bar[self.pos] = (
+            '█',
+            Box::new(color::Rgb(255, 0, 0)),
+            Box::new(color::Rgb(255, 0, 0)),
+        );
 
-        r[self.pos] = ('█', Box::new(color::Rgb(255, 0, 0)), Box::new(color::Rgb(255, 0, 0)));
-
-        r
+        bar
     }
 
-    fn dir(&self, p : i32) -> usize {
-        let mut r = match self.direction {
-            Direction::Left => { self.pos as i32 + p}
-            Direction::Right => { self.pos as i32 - p}
+    fn segment_pos(&self, segment: i32) -> usize {
+        let mut pos = match self.direction {
+            Direction::Left => self.pos as i32 + segment,
+            Direction::Right => self.pos as i32 - segment,
         };
 
-        if r >= PROGRESS_SIZE as i32 {
-            r = PROGRESS_SIZE as i32 - (r % (PROGRESS_SIZE - 1) as i32)
-            // r = PROGRESS_SIZE as i32 - 1
+        if pos >= PROGRESS_SIZE as i32 {
+            pos = PROGRESS_SIZE as i32 - (pos % (PROGRESS_SIZE - 1) as i32)
         }
-        if r < 0{
-            r = abs(r) - 1
-            // r = 0
+        if pos < 0 {
+            pos = abs(pos) - 1
         }
 
-        r as usize
+        pos as usize
     }
 
-    fn aaa(&self) {
+    fn color(&self) -> Vec<f32> {
         let chunk_size = (self.pieces.len() as f32) / ((PROGRESS_SIZE * 2) as f32);
+        let mut start = 0.0;
 
-        let start = 0 as f32;
-        let end = start + chunk_size;
+        let mut res = vec![];
+        loop {
+            let piece_start = start as usize;
+            let piece_end = (start + chunk_size) as usize;
 
+            let have = self.pieces[piece_start..piece_end]
+                .iter()
+                .filter(|&have| *have)
+                .count() as f32;
+            let len = (piece_end - piece_start) as f32;
+            res.push(have / len);
 
-        // self.pieces[start as usize..end as usize].iter().
+            start += chunk_size;
+            if start as usize >= self.pieces.len() {
+                break;
+            }
+        }
 
-
-
+        res
     }
-
 
     fn log(&self, text: &String) {
-        println!("\r{}{}[+] {}", color::Fg(color::Reset), color::Bg(color::Reset), text);
+        println!(
+            "\r{}{}[+] {}",
+            color::Fg(color::Reset),
+            color::Bg(color::Reset),
+            text
+        );
     }
 }
