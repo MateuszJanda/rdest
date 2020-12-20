@@ -45,7 +45,7 @@ impl Metainfo {
     /// use rdest::Metainfo;
     /// use std::path::Path;
     ///
-    /// Metainfo::create_file(Path::new("wallet.dat"), &"127.0.0.1".to_string()).unwrap();
+    /// Metainfo::create_file(Path::new("wallet.dat"), &"127.0.0.1:8000".to_string()).unwrap();
     /// ```
     pub fn create_file(path: &Path, tracker_addr: &String) -> Result<(), Error> {
         let metadata = match fs::metadata(path) {

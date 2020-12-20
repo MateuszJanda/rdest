@@ -5,11 +5,14 @@ use termion::{color, cursor};
 use tokio::sync::{broadcast, mpsc};
 use tokio::time;
 use tokio::time::{Duration, Instant, Interval};
+use termion::color::Color;
+use std::convert::TryInto;
+use num_traits::abs;
 
 const CHANNEL_SIZE: usize = 32;
 const DELAY_MS: u64 = 100;
+const TAIL_SIZE: usize = 4;
 const PROGRESS_SIZE: usize = 10;
-const PROGRESS_START_POS: usize = 1;
 
 pub struct ProgressView {
     pos: usize,
@@ -33,7 +36,7 @@ impl ProgressView {
         let (channel_tx, channel_rx) = mpsc::channel(CHANNEL_SIZE);
 
         let view = ProgressView {
-            pos: PROGRESS_START_POS,
+            pos: 0,
             pieces: vec![false; pieces_num],
             direction: Direction::Right,
             channel: channel_rx,
@@ -44,7 +47,7 @@ impl ProgressView {
     }
 
     pub async fn run(&mut self) {
-        println!("{}", cursor::Hide);
+        // println!("{}", cursor::Hide);
         println!(
             r#"
    _i_i_     .----
@@ -92,25 +95,34 @@ impl ProgressView {
     }
 
     async fn animation(&mut self) {
-        let text = " ".repeat(self.pos) + "a";
+        // let text = "▄".repeat(self.pos) + "a";
+
         let downloaded = self.pieces.iter().filter(|&val| *val).count();
 
         print!(
-            "\r{}[{}/{}]:{}",
+            "\r{}{}[{}/{}]: ",
             color::Fg(color::Red),
+            color::Bg(color::Reset),
             downloaded,
             self.pieces.len(),
-            text
         );
 
+        for (ch, fg, bg) in self.ttt2() {
+            // let c = fg.try_into();
+            // let c = fg.into();
+            // let c: Color = fg;
+            // let c= fg.as_ref();
+            // print!("{} x", color::Fg(c));
+            print!("{}{}{}", color::Fg(fg.as_ref()), color::Bg(bg.as_ref()), ch)
+        }
         match io::stdout().flush() {
             Ok(_) => (),
             Err(_) => (),
         }
 
-        if self.direction == Direction::Right && self.pos + 1 > PROGRESS_START_POS + PROGRESS_SIZE {
+        if self.direction == Direction::Right && self.pos >= PROGRESS_SIZE - 1 {
             self.direction = Direction::Left;
-        } else if self.direction == Direction::Left && self.pos - 1 < PROGRESS_START_POS {
+        } else if self.direction == Direction::Left && self.pos <= 0 {
             self.direction = Direction::Right;
         }
 
@@ -120,7 +132,84 @@ impl ProgressView {
         }
     }
 
+    fn ttt(&self) -> Vec<(char, Box<    dyn Color>, Box<dyn Color>)> {
+        let mut r:Vec<(char, Box<dyn Color>, Box<dyn Color>)> = vec![];
+        for i in 0..self.pos {
+            r.push((' ', Box::new(color::Reset), Box::new(color::Reset)));
+        }
+
+        r.push(('█', Box::new(color::Rgb(255, 0, 0)), Box::new(color::Rgb(255, 0, 0))));
+
+
+        for i in (self.pos + 1)..PROGRESS_SIZE {
+            r.push((' ', Box::new(color::Reset), Box::new(color::Reset)));
+        }
+
+        r
+    }
+
+    fn ttt2(&self) -> Vec<(char, Box<    dyn Color>, Box<dyn Color>)> {
+        let mut r:Vec<(char, Box<dyn Color>, Box<dyn Color>)> = vec![];
+        for i in 0..PROGRESS_SIZE {
+            r.push((' ', Box::new(color::Reset), Box::new(color::Reset)));
+        }
+
+
+
+        // match self.direction {
+        //     Direction::Left => {
+        //         if self.pos >= PROGRESS_SIZE - TAIL_SIZE {
+        //
+        //         } else {
+        //             for _ self.pos
+        //         }
+        //     }
+        //     Direction::Right => {}
+        // }
+
+        for p in (1..=TAIL_SIZE).rev() {
+            let pp = self.dir(p as i32);
+            r[pp] = ('█', Box::new(color::Rgb(255/ (p as u8+ 1), 0, 0)), Box::new(color::Rgb(255/(p as u8+ 1), 0, 0)));
+        }
+
+        r[self.pos] = ('█', Box::new(color::Rgb(255, 0, 0)), Box::new(color::Rgb(255, 0, 0)));
+
+        r
+    }
+
+    fn dir(&self, p : i32) -> usize {
+        let mut r = match self.direction {
+            Direction::Left => { self.pos as i32 + p}
+            Direction::Right => { self.pos as i32 - p}
+        };
+
+        if r >= PROGRESS_SIZE as i32 {
+            r = PROGRESS_SIZE as i32 - (r % (PROGRESS_SIZE - 1) as i32)
+            // r = PROGRESS_SIZE as i32 - 1
+        }
+        if r < 0{
+            r = abs(r) - 1
+            // r = 0
+        }
+
+        r as usize
+    }
+
+    fn aaa(&self) {
+        let chunk_size = (self.pieces.len() as f32) / ((PROGRESS_SIZE * 2) as f32);
+
+        let start = 0 as f32;
+        let end = start + chunk_size;
+
+
+        // self.pieces[start as usize..end as usize].iter().
+
+
+
+    }
+
+
     fn log(&self, text: &String) {
-        println!("\r{}[+] {}", color::Fg(color::Reset), text);
+        println!("\r{}{}[+] {}", color::Fg(color::Reset), color::Bg(color::Reset), text);
     }
 }
