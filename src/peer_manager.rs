@@ -617,8 +617,8 @@ impl PeerManager {
     ) -> Result<bool, Error> {
         match self.peers.get(addr).ok_or(Error::PeerNotFound)?.index {
             Some(index) => {
-                self.peer_log(addr, format!("New piece downloaded: {}", index))
-                    .await;
+                // self.peer_log(addr, format!("New piece downloaded: {}", index))
+                //     .await;
                 self.pieces_status[index] = Status::Have;
                 let _ = self
                     .general_channels
