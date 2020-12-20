@@ -175,7 +175,7 @@ impl PeerManager {
     /// ```
     pub async fn run(&mut self) {
         self.spawn_view();
-        // self.spawn_tracker();
+        self.spawn_tracker();
         self.event_loop().await;
     }
 

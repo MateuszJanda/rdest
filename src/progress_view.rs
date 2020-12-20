@@ -10,11 +10,11 @@ use tokio::time::{Duration, Instant, Interval};
 
 const CHANNEL_SIZE: usize = 32;
 const DELAY_MS: u64 = 100;
-const TAIL_SIZE: usize = 4;
-const PROGRESS_SIZE: usize = 10;
+const SNAKE_TAIL_SIZE: usize = 4;
+const BAR_SIZE: usize = 10;
 
 pub struct ProgressView {
-    pos: usize,
+    head: usize,
     pieces: Vec<bool>,
     direction: Direction,
     channel: mpsc::Receiver<ViewCmd>,
@@ -35,7 +35,7 @@ impl ProgressView {
         let (channel_tx, channel_rx) = mpsc::channel(CHANNEL_SIZE);
 
         let view = ProgressView {
-            pos: 0,
+            head: 0,
             pieces: vec![false; pieces_num],
             direction: Direction::Right,
             channel: channel_rx,
@@ -60,7 +60,7 @@ impl ProgressView {
 
         loop {
             tokio::select! {
-                 _ = animation_timer.tick() => self.animation().await,
+                 _ = animation_timer.tick() => self.progress_animation().await,
                  Ok(cmd) = self.broad_ch.recv() => self.handle_manager_cmd(cmd),
                  cmd = self.channel.recv() => {
                     if !self.handle_cmd(cmd) {
@@ -93,7 +93,7 @@ impl ProgressView {
         true
     }
 
-    async fn animation(&mut self) {
+    async fn progress_animation(&mut self) {
         let downloaded = self.pieces.iter().filter(|&val| *val).count();
         print!(
             "\r{}{}[{}/{}]: ",
@@ -103,59 +103,50 @@ impl ProgressView {
             self.pieces.len(),
         );
 
-        for (ch, fg, bg) in self.snake() {
+        for (ch, fg, bg) in self.snake_chars() {
             print!("{}{}{}", color::Fg(fg.as_ref()), color::Bg(bg.as_ref()), ch)
         }
 
-        match io::stdout().flush() {
-            Ok(_) => (),
-            Err(_) => (),
-        }
+        io::stdout().flush().unwrap();
+        self.move_snake();
+    }
 
-        if self.direction == Direction::Right && self.pos >= PROGRESS_SIZE - 1 {
+    fn move_snake(&mut self) {
+        if self.direction == Direction::Right && self.head >= BAR_SIZE - 1 {
             self.direction = Direction::Left;
-        } else if self.direction == Direction::Left && self.pos <= 0 {
+        } else if self.direction == Direction::Left && self.head <= 0 {
             self.direction = Direction::Right;
         }
 
         match self.direction {
-            Direction::Right => self.pos += 1,
-            Direction::Left => self.pos -= 1,
+            Direction::Right => self.head += 1,
+            Direction::Left => self.head -= 1,
         }
     }
 
-    fn snake(&self) -> Vec<(char, Box<dyn Color>, Box<dyn Color>)> {
+    fn snake_chars(&self) -> Vec<(char, Box<dyn Color>, Box<dyn Color>)> {
         let mut bar: Vec<(char, Box<dyn Color>, Box<dyn Color>)> = vec![];
-        for _ in 0..PROGRESS_SIZE {
+        for _ in 0..BAR_SIZE {
             bar.push((' ', Box::new(color::Reset), Box::new(color::Reset)));
         }
 
-        for segment in 1..=TAIL_SIZE {
-            let pos = self.segment_pos(segment as i32);
-            bar[pos] = (
-                '▄',
-                Box::new(color::Rgb(255 / (segment as u8 + 1), 0, 0)),
-                Box::new(color::Rgb(255 / (segment as u8 + 1), 0, 0)),
-            );
+        for segment in (0..=SNAKE_TAIL_SIZE).rev() {
+            let pos = self.snake_segment_to_pos(segment as i32);
+            let color = color::Rgb(255 / (segment as u8 + 1), 0, 0);
+            bar[pos] = ('▄', Box::new(color), Box::new(color));
         }
-
-        bar[self.pos] = (
-            '█',
-            Box::new(color::Rgb(255, 0, 0)),
-            Box::new(color::Rgb(255, 0, 0)),
-        );
 
         bar
     }
 
-    fn segment_pos(&self, segment: i32) -> usize {
+    fn snake_segment_to_pos(&self, segment: i32) -> usize {
         let mut pos = match self.direction {
-            Direction::Left => self.pos as i32 + segment,
-            Direction::Right => self.pos as i32 - segment,
+            Direction::Left => self.head as i32 + segment,
+            Direction::Right => self.head as i32 - segment,
         };
 
-        if pos >= PROGRESS_SIZE as i32 {
-            pos = PROGRESS_SIZE as i32 - (pos % (PROGRESS_SIZE - 1) as i32)
+        if pos >= BAR_SIZE as i32 {
+            pos = BAR_SIZE as i32 - (pos % (BAR_SIZE - 1) as i32)
         }
         if pos < 0 {
             pos = abs(pos) - 1
