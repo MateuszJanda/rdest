@@ -50,7 +50,7 @@ impl ProgressView {
         println!(
             r#"
    _i_i_     .----
-⸝⸍/     \⸌⸜  / Ok, let's go with it...
+⸝⸍/     \⸌⸜  / Ok, let's go with this...
 ||\  ¬  /||                  ~rdest~
 \_,"" ""._/
 "#
