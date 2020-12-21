@@ -22,6 +22,7 @@ use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time;
 use tokio::time::{Duration, Instant, Interval};
 
+const KEEP_ALIVE_LIMIT: u32 = 2;
 const KEEP_ALIVE_INTERVAL_SEC: u64 = 120;
 const STATS_INTERVAL_SEC: u64 = 10;
 const MAX_STATS_QUEUE_SIZE: usize = 2;
@@ -57,7 +58,7 @@ struct PieceRx {
 struct State {
     choked: bool,
     interested: bool,
-    keep_alive: bool,
+    keep_alive: u32,
 }
 
 struct Stats {
@@ -154,7 +155,7 @@ impl PeerHandler {
             peer_state: State {
                 choked: true,
                 interested: false,
-                keep_alive: false,
+                keep_alive: 0,
             },
             stats: Stats::new(),
             msg_buff: vec![],
@@ -253,11 +254,11 @@ impl PeerHandler {
     }
 
     async fn timeout_keep_alive(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        if !self.peer_state.keep_alive {
+        if self.peer_state.keep_alive == KEEP_ALIVE_LIMIT {
             return Err(Error::KeepAliveTimeout.into());
         }
         self.connection.send_msg(&KeepAlive::new()).await?;
-        self.peer_state.keep_alive = false;
+        self.peer_state.keep_alive += 1;
         Ok(())
     }
 
@@ -296,7 +297,11 @@ impl PeerHandler {
     ) -> Result<bool, Box<dyn std::error::Error>> {
         match opt_frame {
             Some(frame) => {
-                self.peer_state.keep_alive = true;
+                self.peer_state.keep_alive = match frame {
+                    Frame::KeepAlive(_) => self.peer_state.keep_alive,
+                    _ => 0,
+                };
+
                 let handled = match frame {
                     Frame::Handshake(handshake) => self.handle_handshake(&handshake).await?,
                     Frame::KeepAlive(_) => true,
