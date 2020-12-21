@@ -92,8 +92,13 @@ impl Metainfo {
             b"info".to_vec() => BValue::Dict(info)
         ];
 
-        let file_name = path.with_extension("torrent");
-        match fs::write(file_name, BEncoder::new().add_dict(&torrent).encode()) {
+        let p = path.with_extension("torrent");
+        let torrent_file = match p.file_name() {
+            Some(torrent_file) => torrent_file,
+            None => return Err(Error::FileNotFound),
+        };
+
+        match fs::write(torrent_file, BEncoder::new().add_dict(&torrent).encode()) {
             Ok(()) => Ok(()),
             Err(_) => Err(Error::FileCanNotWrite),
         }

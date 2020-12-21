@@ -32,7 +32,7 @@ struct Get {
 #[derive(StructOpt)]
 struct Create {
     /// Create .torrent for file
-    #[structopt(parse(from_os_str), short = "-c", long = "--create", name = "FILE")]
+    #[structopt(parse(from_os_str), name = "FILE")]
     path: PathBuf,
     /// Tracker address
     #[structopt(short, long, name = "ADDRESS")]
