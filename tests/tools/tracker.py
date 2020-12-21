@@ -14,7 +14,7 @@ class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
         # Whenever using 'send_header', you also have to call 'end_headers'
         self.end_headers()
 
-        html = "d8:intervali1800e5:peersld 2:ip9:127.0.0.17:peer id20:AAAAABBBBBCCCCCDDDDD4:porti6881eeee"
+        html = "d8:intervali1800e5:peersld2:ip9:127.0.0.17:peer id20:AAAAABBBBBCCCCCDDDDD4:porti6881eeee"
 
         self.wfile.write(bytes(html, "utf8"))
 
