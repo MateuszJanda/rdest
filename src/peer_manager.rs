@@ -430,14 +430,14 @@ impl PeerManager {
         );
 
         let _ = resp_ch.send(InitCmd::SendBitfield { bitfield });
-        self.peer_log(addr, "Handshake with peer".to_string())
+        self.log_peer(addr, "Handshake with peer".to_string())
             .await?;
 
         Ok(true)
     }
 
     async fn handle_choke(&mut self, addr: &String) -> Result<bool, Error> {
-        self.peer_log(addr, "Peer change state to Choke".to_string())
+        self.log_peer(addr, "Peer change state to Choke".to_string())
             .await?;
 
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
@@ -457,7 +457,7 @@ impl PeerManager {
         addr: &String,
         resp_ch: oneshot::Sender<UnchokeCmd>,
     ) -> Result<bool, Error> {
-        self.peer_log(addr, "Peer change state to Unchoke".to_string())
+        self.log_peer(addr, "Peer change state to Unchoke".to_string())
             .await?;
 
         let pieces = &self.peers[addr].pieces;
@@ -488,7 +488,7 @@ impl PeerManager {
     }
 
     async fn handle_interested(&mut self, addr: &String) -> Result<bool, Error> {
-        self.peer_log(addr, "Peer change state to Interested".to_string())
+        self.log_peer(addr, "Peer change state to Interested".to_string())
             .await?;
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.interested = true;
@@ -500,7 +500,7 @@ impl PeerManager {
         addr: &String,
         resp_ch: oneshot::Sender<NotInterestedCmd>,
     ) -> Result<bool, Error> {
-        self.peer_log(addr, "Peer change state to NotInterested".to_string())
+        self.log_peer(addr, "Peer change state to NotInterested".to_string())
             .await?;
 
         {
@@ -552,7 +552,7 @@ impl PeerManager {
         bitfield: &Bitfield,
         resp_ch: oneshot::Sender<BitfieldCmd>,
     ) -> Result<bool, Error> {
-        self.peer_log(addr, format!("Received a bitfield")).await?;
+        self.log_peer(addr, format!("Received a bitfield")).await?;
         // Update peer pieces bitfield
         {
             let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
@@ -629,7 +629,7 @@ impl PeerManager {
     ) -> Result<bool, Error> {
         match self.peers.get(addr).ok_or(Error::PeerNotFound)?.index {
             Some(index) => {
-                // self.peer_log(addr, format!("New piece downloaded: {}", index))
+                // self.log_peer(addr, format!("New piece downloaded: {}", index))
                 //     .await;
                 self.pieces_status[index] = Status::Have;
                 let _ = self
@@ -681,7 +681,7 @@ impl PeerManager {
     }
 
     async fn handle_kill_req(&mut self, addr: &String, reason: &String) -> Result<bool, Error> {
-        self.peer_log(addr, "Peer killed, reason: ".to_string() + reason)
+        self.log_peer(addr, "Peer killed, reason: ".to_string() + reason)
             .await?;
         self.kill_peer(&addr).await;
 
@@ -900,7 +900,7 @@ impl PeerManager {
         }
     }
 
-    async fn peer_log(&mut self, addr: &String, text: String) -> Result<(), Error> {
+    async fn log_peer(&mut self, addr: &String, text: String) -> Result<(), Error> {
         if let Some(view) = &mut self.view {
             let peer = self.peers.get(addr).ok_or(Error::PeerNotFound)?;
 
