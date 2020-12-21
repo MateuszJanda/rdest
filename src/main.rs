@@ -1,5 +1,5 @@
 use rdest::peer_id;
-use rdest::{Metainfo, PeerManager};
+use rdest::{Metainfo, Session};
 use std::path::PathBuf;
 use structopt::StructOpt;
 use tokio;
@@ -52,8 +52,8 @@ async fn get_torrent(path: &PathBuf) {
         Ok(metainfo) => metainfo,
         Err(e) => panic!("[-] Can't read metafile. Error: {}", e),
     };
-    let mut manager = PeerManager::new(metainfo, peer_id::generate());
-    manager.run().await;
+    let mut session = Session::new(metainfo, peer_id::generate());
+    session.run().await;
 }
 
 async fn create_torrent(path: &PathBuf, tracker_addr: &String) {

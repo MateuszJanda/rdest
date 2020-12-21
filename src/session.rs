@@ -27,8 +27,8 @@ const MAX_OPTIMISTIC_ROUNDS: u32 = 3;
 const MAX_OPTIMISTIC: u32 = 1;
 const MAX_UNCHOKED: u32 = 10;
 
-/// Peer manager.
-pub struct PeerManager {
+/// Session manager.
+pub struct Session {
     own_id: [u8; PEER_ID_SIZE],
     pieces_status: Vec<Status>,
     peers: HashMap<String, Peer>,
@@ -122,28 +122,28 @@ impl Peer {
     }
 }
 
-impl PeerManager {
+impl Session {
     /// Create new instance managing peer-to-peer connection. Currently most settings, are set as
     /// constatns.
     ///
     /// # Example
     /// ```no_run
-    /// use rdest::{Metainfo, PeerManager};
+    /// use rdest::{Metainfo, Session};
     /// use std::path::PathBuf;
     ///
     /// let path = PathBuf::from("ubuntu-20.04.1-desktop-amd64.iso.torrent");
     /// let torrent_file = Metainfo::from_file(path.as_path()).unwrap();
     /// let peer_id = b"AAAAABBBBBCCCCCDDDDD";
     ///
-    /// let mut manager = PeerManager::new(torrent_file, *peer_id);
+    /// let mut session = Session::new(torrent_file, *peer_id);
     /// ```
-    pub fn new(metainfo: Metainfo, own_id: [u8; PEER_ID_SIZE]) -> PeerManager {
+    pub fn new(metainfo: Metainfo, own_id: [u8; PEER_ID_SIZE]) -> Session {
         let (peer_tx, peer_rx) = mpsc::channel(CHANNEL_SIZE);
         let (tracker_tx, tracker_rx) = mpsc::channel(CHANNEL_SIZE);
         let (extractor_tx, extractor_rx) = mpsc::channel(CHANNEL_SIZE);
         let (broad, _) = broadcast::channel(BROADCAST_CHANNEL_SIZE);
 
-        PeerManager {
+        Session {
             own_id,
             pieces_status: vec![Status::Missing; metainfo.pieces_num()],
             peers: HashMap::new(),
@@ -158,12 +158,12 @@ impl PeerManager {
         }
     }
 
-    /// Run PeerManager who will try connect to tracker, get list of available peers, and establish
+    /// Run Session that will try connect to tracker, get list of available peers, and establish
     /// connection with them
     ///
     /// # Example
     /// ```no_run
-    /// use rdest::{Metainfo, PeerManager};
+    /// use rdest::{Metainfo, Session};
     /// use std::path::Path;
     ///
     /// # #[tokio::main]
@@ -172,8 +172,8 @@ impl PeerManager {
     /// let torrent_file = Metainfo::from_file(path).unwrap();
     /// let peer_id = b"AAAAABBBBBCCCCCDDDDD";
     ///
-    /// let mut manager = PeerManager::new(torrent_file, *peer_id);
-    /// manager.run().await;
+    /// let mut session = Session::new(torrent_file, *peer_id);
+    /// session.run().await;
     /// # }
     /// ```
     pub async fn run(&mut self) {

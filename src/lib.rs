@@ -5,7 +5,7 @@
 //!
 //! # Example
 //! ```no_run
-//! use rdest::{Metainfo, PeerManager};
+//! use rdest::{Metainfo, Session};
 //! use std::path::Path;
 //!
 //! # #[tokio::main]
@@ -14,8 +14,8 @@
 //! let torrent_file = Metainfo::from_file(path).unwrap();
 //! let peer_id = b"AAAAABBBBBCCCCCDDDDD";
 //!
-//! let mut manager = PeerManager::new(torrent_file, *peer_id);
-//! manager.run().await;
+//! let mut session = Session::new(torrent_file, *peer_id);
+//! session.run().await;
 //! # }
 //! ```
 
@@ -30,9 +30,9 @@ mod messages;
 mod metainfo;
 mod peer_handler;
 pub mod peer_id;
-mod peer_manager;
 mod progress_view;
 mod serializer;
+mod session;
 mod tracker_client;
 mod tracker_resp;
 mod utils;
@@ -50,4 +50,4 @@ pub use crate::metainfo::Metainfo;
 pub use crate::tracker_client::TrackerClient;
 pub use crate::tracker_resp::TrackerResp;
 
-pub use crate::peer_manager::PeerManager;
+pub use crate::session::Session;
