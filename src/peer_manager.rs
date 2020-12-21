@@ -413,7 +413,7 @@ impl PeerManager {
                 addr,
                 index,
                 resp_ch,
-            } => self.handle_request(&addr, index, resp_ch),
+            } => self.handle_request(&addr, index, resp_ch).await,
             PeerCmd::PieceDone { addr, resp_ch } => self.handle_piece_done(&addr, resp_ch).await,
             PeerCmd::SyncStats {
                 addr,
@@ -604,12 +604,14 @@ impl PeerManager {
         Ok(true)
     }
 
-    fn handle_request(
+    async fn handle_request(
         &mut self,
         addr: &String,
         index: usize,
         resp_ch: oneshot::Sender<RequestCmd>,
     ) -> Result<bool, Error> {
+        self.log_peer(addr, format!("Peer sent request for piece: {}", index))
+            .await?;
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         if peer.am_choked {
             let _ = resp_ch.send(RequestCmd::Ignore);
