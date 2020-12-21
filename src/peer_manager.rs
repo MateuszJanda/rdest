@@ -291,14 +291,14 @@ impl PeerManager {
     }
 
     fn new_optimistic_peers(&mut self) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-        let all_am_choked_for = self
+        let all_am_choked_and_peer_interested = self
             .peers
             .iter()
             .filter(|(_, peer)| peer.am_choked && peer.interested)
             .map(|(addr, _)| addr.clone())
             .collect::<Vec<String>>();
 
-        match all_am_choked_for.choose(&mut rand::thread_rng()) {
+        match all_am_choked_and_peer_interested.choose(&mut rand::thread_rng()) {
             Some(addr) => Ok(vec![addr.clone()]),
             None => Ok(vec![]),
         }
