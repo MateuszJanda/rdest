@@ -145,7 +145,7 @@ impl PeerHandler {
         broad_ch: broadcast::Receiver<BroadCmd>,
     ) -> PeerHandler {
         PeerHandler {
-            connection: Connection::new(addr, socket),
+            connection: Connection::new(addr, pieces_num, socket),
             own_id,
             peer_id,
             info_hash,
@@ -383,7 +383,7 @@ impl PeerHandler {
         &mut self,
         bitfield: Bitfield,
     ) -> Result<bool, Box<dyn std::error::Error>> {
-        bitfield.validate(self.pieces_num)?;
+        bitfield.validate()?;
         self.trigger_cmd_recv_bitfield(bitfield).await?;
         Ok(true)
     }

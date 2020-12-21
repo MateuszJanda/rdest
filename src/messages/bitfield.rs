@@ -2,11 +2,11 @@ use crate::constants::{MSG_ID_SIZE, MSG_LEN_SIZE};
 use crate::serializer::Serializer;
 use crate::Error;
 use std::io::Cursor;
-use std::cmp::min;
 
 #[derive(Debug)]
 pub struct Bitfield {
-    pieces: Vec<u8>,
+    pieces_bytes: Vec<u8>,
+    pieces_num: usize,
 }
 
 impl Bitfield {
@@ -17,7 +17,7 @@ impl Bitfield {
     const BYTE_MASK: u8 = 0b1000_0000;
 
     pub fn from_vec(pieces: &Vec<bool>) -> Bitfield {
-        let mut vec = vec![];
+        let mut pieces_bytes = vec![];
 
         for piece in pieces.chunks(Bitfield::BITS_IN_BYTE) {
             let mut byte: u8 = 0;
@@ -27,28 +27,38 @@ impl Bitfield {
                 }
             }
 
-            vec.push(byte);
+            pieces_bytes.push(byte);
         }
 
-        Bitfield { pieces: vec }
+        Bitfield {
+            pieces_bytes,
+            pieces_num: pieces.len(),
+        }
     }
 
-    pub fn from(crs: &Cursor<&[u8]>) -> Bitfield {
+    pub fn from(crs: &Cursor<&[u8]>, pieces_num: usize) -> Bitfield {
         let start = Bitfield::LEN_SIZE + Bitfield::ID_SIZE;
         let end = crs.position() as usize;
-        let mut pieces = vec![];
-        pieces.extend_from_slice(&crs.get_ref()[start..end]);
+        let mut pieces_bytes = vec![];
+        pieces_bytes.extend_from_slice(&crs.get_ref()[start..end]);
 
-        Bitfield { pieces }
+        Bitfield {
+            pieces_bytes,
+            pieces_num,
+        }
     }
 
     pub fn to_vec(&self) -> Vec<bool> {
         let mut pieces = vec![];
-        for b in self.pieces.iter() {
+        for b in self.pieces_bytes.iter() {
             let mut byte = *b;
-            for _ in 0..min(Bitfield::BITS_IN_BYTE, self.pieces.len()) {
+            for _ in 0..Bitfield::BITS_IN_BYTE {
                 pieces.push(byte & Bitfield::BYTE_MASK != 0);
                 byte = byte << 1;
+
+                if pieces.len() == self.pieces_num {
+                    return pieces;
+                }
             }
         }
 
@@ -62,8 +72,13 @@ impl Bitfield {
         }
     }
 
-    pub fn validate(&self, pieces_num: usize) -> Result<(), Error> {
-        match self.to_vec().len() == pieces_num {
+    pub fn validate(&self) -> Result<(), Error> {
+        let byte_num = match self.pieces_num % Bitfield::BITS_IN_BYTE == 0 {
+            true => self.pieces_num / Bitfield::BITS_IN_BYTE,
+            false => self.pieces_num / Bitfield::BITS_IN_BYTE + 1,
+        };
+
+        match self.pieces_bytes.len() == byte_num {
             true => Ok(()),
             false => Err(Error::InvalidLength("Bitfield".into())),
         }
@@ -73,9 +88,11 @@ impl Bitfield {
 impl Serializer for Bitfield {
     fn data(&self) -> Vec<u8> {
         let mut vec = vec![];
-        vec.extend_from_slice(&((Bitfield::ID_SIZE + self.pieces.len()) as u32).to_be_bytes());
+        vec.extend_from_slice(
+            &((Bitfield::ID_SIZE + self.pieces_bytes.len()) as u32).to_be_bytes(),
+        );
         vec.push(Bitfield::ID);
-        vec.extend_from_slice(self.pieces.as_slice());
+        vec.extend_from_slice(self.pieces_bytes.as_slice());
 
         vec
     }

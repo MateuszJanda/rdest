@@ -94,10 +94,10 @@ impl Metainfo {
 
         let torrent_file = match path.file_name() {
             Some(file_name) => {
-                let mut torrent_file= file_name.to_os_string();
+                let mut torrent_file = file_name.to_os_string();
                 torrent_file.push(".torrent");
                 torrent_file
-            },
+            }
             None => return Err(Error::FileNotFound),
         };
 
