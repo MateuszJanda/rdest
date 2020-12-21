@@ -2,6 +2,7 @@ use crate::constants::{MSG_ID_SIZE, MSG_LEN_SIZE};
 use crate::serializer::Serializer;
 use crate::Error;
 use std::io::Cursor;
+use std::cmp::min;
 
 #[derive(Debug)]
 pub struct Bitfield {
@@ -45,7 +46,7 @@ impl Bitfield {
         let mut pieces = vec![];
         for b in self.pieces.iter() {
             let mut byte = *b;
-            for _ in 0..Bitfield::BITS_IN_BYTE {
+            for _ in 0..min(Bitfield::BITS_IN_BYTE, self.pieces.len()) {
                 pieces.push(byte & Bitfield::BYTE_MASK != 0);
                 byte = byte << 1;
             }
