@@ -244,7 +244,7 @@ impl PeerManager {
             .collect::<Vec<(String, u32)>>();
 
         let state_before = self.conn_state_text();
-        let cmd = self.change_state_cmd(&mut rate, &new_optimistic)?;
+        let cmd = self.change_conn_state(&mut rate, &new_optimistic)?;
         let state_after = self.conn_state_text();
 
         self.log(format!(
@@ -304,7 +304,7 @@ impl PeerManager {
         }
     }
 
-    fn change_state_cmd(
+    fn change_conn_state(
         &mut self,
         rates: &mut Vec<(String, u32)>,
         new_optimistic: &Vec<String>,
