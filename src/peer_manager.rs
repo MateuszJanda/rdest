@@ -262,31 +262,43 @@ impl PeerManager {
         self.peers
             .iter()
             .map(|(_, peer)| {
-                let letter = if peer.optimistic_unchoke {
+                let own_state = if peer.optimistic_unchoke {
                     "o"
-                } else if peer.choked {
+                } else if peer.am_choked {
                     "c"
                 } else {
                     "u"
                 };
 
-                match peer.interested {
-                    true => letter.to_uppercase(),
-                    false => letter.to_string(),
-                }
+                let own_state = match peer.am_interested {
+                    true => own_state.to_uppercase(),
+                    false => own_state.to_string(),
+                };
+
+                let peer_state = match peer.choked {
+                    true => "c",
+                    false => "u",
+                };
+
+                let peer_state = match peer.interested {
+                    true => peer_state.to_uppercase(),
+                    false => peer_state.to_string(),
+                };
+
+                "|".to_owned() + &own_state + &peer_state
             })
             .collect()
     }
 
     fn new_optimistic_peers(&mut self) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-        let all_choked = self
+        let all_am_choked_for = self
             .peers
             .iter()
             .filter(|(_, peer)| peer.am_choked && peer.interested)
             .map(|(addr, _)| addr.clone())
             .collect::<Vec<String>>();
 
-        match all_choked.choose(&mut rand::thread_rng()) {
+        match all_am_choked_for.choose(&mut rand::thread_rng()) {
             Some(addr) => Ok(vec![addr.clone()]),
             None => Ok(vec![]),
         }
@@ -579,7 +591,7 @@ impl PeerManager {
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.am_interested = am_interested;
         if with_am_unchoked {
-            peer.am_choked = true;
+            peer.am_choked = false;
         }
 
         let cmd = BitfieldCmd::SendState {
