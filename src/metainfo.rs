@@ -92,9 +92,12 @@ impl Metainfo {
             b"info".to_vec() => BValue::Dict(info)
         ];
 
-        let p = path.with_extension("torrent");
-        let torrent_file = match p.file_name() {
-            Some(torrent_file) => torrent_file,
+        let torrent_file = match path.file_name() {
+            Some(file_name) => {
+                let mut torrent_file= file_name.to_os_string();
+                torrent_file.push(".torrent");
+                torrent_file
+            },
             None => return Err(Error::FileNotFound),
         };
 
