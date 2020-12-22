@@ -290,7 +290,10 @@ impl Session {
             })
             .collect();
 
-        text + "|"
+        match text.is_empty() {
+            true => text,
+            false => text + "|",
+        }
     }
 
     fn new_optimistic_peers(&mut self) -> Result<Vec<String>, Box<dyn std::error::Error>> {
