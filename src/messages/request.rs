@@ -78,7 +78,7 @@ impl Request {
             return Err(Error::InvalidIndex("Request".into()));
         }
 
-        if self.block_length >= PIECE_BLOCK_SIZE as u32 {
+        if self.block_length > PIECE_BLOCK_SIZE as u32 {
             return Err(Error::InvalidLength("Request".into()));
         }
 
