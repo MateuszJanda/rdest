@@ -482,11 +482,10 @@ impl Session {
         resp_ch: oneshot::Sender<BitfieldCmd>,
     ) -> Result<bool, Error> {
         self.log_peer(addr, format!("Received a bitfield")).await?;
-        // Update peer pieces bitfield
+
         {
             let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-            peer.pieces
-                .copy_from_slice(&bitfield.to_vec(self.metainfo.pieces_num())?);
+            peer.update_pieces(&bitfield.to_vec(self.metainfo.pieces_num())?);
         }
 
         let piece_index = self.choose_piece(&bitfield.to_vec(self.metainfo.pieces_num())?);

@@ -39,6 +39,10 @@ impl Peer {
         }
     }
 
+    pub fn update_pieces(&mut self, pieces: &Vec<bool>) {
+        self.pieces.copy_from_slice(pieces);
+    }
+
     pub fn handle_init(
         &mut self,
         peer_id: [u8; PEER_ID_SIZE],
