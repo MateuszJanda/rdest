@@ -103,7 +103,7 @@ impl Metainfo {
 
         match fs::write(torrent_file, BEncoder::new().add_dict(&torrent).encode()) {
             Ok(()) => Ok(()),
-            Err(_) => Err(Error::FileCanNotWrite),
+            Err(_) => Err(Error::FileCannotWrite),
         }
     }
 

@@ -735,7 +735,7 @@ impl PeerHandler {
         let name = utils::hash_to_string(&piece_rx.hash) + ".piece";
         match fs::write(name, &piece_rx.buff) {
             Ok(()) => Ok(()),
-            Err(_) => Err(Error::FileCanNotWrite),
+            Err(_) => Err(Error::FileCannotWrite),
         }
     }
 }

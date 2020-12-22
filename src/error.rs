@@ -20,7 +20,7 @@ pub enum Error {
     /// Can't load piece file.
     FileNotFound,
     /// Can't write to file.
-    FileCanNotWrite,
+    FileCannotWrite,
     /// Peer not found in manager.
     PeerNotFound,
     /// Piece not requested by client.
@@ -97,8 +97,8 @@ impl fmt::Display for Error {
             Error::InvalidInfoHash => write!(f, "Invalid info hash"),
             Error::InvalidLength(msg) => write!(f, "Invalid length in {}", msg),
             Error::InvalidIndex(msg) => write!(f, "Invalid index in {}", msg),
-            Error::FileNotFound => write!(f, "Can't write to file"),
-            Error::FileCanNotWrite => write!(f, "File not found"),
+            Error::FileNotFound => write!(f, "File not found"),
+            Error::FileCannotWrite => write!(f, "Can't write to file"),
             Error::PeerNotFound => write!(f, "Peer not found"),
             Error::PieceNotRequested => write!(f, "Piece not requested"),
             Error::PieceNotLoaded => write!(f, "Piece not loaded"),
