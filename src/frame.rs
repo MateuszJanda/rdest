@@ -46,7 +46,7 @@ enum MsgId {
 }
 
 impl Frame {
-    pub fn parse(crs: &mut Cursor<&[u8]>, pieces_num: usize) -> Result<Frame, Error> {
+    pub fn parse(crs: &mut Cursor<&[u8]>) -> Result<Frame, Error> {
         let length = Self::get_message_length(crs)?;
         if length == KeepAlive::LEN as usize {
             crs.set_position(KeepAlive::FULL_SIZE as u64);
@@ -89,7 +89,7 @@ impl Frame {
             }
             Some(MsgId::BitfieldId) => {
                 crs.set_position(Bitfield::check(available_data, length)? as u64);
-                Ok(Frame::Bitfield(Bitfield::from(crs, pieces_num)))
+                Ok(Frame::Bitfield(Bitfield::from(crs)))
             }
             Some(MsgId::RequestId) => {
                 crs.set_position(Request::check(available_data, length)? as u64);

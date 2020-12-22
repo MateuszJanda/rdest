@@ -568,7 +568,8 @@ impl Session {
         // Update peer pieces bitfield
         {
             let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-            peer.pieces.copy_from_slice(&bitfield.to_vec());
+            peer.pieces
+                .copy_from_slice(&bitfield.to_vec(self.metainfo.pieces_num())?);
         }
 
         // BEP3 says "whenever a downloader doesn't have something they currently would ask a peer
@@ -577,7 +578,7 @@ impl Session {
         // Sending NotInterested explicitly (this is default state) is mandatory according BEP3, but
         // Interested should be send only after Unchoke. It appears, unfortunately, that many
         // clients wait for this message (doesn't send Unchoke and send KeepAlive instead).
-        let index = self.choose_piece(&bitfield.to_vec());
+        let index = self.choose_piece(&bitfield.to_vec(self.metainfo.pieces_num())?);
         let am_interested = match index {
             Some(_) => true,
             None => false,

@@ -9,16 +9,14 @@ use tokio::net::TcpStream;
 
 pub struct Connection {
     pub addr: String,
-    pieces_num: usize,
     pub socket: TcpStream,
     pub buffer: BytesMut,
 }
 
 impl Connection {
-    pub fn new(addr: String, pieces_num: usize, socket: TcpStream) -> Connection {
+    pub fn new(addr: String, socket: TcpStream) -> Connection {
         Connection {
             addr,
-            pieces_num,
             socket,
             buffer: BytesMut::with_capacity(MAX_FRAME_SIZE),
         }
@@ -76,7 +74,7 @@ impl Connection {
         let mut crs = Cursor::new(&self.buffer[..]);
 
         // Check whether a full frame is available
-        match Frame::parse(&mut crs, self.pieces_num) {
+        match Frame::parse(&mut crs) {
             // Discard the frame from the buffer
             Ok(frame) => {
                 let len = crs.position() as usize;

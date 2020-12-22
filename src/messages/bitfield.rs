@@ -6,7 +6,6 @@ use std::io::Cursor;
 #[derive(Debug)]
 pub struct Bitfield {
     pieces_bytes: Vec<u8>,
-    pieces_num: usize,
 }
 
 impl Bitfield {
@@ -30,25 +29,28 @@ impl Bitfield {
             pieces_bytes.push(byte);
         }
 
-        Bitfield {
-            pieces_bytes,
-            pieces_num: pieces.len(),
-        }
+        Bitfield { pieces_bytes }
     }
 
-    pub fn from(crs: &Cursor<&[u8]>, pieces_num: usize) -> Bitfield {
+    pub fn from(crs: &Cursor<&[u8]>) -> Bitfield {
         let start = Bitfield::LEN_SIZE + Bitfield::ID_SIZE;
         let end = crs.position() as usize;
         let mut pieces_bytes = vec![];
         pieces_bytes.extend_from_slice(&crs.get_ref()[start..end]);
 
-        Bitfield {
-            pieces_bytes,
-            pieces_num,
-        }
+        Bitfield { pieces_bytes }
     }
 
-    pub fn to_vec(&self) -> Vec<bool> {
+    pub fn to_vec(&self, pieces_num: usize) -> Result<Vec<bool>, Error> {
+        let bytes_num = match pieces_num % Bitfield::BITS_IN_BYTE == 0 {
+            true => pieces_num / Bitfield::BITS_IN_BYTE,
+            false => pieces_num / Bitfield::BITS_IN_BYTE + 1,
+        };
+
+        if self.pieces_bytes.len() != bytes_num {
+            return Err(Error::InvalidLength("Bitfield".into()));
+        }
+
         let mut pieces = vec![];
         for b in self.pieces_bytes.iter() {
             let mut byte = *b;
@@ -56,13 +58,13 @@ impl Bitfield {
                 pieces.push(byte & Bitfield::BYTE_MASK != 0);
                 byte = byte << 1;
 
-                if pieces.len() == self.pieces_num {
-                    return pieces;
+                if pieces.len() == pieces_num {
+                    return Ok(pieces);
                 }
             }
         }
 
-        pieces
+        Ok(pieces)
     }
 
     pub fn check(available_data: usize, length: usize) -> Result<usize, Error> {
@@ -72,13 +74,13 @@ impl Bitfield {
         }
     }
 
-    pub fn validate(&self) -> Result<(), Error> {
-        let byte_num = match self.pieces_num % Bitfield::BITS_IN_BYTE == 0 {
-            true => self.pieces_num / Bitfield::BITS_IN_BYTE,
-            false => self.pieces_num / Bitfield::BITS_IN_BYTE + 1,
+    pub fn validate(&self, pieces_num: usize) -> Result<(), Error> {
+        let bytes_num = match pieces_num % Bitfield::BITS_IN_BYTE == 0 {
+            true => pieces_num / Bitfield::BITS_IN_BYTE,
+            false => pieces_num / Bitfield::BITS_IN_BYTE + 1,
         };
 
-        match self.pieces_bytes.len() == byte_num {
+        match self.pieces_bytes.len() == bytes_num {
             true => Ok(()),
             false => Err(Error::InvalidLength("Bitfield".into())),
         }
