@@ -360,16 +360,9 @@ impl Metainfo {
     }
 
     fn piece_pos(&self, pos: usize) -> PiecePos {
-        let file_index = match pos % self.piece_length as usize != 0 {
-            true => pos / self.piece_length as usize + 1,
-            false => pos / self.piece_length as usize,
-        };
-
-        let byte_index = pos % self.piece_length as usize;
-
         PiecePos {
-            file_index,
-            byte_index,
+            file_index: pos / self.piece_length as usize,
+            byte_index: pos % self.piece_length as usize
         }
     }
 }
