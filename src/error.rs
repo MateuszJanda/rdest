@@ -13,6 +13,8 @@ pub enum Error {
     InvalidProtocolId,
     /// Peer return invalid info hash in Handshake message.
     InvalidInfoHash,
+    /// Peer introduced himself with unexpected ID
+    InvalidPeerId,
     /// Invalid length of Piece or Request message (different than requested peer).
     InvalidLength(String),
     /// Invalid index (different than requested by peer).
@@ -95,6 +97,7 @@ impl fmt::Display for Error {
             Error::Incomplete(msg) => write!(f, "Incomplete {}", msg),
             Error::InvalidProtocolId => write!(f, "Invalid protocol Id"),
             Error::InvalidInfoHash => write!(f, "Invalid info hash"),
+            Error::InvalidPeerId => write!(f, "Invalid peer id"),
             Error::InvalidLength(msg) => write!(f, "Invalid length in {}", msg),
             Error::InvalidIndex(msg) => write!(f, "Invalid index in {}", msg),
             Error::FileNotFound => write!(f, "File not found"),

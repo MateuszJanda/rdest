@@ -92,7 +92,7 @@ impl Handshake {
                     .enumerate()
                     .any(|(idx, b)| *b != peer_id[idx])
                 {
-                    return Err(Error::InvalidInfoHash);
+                    return Err(Error::UnexpectedPeerId);
                 }
                 Ok(())
             }
