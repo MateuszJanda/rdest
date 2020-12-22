@@ -18,6 +18,11 @@ pub enum ExtractorCmd {
 
 pub enum ViewCmd {
     Log(String),
+    LogPeer {
+        addr: String,
+        peer_id: Option<[u8; PEER_ID_SIZE]>,
+        text: String,
+    },
     Kill,
 }
 

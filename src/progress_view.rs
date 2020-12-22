@@ -1,4 +1,6 @@
 use crate::commands::{BroadCmd, ViewCmd};
+use crate::constants::PEER_ID_SIZE;
+use crate::utils::hash_to_string;
 use num_traits::abs;
 use std::io;
 use std::io::Write;
@@ -46,7 +48,6 @@ impl ProgressView {
     }
 
     pub async fn run(&mut self) {
-        // println!("{}", cursor::Hide);
         println!(
             r#"
    _i_i_     .----
@@ -85,6 +86,11 @@ impl ProgressView {
 
     fn handle_cmd(&self, cmd: Option<ViewCmd>) -> bool {
         match cmd {
+            Some(ViewCmd::LogPeer {
+                addr,
+                peer_id,
+                text,
+            }) => self.log_peer(&addr, &peer_id, &text),
             Some(ViewCmd::Log(text)) => self.log(&text),
             Some(ViewCmd::Kill) => return false,
             None => (),
@@ -106,6 +112,7 @@ impl ProgressView {
         for (ch, fg, bg) in self.snake_chars() {
             print!("{}{}{}", color::Fg(fg.as_ref()), color::Bg(bg.as_ref()), ch)
         }
+        print!("{}{}", color::Fg(color::Reset), color::Bg(color::Reset),);
 
         io::stdout().flush().unwrap();
         self.move_snake();
@@ -155,12 +162,19 @@ impl ProgressView {
         pos as usize
     }
 
+    fn log_peer(&self, addr: &String, peer_id: &Option<[u8; PEER_ID_SIZE]>, text: &String) {
+        let peer_id = match peer_id {
+            None => "".to_string(),
+            Some(peer_id) => match String::from_utf8(peer_id.to_vec()) {
+                Ok(s) => s,
+                Err(_) => hash_to_string(&peer_id),
+            },
+        };
+
+        println!("\r[{}]:[{}] {}", peer_id, addr, text);
+    }
+
     fn log(&self, text: &String) {
-        println!(
-            "\r{}{}{}",
-            color::Fg(color::Reset),
-            color::Bg(color::Reset),
-            text
-        );
+        println!("\r{}", text);
     }
 }

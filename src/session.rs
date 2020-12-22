@@ -10,7 +10,6 @@ use crate::messages::bitfield::Bitfield;
 use crate::peer::Peer;
 use crate::peer_handler::PeerHandler;
 use crate::progress_view::ProgressView;
-use crate::utils::hash_to_string;
 use crate::{Error, Metainfo, TrackerClient};
 use rand::seq::SliceRandom;
 use std::cmp::max;
@@ -726,16 +725,12 @@ impl Session {
         if let Some(view) = &mut self.view {
             let peer = self.peers.get(addr).ok_or(Error::PeerNotFound)?;
 
-            let peer_id = match peer.id {
-                None => "".to_string(),
-                Some(id) => match String::from_utf8(id.to_vec()) {
-                    Ok(s) => s,
-                    Err(_) => hash_to_string(&id),
-                },
+            let cmd = ViewCmd::LogPeer {
+                addr: addr.clone(),
+                peer_id: peer.id,
+                text,
             };
-
-            let line = format!("[{}]:[{}] {}", peer_id, addr, text);
-            let _ = view.channel.send(ViewCmd::Log(line)).await;
+            let _ = view.channel.send(cmd).await;
         }
         Ok(())
     }
