@@ -16,7 +16,7 @@ impl Piece {
     const ID_SIZE: usize = MSG_ID_SIZE;
     const INDEX_SIZE: usize = 4;
     const BEGIN_SIZE: usize = 4;
-    const MIN_LEN: usize = 9;
+    const MIN_LEN: usize = Piece::ID_SIZE + Piece::INDEX_SIZE + Piece::BEGIN_SIZE;
 
     pub fn new(index: usize, block_begin: usize, block: Vec<u8>) -> Piece {
         Piece {
@@ -91,7 +91,10 @@ impl Piece {
 impl Serializer for Piece {
     fn data(&self) -> Vec<u8> {
         let mut vec = vec![];
-        vec.extend_from_slice(&((Piece::ID_SIZE + self.block.len()) as u32).to_be_bytes());
+        vec.extend_from_slice(
+            &((Piece::ID_SIZE + Piece::INDEX_SIZE + Piece::BEGIN_SIZE + self.block.len()) as u32)
+                .to_be_bytes(),
+        );
         vec.push(Piece::ID);
         vec.extend_from_slice(&self.index.to_be_bytes());
         vec.extend_from_slice(&self.block_begin.to_be_bytes());
