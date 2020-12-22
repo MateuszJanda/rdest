@@ -428,8 +428,7 @@ impl Session {
         self.log_peer(addr, "Peer change state to Unchoke".to_string())
             .await?;
 
-        let pieces = &self.peers[addr].pieces;
-        let piece_index = self.choose_piece(pieces);
+        let piece_index = self.choose_piece(addr);
 
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         let cmd = peer.handle_unchoke(piece_index, &mut self.pieces_status, &self.metainfo);
@@ -454,8 +453,7 @@ impl Session {
         self.log_peer(addr, "Peer change state to NotInterested".to_string())
             .await?;
 
-        let peer = self.peers.get(addr).ok_or(Error::PeerNotFound)?;
-        let piece_index = self.choose_piece(&peer.pieces);
+        let piece_index = self.choose_piece(addr);
 
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         let cmd = peer.handle_not_interested(piece_index);
@@ -488,7 +486,7 @@ impl Session {
             peer.update_pieces(&bitfield.to_vec(self.metainfo.pieces_num())?);
         }
 
-        let piece_index = self.choose_piece(&bitfield.to_vec(self.metainfo.pieces_num())?);
+        let piece_index = self.choose_piece(addr);
 
         let unchoked_num = self.unchoked_num();
 
@@ -535,8 +533,7 @@ impl Session {
             None => panic!("Piece downloaded but not requested"),
         }
 
-        let pieces = &self.peers[addr].pieces;
-        let piece_index = self.choose_piece(pieces);
+        let piece_index = self.choose_piece(addr);
 
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         let cmd = peer.handle_piece_done(piece_index, &mut self.pieces_status, &self.metainfo);
@@ -586,7 +583,9 @@ impl Session {
             .count()
     }
 
-    fn choose_piece(&self, pieces: &Vec<bool>) -> Option<usize> {
+    fn choose_piece(&self, addr: &String) -> Option<usize> {
+        let pieces = &self.peers[addr].pieces;
+
         // Count how many peers have specific piece
         let mut vec: Vec<u32> = vec![0; self.metainfo.pieces_num()];
         for (_, peer) in self.peers.iter() {
