@@ -24,7 +24,7 @@ pub enum ViewCmd {
 #[derive(Debug, Clone)]
 pub enum BroadCmd {
     SendHave {
-        index: usize,
+        piece_index: usize,
     },
     SendOwnState {
         am_choked_map: HashMap<String, bool>,
@@ -53,7 +53,7 @@ pub enum PeerCmd {
     },
     RecvHave {
         addr: String,
-        index: usize,
+        piece_index: usize,
         resp_ch: oneshot::Sender<HaveCmd>,
     },
     RecvBitfield {
@@ -63,7 +63,7 @@ pub enum PeerCmd {
     },
     RecvRequest {
         addr: String,
-        index: usize,
+        piece_index: usize,
         resp_ch: oneshot::Sender<RequestCmd>,
     },
     PieceDone {
@@ -83,7 +83,7 @@ pub enum PeerCmd {
 
 #[derive(Debug)]
 pub struct ReqData {
-    pub index: usize,
+    pub piece_index: usize,
     pub piece_length: usize,
     pub piece_hash: [u8; HASH_SIZE],
 }
@@ -125,7 +125,7 @@ pub enum BitfieldCmd {
 #[derive(Debug)]
 pub enum RequestCmd {
     LoadAndSendPiece {
-        index: usize,
+        piece_index: usize,
         piece_hash: [u8; HASH_SIZE],
     },
     Ignore,

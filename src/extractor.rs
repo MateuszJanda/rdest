@@ -38,11 +38,11 @@ impl Extractor {
             let mut writer = BufWriter::new(File::create(path)?);
 
             // Write pieces/chunks
-            for index in start.file_index..end.file_index {
-                let name = utils::hash_to_string(&self.metainfo.piece(index)) + ".piece";
+            for piece_index in start.file_index..end.file_index {
+                let name = utils::hash_to_string(&self.metainfo.piece(piece_index)) + ".piece";
                 let reader = &mut BufReader::new(File::open(name)?);
 
-                if index == start.file_index {
+                if piece_index == start.file_index {
                     reader.seek(std::io::SeekFrom::Start(start.byte_index as u64))?;
                 }
 

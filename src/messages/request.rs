@@ -5,7 +5,7 @@ use std::io::Cursor;
 
 #[derive(Debug)]
 pub struct Request {
-    index: u32,
+    piece_index: u32,
     block_begin: u32,
     block_length: u32,
 }
@@ -20,9 +20,9 @@ impl Request {
     const LENGTH_SIZE: usize = 4;
     const FULL_SIZE: usize = Request::LEN_SIZE + Request::LEN as usize;
 
-    pub fn new(index: usize, block_begin: usize, block_length: usize) -> Request {
+    pub fn new(piece_index: usize, block_begin: usize, block_length: usize) -> Request {
         Request {
-            index: index as u32,
+            piece_index: piece_index as u32,
             block_begin: block_begin as u32,
             block_length: block_length as u32,
         }
@@ -30,8 +30,8 @@ impl Request {
 
     pub fn from(crs: &Cursor<&[u8]>) -> Request {
         let start = Request::LEN_SIZE + Request::ID_SIZE;
-        let mut index = [0; Request::INDEX_SIZE];
-        index.copy_from_slice(&crs.get_ref()[start..start + Request::INDEX_SIZE]);
+        let mut piece_index = [0; Request::INDEX_SIZE];
+        piece_index.copy_from_slice(&crs.get_ref()[start..start + Request::INDEX_SIZE]);
 
         let start = start + Request::INDEX_SIZE;
         let mut block_begin = [0; Request::BEGIN_SIZE];
@@ -42,7 +42,7 @@ impl Request {
         block_length.copy_from_slice(&crs.get_ref()[start..start + Request::LENGTH_SIZE]);
 
         Request {
-            index: u32::from_be_bytes(index),
+            piece_index: u32::from_be_bytes(piece_index),
             block_begin: u32::from_be_bytes(block_begin),
             block_length: u32::from_be_bytes(block_length),
         }
@@ -56,8 +56,8 @@ impl Request {
         Err(Error::Incomplete("Request".into()))
     }
 
-    pub fn index(&self) -> usize {
-        self.index as usize
+    pub fn piece_index(&self) -> usize {
+        self.piece_index as usize
     }
 
     pub fn block_begin(&self) -> usize {
@@ -70,12 +70,12 @@ impl Request {
 
     pub fn validate(
         &self,
-        index: usize,
+        piece_index: usize,
         pieces_num: usize,
         piece_length: usize,
     ) -> Result<(), Error> {
-        if self.index >= pieces_num as u32 || self.index != index as u32 {
-            return Err(Error::InvalidIndex("Request".into()));
+        if self.piece_index >= pieces_num as u32 || self.piece_index != piece_index as u32 {
+            return Err(Error::InvalidPieceIndex("Request".into()));
         }
 
         if self.block_length > PIECE_BLOCK_SIZE as u32 {
@@ -95,7 +95,7 @@ impl Serializer for Request {
         let mut vec = vec![];
         vec.extend_from_slice(&Request::LEN.to_be_bytes());
         vec.push(Request::ID);
-        vec.extend_from_slice(&self.index.to_be_bytes());
+        vec.extend_from_slice(&self.piece_index.to_be_bytes());
         vec.extend_from_slice(&self.block_begin.to_be_bytes());
         vec.extend_from_slice(&self.block_length.to_be_bytes());
 

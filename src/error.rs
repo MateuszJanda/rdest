@@ -17,8 +17,8 @@ pub enum Error {
     InvalidPeerId,
     /// Invalid length of Piece or Request message (different than requested peer).
     InvalidLength(String),
-    /// Invalid index (different than requested by peer).
-    InvalidIndex(String),
+    /// Invalid piece index (different than requested by peer).
+    InvalidPieceIndex(String),
     /// Can't load piece file.
     FileNotFound,
     /// Can't write to file.
@@ -101,7 +101,7 @@ impl fmt::Display for Error {
             Error::InvalidInfoHash => write!(f, "Invalid info hash"),
             Error::InvalidPeerId => write!(f, "Invalid peer id"),
             Error::InvalidLength(msg) => write!(f, "Invalid length in {}", msg),
-            Error::InvalidIndex(msg) => write!(f, "Invalid index in {}", msg),
+            Error::InvalidPieceIndex(msg) => write!(f, "Invalid piece index in {}", msg),
             Error::FileNotFound => write!(f, "File not found"),
             Error::FileCannotWrite => write!(f, "Can't write to file"),
             Error::PeerNotFound => write!(f, "Peer not found"),

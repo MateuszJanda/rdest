@@ -78,7 +78,7 @@ impl ProgressView {
 
     fn handle_manager_cmd(&mut self, cmd: BroadCmd) {
         match cmd {
-            BroadCmd::SendHave { index } => self.pieces[index] = true,
+            BroadCmd::SendHave { piece_index } => self.pieces[piece_index] = true,
             _ => (),
         }
     }

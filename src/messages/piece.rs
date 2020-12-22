@@ -5,7 +5,7 @@ use std::io::Cursor;
 
 #[derive(Debug)]
 pub struct Piece {
-    index: u32,
+    piece_index: u32,
     block_begin: u32,
     block: Vec<u8>,
 }
@@ -18,9 +18,9 @@ impl Piece {
     const BEGIN_SIZE: usize = 4;
     const MIN_LEN: usize = Piece::ID_SIZE + Piece::INDEX_SIZE + Piece::BEGIN_SIZE;
 
-    pub fn new(index: usize, block_begin: usize, block: Vec<u8>) -> Piece {
+    pub fn new(piece_index: usize, block_begin: usize, block: Vec<u8>) -> Piece {
         Piece {
-            index: index as u32,
+            piece_index: piece_index as u32,
             block_begin: block_begin as u32,
             block,
         }
@@ -28,8 +28,8 @@ impl Piece {
 
     pub fn from(crs: &Cursor<&[u8]>) -> Piece {
         let start = Piece::LEN_SIZE + Piece::ID_SIZE;
-        let mut index = [0; Piece::INDEX_SIZE];
-        index.copy_from_slice(&crs.get_ref()[start..start + Piece::INDEX_SIZE]);
+        let mut piece_index = [0; Piece::INDEX_SIZE];
+        piece_index.copy_from_slice(&crs.get_ref()[start..start + Piece::INDEX_SIZE]);
 
         let start = start + Piece::INDEX_SIZE;
         let mut block_begin = [0; Piece::BEGIN_SIZE];
@@ -41,7 +41,7 @@ impl Piece {
         block.extend_from_slice(&crs.get_ref()[start..end]);
 
         Piece {
-            index: u32::from_be_bytes(index),
+            piece_index: u32::from_be_bytes(piece_index),
             block_begin: u32::from_be_bytes(block_begin),
             block,
         }
@@ -68,16 +68,16 @@ impl Piece {
 
     pub fn validate(
         &self,
-        index: usize,
+        piece_index: usize,
         block_begin: usize,
         block_length: usize,
     ) -> Result<(), Error> {
-        if self.index as usize != index {
-            return Err(Error::InvalidIndex("Piece".into()));
+        if self.piece_index as usize != piece_index {
+            return Err(Error::InvalidPieceIndex("Piece".into()));
         }
 
         if self.block_begin as usize != block_begin {
-            return Err(Error::InvalidIndex("Piece".into()));
+            return Err(Error::InvalidPieceIndex("Piece".into()));
         }
 
         if self.block.len() as usize != block_length {
@@ -96,7 +96,7 @@ impl Serializer for Piece {
                 .to_be_bytes(),
         );
         vec.push(Piece::ID);
-        vec.extend_from_slice(&self.index.to_be_bytes());
+        vec.extend_from_slice(&self.piece_index.to_be_bytes());
         vec.extend_from_slice(&self.block_begin.to_be_bytes());
         vec.extend_from_slice(self.block.as_slice());
 

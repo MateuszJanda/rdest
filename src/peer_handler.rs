@@ -43,12 +43,12 @@ pub struct PeerHandler {
 }
 
 struct PieceTx {
-    index: usize,
+    piece_index: usize,
     buff: Vec<u8>,
 }
 
 struct PieceRx {
-    index: usize,
+    piece_index: usize,
     hash: [u8; HASH_SIZE],
     buff: Vec<u8>,
     requested: VecDeque<(usize, usize)>,
@@ -69,7 +69,7 @@ struct Stats {
 impl PieceRx {
     fn new(req_data: &ReqData) -> PieceRx {
         PieceRx {
-            index: req_data.index,
+            piece_index: req_data.piece_index,
             hash: req_data.piece_hash,
             buff: vec![0; req_data.piece_length],
             requested: VecDeque::from(vec![]),
@@ -260,9 +260,9 @@ impl PeerHandler {
         cmd: BroadCmd,
     ) -> Result<(), Box<dyn std::error::Error>> {
         match cmd {
-            BroadCmd::SendHave { index } => match self.peer_state.choked {
-                true => self.msg_buff.push(Frame::Have(Have::new(index))),
-                false => self.connection.send_msg(&Have::new(index)).await?,
+            BroadCmd::SendHave { piece_index } => match self.peer_state.choked {
+                true => self.msg_buff.push(Frame::Have(Have::new(piece_index))),
+                false => self.connection.send_msg(&Have::new(piece_index)).await?,
             },
             BroadCmd::SendOwnState { am_choked_map } => {
                 match am_choked_map.get(&self.connection.addr) {
@@ -379,7 +379,7 @@ impl PeerHandler {
     ) -> Result<bool, Box<dyn std::error::Error>> {
         match &self.piece_tx {
             Some(piece_tx) => {
-                if piece_tx.index != request.index() {
+                if piece_tx.piece_index != request.piece_index() {
                     self.trigger_cmd_recv_request(&request).await?;
                 }
             }
@@ -388,7 +388,7 @@ impl PeerHandler {
 
         match &self.piece_tx {
             Some(piece_tx) => {
-                request.validate(piece_tx.index, self.pieces_num, piece_tx.buff.len())?;
+                request.validate(piece_tx.piece_index, self.pieces_num, piece_tx.buff.len())?;
                 self.send_piece(&request).await?
             }
             None => (),
@@ -405,7 +405,7 @@ impl PeerHandler {
             .iter()
             .any(|(block_begin, block_length)| {
                 piece
-                    .validate(piece_rx.index, *block_begin, *block_length)
+                    .validate(piece_rx.piece_index, *block_begin, *block_length)
                     .is_ok()
             });
         if !is_piece_requested {
@@ -526,7 +526,7 @@ impl PeerHandler {
         self.peer_ch
             .send(PeerCmd::RecvHave {
                 addr: self.connection.addr.clone(),
-                index: have.index(),
+                piece_index: have.piece_index(),
                 resp_ch: resp_tx,
             })
             .await?;
@@ -584,15 +584,16 @@ impl PeerHandler {
         self.peer_ch
             .send(PeerCmd::RecvRequest {
                 addr: self.connection.addr.clone(),
-                index: request.index(),
+                piece_index: request.piece_index(),
                 resp_ch: resp_tx,
             })
             .await?;
 
         match resp_rx.await? {
-            RequestCmd::LoadAndSendPiece { index, piece_hash } => {
-                self.load_piece_from_file(index, &piece_hash)?
-            }
+            RequestCmd::LoadAndSendPiece {
+                piece_index,
+                piece_hash,
+            } => self.load_piece_from_file(piece_index, &piece_hash)?,
             RequestCmd::Ignore => self.piece_tx = None,
         };
 
@@ -653,7 +654,7 @@ impl PeerHandler {
         if let Some(piece_rx) = self.piece_rx.as_mut() {
             if let Some((block_begin, block_len)) = piece_rx.left.pop_front() {
                 piece_rx.requested.push_back((block_begin, block_len));
-                let msg = Request::new(piece_rx.index, block_begin, block_len);
+                let msg = Request::new(piece_rx.piece_index, block_begin, block_len);
                 self.connection.send_msg(&msg).await?;
             }
         }
@@ -669,7 +670,7 @@ impl PeerHandler {
                 self.stats.update_uploaded(request.block_length());
                 self.connection
                     .send_msg(&Piece::new(
-                        request.index(),
+                        request.piece_index(),
                         request.block_begin(),
                         piece_tx.buff[request.block_begin()..block_end].to_vec(),
                     ))
@@ -697,13 +698,16 @@ impl PeerHandler {
 
     fn load_piece_from_file(
         &mut self,
-        index: usize,
+        piece_index: usize,
         piece_hash: &[u8; HASH_SIZE],
     ) -> Result<(), Error> {
         let name = utils::hash_to_string(piece_hash) + ".piece";
         match fs::read(name) {
             Ok(data) => {
-                self.piece_tx = Some(PieceTx { index, buff: data });
+                self.piece_tx = Some(PieceTx {
+                    piece_index,
+                    buff: data,
+                });
                 Ok(())
             }
             Err(_) => Err(Error::FileNotFound),

@@ -303,8 +303,8 @@ impl Metainfo {
     }
 
     /// Return SHA-1 hash of specific piece.
-    pub fn piece(&self, index: usize) -> &[u8; HASH_SIZE] {
-        &self.pieces[index]
+    pub fn piece(&self, piece_index: usize) -> &[u8; HASH_SIZE] {
+        &self.pieces[piece_index]
     }
 
     /// Return number of SHA-1 hashes.
@@ -313,8 +313,8 @@ impl Metainfo {
     }
 
     /// Return length of specific piece.
-    pub fn piece_length(&self, index: usize) -> usize {
-        if index < self.pieces.len() - 1 {
+    pub fn piece_length(&self, piece_index: usize) -> usize {
+        if piece_index < self.pieces.len() - 1 {
             return self.piece_length as usize;
         }
 

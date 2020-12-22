@@ -5,7 +5,7 @@ use std::io::Cursor;
 
 #[derive(Debug)]
 pub struct Have {
-    index: u32,
+    piece_index: u32,
 }
 
 impl Have {
@@ -16,19 +16,19 @@ impl Have {
     const INDEX_SIZE: usize = 4;
     const FULL_SIZE: usize = Have::LEN_SIZE + Have::LEN as usize;
 
-    pub fn new(index: usize) -> Have {
+    pub fn new(piece_index: usize) -> Have {
         Have {
-            index: index as u32,
+            piece_index: piece_index as u32,
         }
     }
 
     pub fn from(crs: &Cursor<&[u8]>) -> Have {
         let start = Have::LEN_SIZE + Have::ID_SIZE;
-        let mut index = [0; Have::INDEX_SIZE];
-        index.copy_from_slice(&crs.get_ref()[start..start + Have::INDEX_SIZE]);
+        let mut piece_index = [0; Have::INDEX_SIZE];
+        piece_index.copy_from_slice(&crs.get_ref()[start..start + Have::INDEX_SIZE]);
 
         Have {
-            index: u32::from_be_bytes(index),
+            piece_index: u32::from_be_bytes(piece_index),
         }
     }
 
@@ -39,14 +39,14 @@ impl Have {
         }
     }
 
-    pub fn index(&self) -> usize {
-        self.index as usize
+    pub fn piece_index(&self) -> usize {
+        self.piece_index as usize
     }
 
     pub fn validate(&self, pieces_num: usize) -> Result<(), Error> {
-        match (self.index as usize) < pieces_num {
+        match (self.piece_index as usize) < pieces_num {
             true => Ok(()),
-            false => Err(Error::InvalidIndex("Have".into())),
+            false => Err(Error::InvalidPieceIndex("Have".into())),
         }
     }
 }
@@ -56,7 +56,7 @@ impl Serializer for Have {
         let mut vec = vec![];
         vec.extend_from_slice(&Have::LEN.to_be_bytes());
         vec.push(Have::ID);
-        vec.extend_from_slice(&self.index.to_be_bytes());
+        vec.extend_from_slice(&self.piece_index.to_be_bytes());
 
         vec
     }
