@@ -799,7 +799,7 @@ impl Session {
     }
 
     fn spawn_peer_handler(&mut self) {
-        let (addr, id) = match self.candidates.pop() {
+        let (addr, peer_id) = match self.candidates.pop() {
             Some(value) => value,
             None => return,
         };
@@ -808,29 +808,20 @@ impl Session {
             return;
         }
 
-        let peer_id = Some(id.clone());
-        let peer_addr = addr.clone();
-        let own_id = self.own_id.clone();
-        let info_hash = *self.metainfo.info_hash();
-        let pieces_num = self.metainfo.pieces_num();
-        let peer_ch = self.general_channels.tx.clone();
-        let broad_ch = self.general_channels.broad.subscribe();
+        let mut peer_handler = PeerHandler::new(
+            addr.clone(),
+            self.own_id,
+            Some(peer_id),
+            *self.metainfo.info_hash(),
+            self.metainfo.pieces_num(),
+            self.general_channels.tx.clone(),
+            self.general_channels.broad.subscribe(),
+        );
 
-        let job = tokio::spawn(async move {
-            PeerHandler::run_incoming(
-                addr,
-                own_id,
-                Some(id),
-                info_hash,
-                pieces_num,
-                peer_ch,
-                broad_ch,
-            )
-            .await
-        });
+        let job = tokio::spawn(async move { peer_handler.run_incoming().await });
 
-        let peer = Peer::new(peer_id, self.metainfo.pieces_num(), job);
-        self.peers.insert(peer_addr, peer);
+        let peer = Peer::new(Some(peer_id), self.metainfo.pieces_num(), job);
+        self.peers.insert(addr, peer);
     }
 
     async fn spawn_peer_listener(&mut self, socket: TcpStream) {
@@ -848,24 +839,22 @@ impl Session {
             Err(_) => return,
         };
 
-        let peer_addr = addr.clone();
-        let own_id = self.own_id.clone();
-        let info_hash = *self.metainfo.info_hash();
-        let pieces_num = self.metainfo.pieces_num();
-        let job_ch = self.general_channels.tx.clone();
-        let broad_ch = self.general_channels.broad.subscribe();
+        let mut peer_handler = PeerHandler::new(
+            addr.clone(),
+            self.own_id,
+            None,
+            *self.metainfo.info_hash(),
+            self.metainfo.pieces_num(),
+            self.general_channels.tx.clone(),
+            self.general_channels.broad.subscribe(),
+        );
 
-        let job = tokio::spawn(async move {
-            PeerHandler::run_outgoing(
-                socket, addr, own_id, None, info_hash, pieces_num, job_ch, broad_ch,
-            )
-            .await
-        });
+        let job = tokio::spawn(async move { peer_handler.run_outgoing(socket).await });
 
-        self.log("New peer connect from: ".to_string() + &peer_addr.as_str())
+        self.log("New peer connect from: ".to_string() + &addr.as_str())
             .await;
         let peer = Peer::new(None, self.metainfo.pieces_num(), job);
-        self.peers.insert(peer_addr, peer);
+        self.peers.insert(addr, peer);
     }
 
     async fn kill_view(&mut self) {

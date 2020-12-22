@@ -39,6 +39,8 @@ pub enum Error {
     KeepAliveTimeout,
     /// Missing info field to calculate hash.
     InfoMissing,
+    /// Socket not available.
+    SocketNotAvailable,
     /// Can't read from socket.
     CantReadFromSocket,
     /// Connection reset.
@@ -109,6 +111,7 @@ impl fmt::Display for Error {
             Error::PieceHashMismatch => write!(f, "Piece hash mismatch"),
             Error::BlockNotRequested => write!(f, "Block not requested"),
             Error::KeepAliveTimeout => write!(f, "Keep alive timeout"),
+            Error::SocketNotAvailable => write!(f, "Socket not available"),
             Error::CantReadFromSocket => write!(f, "Can't read from socket"),
             Error::InfoMissing => write!(f, "Info field missing"),
             Error::ConnectionReset => write!(f, "Connection reset by peer"),

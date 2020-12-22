@@ -134,8 +134,7 @@ impl Stats {
 }
 
 impl PeerHandler {
-    fn new(
-        socket: TcpStream,
+    pub fn new(
         addr: String,
         own_id: [u8; PEER_ID_SIZE],
         peer_id: Option<[u8; PEER_ID_SIZE]>,
@@ -145,7 +144,7 @@ impl PeerHandler {
         broad_ch: broadcast::Receiver<BroadCmd>,
     ) -> PeerHandler {
         PeerHandler {
-            connection: Connection::new(addr, socket),
+            connection: Connection::new(addr),
             own_id,
             peer_id,
             info_hash,
@@ -164,40 +163,26 @@ impl PeerHandler {
         }
     }
 
-    pub async fn run_incoming(
-        addr: String,
-        own_id: [u8; PEER_ID_SIZE],
-        peer_id: Option<[u8; PEER_ID_SIZE]>,
-        info_hash: [u8; HASH_SIZE],
-        pieces_num: usize,
-        mut peer_ch: mpsc::Sender<PeerCmd>,
-        broad_ch: broadcast::Receiver<BroadCmd>,
-    ) {
-        match TcpStream::connect(&addr).await {
+    pub async fn run_incoming(&mut self) {
+        match TcpStream::connect(&self.connection.addr).await {
             Ok(socket) => {
-                let mut handler = PeerHandler::new(
-                    socket, addr, own_id, peer_id, info_hash, pieces_num, peer_ch, broad_ch,
-                );
-                handler.run().await;
+                self.connection.with_socket(socket);
+                self.run().await;
             }
-            Err(_) => Self::kill_req(&addr, &"Connection fail".to_string(), &mut peer_ch).await,
+            Err(_) => {
+                Self::kill_req(
+                    &self.connection.addr,
+                    &"Connection fail".to_string(),
+                    &mut self.peer_ch,
+                )
+                .await
+            }
         }
     }
 
-    pub async fn run_outgoing(
-        socket: TcpStream,
-        addr: String,
-        own_id: [u8; PEER_ID_SIZE],
-        peer_id: Option<[u8; PEER_ID_SIZE]>,
-        info_hash: [u8; HASH_SIZE],
-        pieces_num: usize,
-        peer_ch: mpsc::Sender<PeerCmd>,
-        broad_ch: broadcast::Receiver<BroadCmd>,
-    ) {
-        let mut handler = PeerHandler::new(
-            socket, addr, own_id, peer_id, info_hash, pieces_num, peer_ch, broad_ch,
-        );
-        handler.run().await;
+    pub async fn run_outgoing(&mut self, socket: TcpStream) {
+        self.connection.with_socket(socket);
+        self.run().await;
     }
 
     async fn run(&mut self) {

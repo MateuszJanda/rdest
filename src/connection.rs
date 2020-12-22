@@ -9,17 +9,22 @@ use tokio::net::TcpStream;
 
 pub struct Connection {
     pub addr: String,
-    pub socket: TcpStream,
-    pub buffer: BytesMut,
+    socket: Option<TcpStream>,
+    buffer: BytesMut,
 }
 
 impl Connection {
-    pub fn new(addr: String, socket: TcpStream) -> Connection {
+    pub fn new(addr: String) -> Connection {
         Connection {
             addr,
-            socket,
+            socket: None,
             buffer: BytesMut::with_capacity(MAX_FRAME_SIZE),
         }
+    }
+
+    pub fn with_socket(&mut self, socket: TcpStream) -> &mut Self {
+        self.socket = Some(socket);
+        self
     }
 
     pub async fn send_frame(&mut self, frame: &Frame) -> Result<(), Box<dyn std::error::Error>> {
@@ -44,7 +49,9 @@ impl Connection {
         &mut self,
         msg: &T,
     ) -> Result<(), Box<dyn std::error::Error>> {
-        self.socket.write_all(msg.data().as_slice()).await?;
+        if let Some(socket) = self.socket.as_mut() {
+            socket.write_all(msg.data().as_slice()).await?;
+        }
 
         Ok(())
     }
@@ -55,17 +62,22 @@ impl Connection {
                 return Ok(Some(frame));
             }
 
-            let n = match self.socket.read_buf(&mut self.buffer).await {
-                Err(_) => return Err(Error::CantReadFromSocket),
-                Ok(n) => n,
-            };
+            match self.socket.as_mut() {
+                Some(socket) => {
+                    let n = match socket.read_buf(&mut self.buffer).await {
+                        Err(_) => return Err(Error::CantReadFromSocket),
+                        Ok(n) => n,
+                    };
 
-            if n == 0 {
-                return match self.buffer.is_empty() {
-                    // Connection closed by peer
-                    true => Ok(None),
-                    false => Err(Error::ConnectionReset),
-                };
+                    if n == 0 {
+                        return match self.buffer.is_empty() {
+                            // Connection closed by peer
+                            true => Ok(None),
+                            false => Err(Error::ConnectionReset),
+                        };
+                    }
+                }
+                None => return Err(Error::SocketNotAvailable),
             }
         }
     }
