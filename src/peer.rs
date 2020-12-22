@@ -78,9 +78,7 @@ impl Peer {
                 pieces_status[piece_index] = Status::Reserved;
                 match self.am_interested {
                     true => UnchokeCmd::SendRequest(req_data(metainfo, piece_index)),
-                    false => {
-                        UnchokeCmd::SendInterestedAndRequest(req_data(metainfo, piece_index))
-                    }
+                    false => UnchokeCmd::SendInterestedAndRequest(req_data(metainfo, piece_index)),
                 }
             }
             None => match self.am_interested {
@@ -118,7 +116,8 @@ impl Peer {
         self.pieces[piece_index] = true;
 
         if pieces_status[piece_index] == Status::Missing && !self.am_interested {
-            if !self.choked && self.piece_index.is_none() { // TODO: why choked is checked?
+            if !self.choked && self.piece_index.is_none() {
+                // TODO: why choked is checked?
                 pieces_status[piece_index] = Status::Reserved;
                 self.piece_index = Some(piece_index);
                 self.am_interested = true;
@@ -149,7 +148,7 @@ impl Peer {
         };
 
         // Change to unchoked or not
-        let with_am_unchoked = unchoked_num < MAX_UNCHOKED as usize && self.am_choked;
+        let with_am_unchoked = unchoked_num < MAX_UNCHOKED && self.am_choked;
 
         // Update own state
         self.am_interested = am_interested;

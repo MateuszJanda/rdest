@@ -15,4 +15,7 @@ pub const MSG_LEN_SIZE: usize = 4;
 pub const MSG_ID_POS: usize = MSG_LEN_SIZE;
 pub const MSG_ID_SIZE: usize = 1;
 
-pub const MAX_UNCHOKED: u32 = 10; // TODO: -> usize
+pub const MAX_NOT_INTERESTED: usize = 4;
+pub const MAX_OPTIMISTIC_ROUNDS: usize = 3;
+pub const MAX_OPTIMISTIC: usize = 1;
+pub const MAX_UNCHOKED: usize = 10;

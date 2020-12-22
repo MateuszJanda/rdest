@@ -2,7 +2,9 @@ use crate::commands::{
     BitfieldCmd, BroadCmd, ExtractorCmd, HaveCmd, InitCmd, NotInterestedCmd, PeerCmd, PieceDoneCmd,
     RequestCmd, TrackerCmd, UnchokeCmd, ViewCmd,
 };
-use crate::constants::{MAX_UNCHOKED, PEER_ID_SIZE, PORT};
+use crate::constants::{
+    MAX_NOT_INTERESTED, MAX_OPTIMISTIC, MAX_OPTIMISTIC_ROUNDS, MAX_UNCHOKED, PEER_ID_SIZE, PORT,
+};
 use crate::extractor::Extractor;
 use crate::messages::bitfield::Bitfield;
 use crate::peer::Peer;
@@ -23,9 +25,6 @@ use tokio::time::{Duration, Instant, Interval};
 const CHANNEL_SIZE: usize = 64;
 const BROADCAST_CHANNEL_SIZE: usize = 32;
 const CHANGE_STATE_INTERVAL_SEC: u64 = 10;
-const MAX_NOT_INTERESTED: usize = 4;
-const MAX_OPTIMISTIC_ROUNDS: u32 = 3;
-const MAX_OPTIMISTIC: u32 = 1;
 
 /// Session manager.
 pub struct Session {
@@ -38,7 +37,7 @@ pub struct Session {
     view: Option<View>,
     tracker: Job<TrackerCmd>,
     extractor: Job<ExtractorCmd>,
-    round: u32,
+    round: usize,
     files_extracted: bool,
 }
 
@@ -492,7 +491,7 @@ impl Session {
 
         let piece_index = self.choose_piece(&bitfield.to_vec(self.metainfo.pieces_num())?);
 
-        let unchoked_num = self.unchoked_num() as usize;
+        let unchoked_num = self.unchoked_num();
 
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         let cmd = peer.handle_bitfield(piece_index, unchoked_num);
@@ -581,11 +580,11 @@ impl Session {
         Ok(true)
     }
 
-    fn unchoked_num(&self) -> u32 {
+    fn unchoked_num(&self) -> usize {
         self.peers
             .iter()
             .filter(|(_, peer)| peer.am_choked == false && peer.optimistic_unchoke == true)
-            .count() as u32
+            .count()
     }
 
     fn choose_piece(&self, pieces: &Vec<bool>) -> Option<usize> {
