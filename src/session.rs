@@ -259,7 +259,8 @@ impl Session {
     }
 
     fn conn_state_text(&self) -> String {
-        self.peers
+        let text: String = self
+            .peers
             .iter()
             .map(|(_, peer)| {
                 let own_state = if peer.optimistic_unchoke {
@@ -287,7 +288,9 @@ impl Session {
 
                 "|".to_owned() + &own_state + &peer_state
             })
-            .collect()
+            .collect();
+
+        text + "|"
     }
 
     fn new_optimistic_peers(&mut self) -> Result<Vec<String>, Box<dyn std::error::Error>> {

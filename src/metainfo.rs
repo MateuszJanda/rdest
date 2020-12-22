@@ -362,7 +362,7 @@ impl Metainfo {
     fn piece_pos(&self, pos: usize) -> PiecePos {
         PiecePos {
             file_index: pos / self.piece_length as usize,
-            byte_index: pos % self.piece_length as usize
+            byte_index: pos % self.piece_length as usize,
         }
     }
 }

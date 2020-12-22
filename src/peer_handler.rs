@@ -679,15 +679,14 @@ impl PeerHandler {
     async fn send_piece(&mut self, request: &Request) -> Result<(), Box<dyn std::error::Error>> {
         match &self.piece_tx {
             Some(piece_tx) => {
-                let block_begin = request.block_begin();
-                let block_end = block_begin + request.block_length();
+                let block_end = request.block_begin() + request.block_length();
 
                 self.stats.update_uploaded(request.block_length());
                 self.connection
                     .send_msg(&Piece::new(
                         request.index(),
                         request.block_begin(),
-                        piece_tx.buff[block_begin..block_end].to_vec(),
+                        piece_tx.buff[request.block_begin()..block_end].to_vec(),
                     ))
                     .await?;
                 Ok(())
