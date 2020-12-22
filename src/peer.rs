@@ -93,7 +93,7 @@ impl Peer {
 
         self.choked = false;
         self.piece_index = chosen_index;
-        self.am_interested = piece_index.is_some();
+        self.am_interested = chosen_index.is_some();
 
         cmd
     }
@@ -223,6 +223,33 @@ impl Peer {
     ) {
         self.download_rate = *downloaded_rate;
         self.uploaded_rate = *uploaded_rate;
+    }
+
+    pub fn status_abbreviation(&self) -> String {
+        let own_state = if self.optimistic_unchoke {
+            "o"
+        } else if self.am_choked {
+            "c"
+        } else {
+            "u"
+        };
+
+        let own_state = match self.am_interested {
+            true => own_state.to_uppercase(),
+            false => own_state.to_string(),
+        };
+
+        let peer_state = match self.choked {
+            true => "c",
+            false => "u",
+        };
+
+        let peer_state = match self.interested {
+            true => peer_state.to_uppercase(),
+            false => peer_state.to_string(),
+        };
+
+        own_state + &peer_state
     }
 }
 

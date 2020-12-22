@@ -228,32 +228,7 @@ impl Session {
         let text: String = self
             .peers
             .iter()
-            .map(|(_, peer)| {
-                let own_state = if peer.optimistic_unchoke {
-                    "o"
-                } else if peer.am_choked {
-                    "c"
-                } else {
-                    "u"
-                };
-
-                let own_state = match peer.am_interested {
-                    true => own_state.to_uppercase(),
-                    false => own_state.to_string(),
-                };
-
-                let peer_state = match peer.choked {
-                    true => "c",
-                    false => "u",
-                };
-
-                let peer_state = match peer.interested {
-                    true => peer_state.to_uppercase(),
-                    false => peer_state.to_string(),
-                };
-
-                "|".to_owned() + &own_state + &peer_state
-            })
+            .map(|(_, peer)| "|".to_owned() + peer.status_abbreviation().as_str())
             .collect();
 
         match text.is_empty() {
