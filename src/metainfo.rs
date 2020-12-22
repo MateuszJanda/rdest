@@ -71,10 +71,10 @@ impl Metainfo {
             Err(_) => return Err(Error::FileNotFound),
         };
 
-        let mut hasher = sha1::Sha1::new();
         let pieces = data
             .chunks(PIECE_LENGTH)
             .flat_map(|chunk| {
+                let mut hasher = sha1::Sha1::new();
                 hasher.update(chunk);
                 hasher.digest().bytes().as_ref().to_vec()
             })
