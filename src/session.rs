@@ -429,7 +429,6 @@ impl Session {
             .await?;
 
         let piece_index = self.choose_piece(addr);
-
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         let cmd = peer.handle_unchoke(piece_index, &mut self.pieces_status, &self.metainfo);
         let _ = &resp_ch.send(cmd);
@@ -454,7 +453,6 @@ impl Session {
             .await?;
 
         let piece_index = self.choose_piece(addr);
-
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         let cmd = peer.handle_not_interested(piece_index);
         let _ = resp_ch.send(cmd);
@@ -481,13 +479,10 @@ impl Session {
     ) -> Result<bool, Error> {
         self.log_peer(addr, format!("Received a bitfield")).await?;
 
-        {
-            let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-            peer.update_pieces(&bitfield.to_vec(self.metainfo.pieces_num())?);
-        }
+        let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
+        peer.update_pieces(&bitfield.to_vec(self.metainfo.pieces_num())?);
 
         let piece_index = self.choose_piece(addr);
-
         let unchoked_num = self.unchoked_num();
 
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
@@ -522,8 +517,6 @@ impl Session {
     ) -> Result<bool, Error> {
         match self.peers.get(addr).ok_or(Error::PeerNotFound)?.piece_index {
             Some(piece_index) => {
-                // self.log_peer(addr, format!("New piece downloaded: {}", piece_index))
-                //     .await;
                 self.pieces_status[piece_index] = Status::Have;
                 let _ = self
                     .general_channels
@@ -534,7 +527,6 @@ impl Session {
         }
 
         let piece_index = self.choose_piece(addr);
-
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         let cmd = peer.handle_piece_done(piece_index, &mut self.pieces_status, &self.metainfo);
         let _ = resp_ch.send(cmd);
