@@ -1,10 +1,11 @@
 use crate::commands::{
     BitfieldCmd, BroadCmd, ExtractorCmd, HaveCmd, InitCmd, NotInterestedCmd, PeerCmd, PieceDoneCmd,
-    ReqData, RequestCmd, TrackerCmd, UnchokeCmd, ViewCmd,
+    RequestCmd, TrackerCmd, UnchokeCmd, ViewCmd,
 };
-use crate::constants::{PEER_ID_SIZE, PORT};
+use crate::constants::{MAX_UNCHOKED, PEER_ID_SIZE, PORT};
 use crate::extractor::Extractor;
 use crate::messages::bitfield::Bitfield;
+use crate::peer::Peer;
 use crate::peer_handler::PeerHandler;
 use crate::progress_view::ProgressView;
 use crate::utils::hash_to_string;
@@ -25,7 +26,6 @@ const CHANGE_STATE_INTERVAL_SEC: u64 = 10;
 const MAX_NOT_INTERESTED: usize = 4;
 const MAX_OPTIMISTIC_ROUNDS: u32 = 3;
 const MAX_OPTIMISTIC: u32 = 1;
-const MAX_UNCHOKED: u32 = 10;
 
 /// Session manager.
 pub struct Session {
@@ -40,21 +40,6 @@ pub struct Session {
     extractor: Job<ExtractorCmd>,
     round: u32,
     files_extracted: bool,
-}
-
-#[derive(Debug)]
-struct Peer {
-    id: Option<[u8; PEER_ID_SIZE]>,
-    pieces: Vec<bool>,
-    job: Option<JoinHandle<()>>,
-    piece_index: Option<usize>,
-    am_interested: bool,
-    am_choked: bool,
-    interested: bool,
-    choked: bool,
-    optimistic_unchoke: bool,
-    download_rate: Option<u32>,
-    uploaded_rate: Option<u32>,
 }
 
 #[derive(Debug)]
@@ -101,24 +86,6 @@ impl GeneralChannels {
         broad: broadcast::Sender<BroadCmd>,
     ) -> GeneralChannels {
         GeneralChannels { tx, rx, broad }
-    }
-}
-
-impl Peer {
-    fn new(id: Option<[u8; PEER_ID_SIZE]>, pieces_num: usize, job: JoinHandle<()>) -> Peer {
-        Peer {
-            id,
-            pieces: vec![false; pieces_num],
-            job: Some(job),
-            piece_index: None,
-            am_interested: false,
-            am_choked: true,
-            interested: false,
-            choked: true,
-            optimistic_unchoke: false,
-            download_rate: None,
-            uploaded_rate: None,
-        }
     }
 }
 
@@ -436,21 +403,12 @@ impl Session {
         peer_id: [u8; PEER_ID_SIZE],
         resp_ch: oneshot::Sender<InitCmd>,
     ) -> Result<bool, Error> {
-        let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-        peer.id = Some(peer_id);
-
-        let bitfield = Bitfield::from_vec(
-            &self
-                .pieces_status
-                .iter()
-                .map(|status| *status == Status::Have)
-                .collect(),
-        );
-
-        let _ = resp_ch.send(InitCmd::SendBitfield { bitfield });
         self.log_peer(addr, "Handshake with peer".to_string())
             .await?;
 
+        let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
+        let cmd = peer.handle_init(peer_id, &self.pieces_status);
+        let _ = resp_ch.send(cmd);
         Ok(true)
     }
 
@@ -459,14 +417,7 @@ impl Session {
             .await?;
 
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-        peer.choked = true;
-
-        match peer.piece_index {
-            Some(piece_index) if self.pieces_status[piece_index] == Status::Reserved => {
-                self.pieces_status[piece_index] = Status::Missing
-            }
-            _ => (),
-        }
+        peer.handle_choke(&mut self.pieces_status);
         Ok(true)
     }
 
@@ -481,26 +432,8 @@ impl Session {
         let pieces = &self.peers[addr].pieces;
         let piece_index = self.choose_piece(pieces);
 
-        let peer = self.peers.get(addr).ok_or(Error::PeerNotFound)?;
-        let cmd = match piece_index {
-            Some(piece_index) => {
-                self.pieces_status[piece_index] = Status::Reserved;
-                match peer.am_interested {
-                    true => UnchokeCmd::SendRequest(self.req_data(piece_index)),
-                    false => UnchokeCmd::SendInterestedAndRequest(self.req_data(piece_index)),
-                }
-            }
-            None => match peer.am_interested {
-                true => UnchokeCmd::SendNotInterested,
-                false => UnchokeCmd::Ignore,
-            },
-        };
-
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-        peer.choked = false;
-        peer.piece_index = piece_index;
-        peer.am_interested = piece_index.is_some();
-
+        let cmd = peer.handle_unchoke(piece_index, &mut self.pieces_status, &self.metainfo);
         let _ = &resp_ch.send(cmd);
         Ok(true)
     }
@@ -508,8 +441,9 @@ impl Session {
     async fn handle_interested(&mut self, addr: &String) -> Result<bool, Error> {
         self.log_peer(addr, "Peer change state to Interested".to_string())
             .await?;
+
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-        peer.interested = true;
+        peer.handle_interested();
         Ok(true)
     }
 
@@ -521,18 +455,11 @@ impl Session {
         self.log_peer(addr, "Peer change state to NotInterested".to_string())
             .await?;
 
-        {
-            let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-            peer.interested = false;
-        }
-
         let peer = self.peers.get(addr).ok_or(Error::PeerNotFound)?;
         let piece_index = self.choose_piece(&peer.pieces);
-        let cmd = match !peer.am_interested && peer.piece_index.is_none() && piece_index.is_none() {
-            true => NotInterestedCmd::PrepareKill,
-            false => NotInterestedCmd::Ignore,
-        };
 
+        let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
+        let cmd = peer.handle_not_interested(piece_index);
         let _ = resp_ch.send(cmd);
         Ok(true)
     }
@@ -544,22 +471,7 @@ impl Session {
         resp_ch: oneshot::Sender<HaveCmd>,
     ) -> Result<bool, Error> {
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-        peer.pieces[piece_index] = true;
-
-        let cmd = if self.pieces_status[piece_index] == Status::Missing && !peer.am_interested {
-            if !peer.choked && peer.piece_index.is_none() {
-                self.pieces_status[piece_index] = Status::Reserved;
-                peer.piece_index = Some(piece_index);
-                peer.am_interested = true;
-                HaveCmd::SendInterestedAndRequest(self.req_data(piece_index))
-            } else {
-                peer.am_interested = true;
-                HaveCmd::SendInterested
-            }
-        } else {
-            HaveCmd::Ignore
-        };
-
+        let cmd = peer.handle_have(piece_index, &mut self.pieces_status, &self.metainfo);
         let _ = resp_ch.send(cmd);
         Ok(true)
     }
@@ -578,34 +490,12 @@ impl Session {
                 .copy_from_slice(&bitfield.to_vec(self.metainfo.pieces_num())?);
         }
 
-        // BEP3 says "whenever a downloader doesn't have something they currently would ask a peer
-        // for in unchoked, they must express lack of interest, despite being choked"
-        //
-        // Sending NotInterested explicitly (this is default state) is mandatory according BEP3, but
-        // Interested should be send only after Unchoke. It appears, unfortunately, that many
-        // clients wait for this message (doesn't send Unchoke and send KeepAlive instead).
         let piece_index = self.choose_piece(&bitfield.to_vec(self.metainfo.pieces_num())?);
-        let am_interested = match piece_index {
-            Some(_) => true,
-            None => false,
-        };
 
-        // Change to unchoked or not
-        let peer = self.peers.get(addr).ok_or(Error::PeerNotFound)?;
-        let with_am_unchoked = self.unchoked_num() < MAX_UNCHOKED && peer.am_choked;
+        let unchoked_num = self.unchoked_num() as usize;
 
-        // Update own state
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-        peer.am_interested = am_interested;
-        if with_am_unchoked {
-            peer.am_choked = false;
-        }
-
-        let cmd = BitfieldCmd::SendState {
-            with_am_unchoked,
-            am_interested,
-        };
-
+        let cmd = peer.handle_bitfield(piece_index, unchoked_num);
         let _ = &resp_ch.send(cmd);
 
         Ok(true)
@@ -622,27 +512,10 @@ impl Session {
             format!("Peer sent request for piece: {}", piece_index),
         )
         .await?;
+
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-        if peer.am_choked {
-            let _ = resp_ch.send(RequestCmd::Ignore);
-            return Ok(true);
-        }
-
-        if piece_index >= self.metainfo.pieces_num() {
-            let _ = resp_ch.send(RequestCmd::Ignore);
-            return Ok(true);
-        }
-
-        if self.pieces_status[piece_index] != Status::Have {
-            let _ = resp_ch.send(RequestCmd::Ignore);
-            return Ok(true);
-        }
-
-        let _ = resp_ch.send(RequestCmd::LoadAndSendPiece {
-            piece_index,
-            piece_hash: *self.metainfo.piece(piece_index),
-        });
-
+        let cmd = peer.handle_request(piece_index, &self.pieces_status, &self.metainfo);
+        let _ = resp_ch.send(cmd);
         Ok(true)
     }
 
@@ -667,27 +540,8 @@ impl Session {
         let pieces = &self.peers[addr].pieces;
         let piece_index = self.choose_piece(pieces);
 
-        let cmd = match piece_index {
-            Some(piece_index) => {
-                let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-                self.pieces_status[piece_index] = Status::Reserved;
-                peer.piece_index = Some(piece_index);
-                match peer.choked {
-                    true => PieceDoneCmd::Ignore,
-                    false => PieceDoneCmd::SendRequest(self.req_data(piece_index)),
-                }
-            }
-            None => {
-                let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-                peer.piece_index = None;
-                peer.am_interested = false;
-                match peer.interested {
-                    true => PieceDoneCmd::SendNotInterested,
-                    false => PieceDoneCmd::PrepareKill,
-                }
-            }
-        };
-
+        let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
+        let cmd = peer.handle_piece_done(piece_index, &mut self.pieces_status, &self.metainfo);
         let _ = resp_ch.send(cmd);
         Ok(true)
     }
@@ -699,8 +553,7 @@ impl Session {
         uploaded_rate: &Option<u32>,
     ) -> Result<bool, Error> {
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-        peer.download_rate = *downloaded_rate;
-        peer.uploaded_rate = *uploaded_rate;
+        peer.handle_sync_stats(downloaded_rate, uploaded_rate);
         Ok(true)
     }
 
@@ -733,14 +586,6 @@ impl Session {
             .iter()
             .filter(|(_, peer)| peer.am_choked == false && peer.optimistic_unchoke == true)
             .count() as u32
-    }
-
-    fn req_data(&self, piece_index: usize) -> ReqData {
-        ReqData {
-            piece_index,
-            piece_length: self.metainfo.piece_length(piece_index),
-            piece_hash: *self.metainfo.piece(piece_index),
-        }
     }
 
     fn choose_piece(&self, pieces: &Vec<bool>) -> Option<usize> {

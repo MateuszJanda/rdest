@@ -28,6 +28,7 @@ mod extractor;
 mod frame;
 mod messages;
 mod metainfo;
+mod peer;
 mod peer_handler;
 pub mod peer_id;
 mod progress_view;

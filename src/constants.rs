@@ -14,3 +14,5 @@ pub const MAX_FRAME_SIZE: usize = 65536;
 pub const MSG_LEN_SIZE: usize = 4;
 pub const MSG_ID_POS: usize = MSG_LEN_SIZE;
 pub const MSG_ID_SIZE: usize = 1;
+
+pub const MAX_UNCHOKED: u32 = 10; // TODO: -> usize

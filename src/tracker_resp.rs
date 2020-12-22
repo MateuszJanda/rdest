@@ -8,11 +8,11 @@ use std::convert::{TryFrom, TryInto};
 #[derive(PartialEq, Clone, Debug)]
 pub struct TrackerResp {
     interval: u64,
-    peers: Vec<Peer>,
+    peers: Vec<PeerAddr>,
 }
 
 #[derive(PartialEq, Clone, Debug)]
-pub struct Peer {
+pub struct PeerAddr {
     ip: String,
     peer_id: [u8; HASH_SIZE],
     port: u64,
@@ -70,14 +70,14 @@ impl TrackerResp {
         }
     }
 
-    fn find_peers(dict: &HashMap<Vec<u8>, BValue>) -> Result<Vec<Peer>, Error> {
+    fn find_peers(dict: &HashMap<Vec<u8>, BValue>) -> Result<Vec<PeerAddr>, Error> {
         match dict.get(&b"peers".to_vec()) {
             Some(BValue::List(peers)) => Ok(Self::peer_list(peers)),
             _ => Err(Error::TrackerIncorrectOrMissing("peers".into())),
         }
     }
 
-    fn peer_list(list: &Vec<BValue>) -> Vec<Peer> {
+    fn peer_list(list: &Vec<BValue>) -> Vec<PeerAddr> {
         list.iter()
             .filter_map(|elem| match elem {
                 BValue::Dict(dict) => Some(dict),
@@ -103,7 +103,7 @@ impl TrackerResp {
                     peer_id.as_slice().try_into(),
                     u64::try_from(*port),
                 ) {
-                    (Ok(ip), Ok(peer_id), Ok(port)) => Some(Peer { ip, peer_id, port }),
+                    (Ok(ip), Ok(peer_id), Ok(port)) => Some(PeerAddr { ip, peer_id, port }),
                     _ => None,
                 }
             })
