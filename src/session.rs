@@ -428,9 +428,9 @@ impl Session {
         self.log_peer(addr, "Peer change state to Unchoke".to_string())
             .await?;
 
-        let piece_index = self.choose_piece(addr);
+        let chosen_index = self.choose_piece_index(addr);
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-        let cmd = peer.handle_unchoke(piece_index, &mut self.pieces_status, &self.metainfo);
+        let cmd = peer.handle_unchoke(chosen_index, &mut self.pieces_status, &self.metainfo);
         let _ = &resp_ch.send(cmd);
         Ok(true)
     }
@@ -452,9 +452,9 @@ impl Session {
         self.log_peer(addr, "Peer change state to NotInterested".to_string())
             .await?;
 
-        let piece_index = self.choose_piece(addr);
+        let chosen_index = self.choose_piece_index(addr);
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-        let cmd = peer.handle_not_interested(piece_index);
+        let cmd = peer.handle_not_interested(chosen_index);
         let _ = resp_ch.send(cmd);
         Ok(true)
     }
@@ -482,11 +482,11 @@ impl Session {
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.update_pieces(&bitfield.to_vec(self.metainfo.pieces_num())?);
 
-        let piece_index = self.choose_piece(addr);
+        let chosen_index = self.choose_piece_index(addr);
         let unchoked_num = self.unchoked_num();
 
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-        let cmd = peer.handle_bitfield(piece_index, unchoked_num);
+        let cmd = peer.handle_bitfield(chosen_index, unchoked_num);
         let _ = &resp_ch.send(cmd);
 
         Ok(true)
@@ -526,9 +526,9 @@ impl Session {
             None => panic!("Piece downloaded but not requested"),
         }
 
-        let piece_index = self.choose_piece(addr);
+        let chosen_index = self.choose_piece_index(addr);
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-        let cmd = peer.handle_piece_done(piece_index, &mut self.pieces_status, &self.metainfo);
+        let cmd = peer.handle_piece_done(chosen_index, &mut self.pieces_status, &self.metainfo);
         let _ = resp_ch.send(cmd);
         Ok(true)
     }
@@ -575,7 +575,7 @@ impl Session {
             .count()
     }
 
-    fn choose_piece(&self, addr: &String) -> Option<usize> {
+    fn choose_piece_index(&self, addr: &String) -> Option<usize> {
         let pieces = &self.peers[addr].pieces;
 
         // Count how many peers have specific piece

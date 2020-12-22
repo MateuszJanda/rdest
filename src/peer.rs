@@ -73,16 +73,16 @@ impl Peer {
 
     pub fn handle_unchoke(
         &mut self,
-        piece_index: Option<usize>,
+        chosen_index: Option<usize>,
         pieces_status: &mut Vec<Status>,
         metainfo: &Metainfo,
     ) -> UnchokeCmd {
-        let cmd = match piece_index {
-            Some(piece_index) => {
-                pieces_status[piece_index] = Status::Reserved;
+        let cmd = match chosen_index {
+            Some(chosen_index) => {
+                pieces_status[chosen_index] = Status::Reserved;
                 match self.am_interested {
-                    true => UnchokeCmd::SendRequest(req_data(metainfo, piece_index)),
-                    false => UnchokeCmd::SendInterestedAndRequest(req_data(metainfo, piece_index)),
+                    true => UnchokeCmd::SendRequest(req_data(metainfo, chosen_index)),
+                    false => UnchokeCmd::SendInterestedAndRequest(req_data(metainfo, chosen_index)),
                 }
             }
             None => match self.am_interested {
@@ -92,7 +92,7 @@ impl Peer {
         };
 
         self.choked = false;
-        self.piece_index = piece_index;
+        self.piece_index = chosen_index;
         self.am_interested = piece_index.is_some();
 
         cmd
@@ -102,10 +102,10 @@ impl Peer {
         self.interested = true;
     }
 
-    pub fn handle_not_interested(&mut self, piece_index: Option<usize>) -> NotInterestedCmd {
+    pub fn handle_not_interested(&mut self, chosen_index: Option<usize>) -> NotInterestedCmd {
         self.interested = false;
 
-        match !self.am_interested && self.piece_index.is_none() && piece_index.is_none() {
+        match !self.am_interested && self.piece_index.is_none() && chosen_index.is_none() {
             true => NotInterestedCmd::PrepareKill,
             false => NotInterestedCmd::Ignore,
         }
@@ -137,7 +137,7 @@ impl Peer {
 
     pub fn handle_bitfield(
         &mut self,
-        piece_index: Option<usize>,
+        chosen_index: Option<usize>,
         unchoked_num: usize,
     ) -> BitfieldCmd {
         // BEP3 says "whenever a downloader doesn't have something they currently would ask a peer
@@ -146,7 +146,7 @@ impl Peer {
         // Sending NotInterested explicitly (this is default state) is mandatory according BEP3, but
         // Interested should be send only after Unchoke. It appears (unfortunately) that many
         // clients wait for this message (doesn't send Unchoke and send KeepAlive instead).
-        let am_interested = match piece_index {
+        let am_interested = match chosen_index {
             Some(_) => true,
             None => false,
         };
@@ -192,17 +192,17 @@ impl Peer {
 
     pub fn handle_piece_done(
         &mut self,
-        piece_index: Option<usize>,
+        chosen_index: Option<usize>,
         pieces_status: &mut Vec<Status>,
         metainfo: &Metainfo,
     ) -> PieceDoneCmd {
-        match piece_index {
-            Some(piece_index) => {
-                pieces_status[piece_index] = Status::Reserved;
-                self.piece_index = Some(piece_index);
+        match chosen_index {
+            Some(chosen_index) => {
+                pieces_status[chosen_index] = Status::Reserved;
+                self.piece_index = Some(chosen_index);
                 match self.choked {
                     true => PieceDoneCmd::Ignore,
-                    false => PieceDoneCmd::SendRequest(req_data(&metainfo, piece_index)),
+                    false => PieceDoneCmd::SendRequest(req_data(&metainfo, chosen_index)),
                 }
             }
             None => {
