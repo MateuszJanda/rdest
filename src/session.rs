@@ -1,5 +1,5 @@
 use crate::commands::{
-    BitfieldCmd, BroadCmd, ExtractorCmd, HaveCmd, InitCmd, NotInterestedCmd, PeerCmd, PieceDoneCmd,
+    BitfieldCmd, BroadCmd, ExtractorCmd, HaveCmd, InitCmd, NotInterestedCmd, PeerCmd, PieceCmd,
     RequestCmd, TrackerCmd, UnchokeCmd, ViewCmd,
 };
 use crate::constants::{
@@ -21,6 +21,7 @@ use tokio::task::JoinHandle;
 use tokio::time;
 use tokio::time::{Duration, Instant, Interval};
 
+const END_GAME_LIMIT: usize = 10;
 const CHANNEL_SIZE: usize = 64;
 const BROADCAST_CHANNEL_SIZE: usize = 32;
 const CHANGE_STATE_INTERVAL_SEC: u64 = 10;
@@ -63,7 +64,7 @@ struct GeneralChannels {
 #[derive(PartialEq, Clone, Debug)]
 pub enum Status {
     Missing,
-    Reserved,
+    Reserved(usize),
     Have,
 }
 
@@ -361,11 +362,18 @@ impl Session {
                 resp_ch,
             } => self.handle_request(&addr, piece_index, resp_ch).await,
             PeerCmd::PieceDone { addr, resp_ch } => self.handle_piece_done(&addr, resp_ch).await,
+            PeerCmd::PieceCancel { addr, resp_ch } => {
+                self.handle_piece_cancel(&addr, resp_ch).await
+            }
             PeerCmd::SyncStats {
                 addr,
                 downloaded_rate,
                 uploaded_rate,
-            } => self.handle_sync_stats(&addr, &downloaded_rate, &uploaded_rate),
+                unexpected_blocks,
+            } => {
+                self.handle_sync_stats(&addr, &downloaded_rate, &uploaded_rate, unexpected_blocks)
+                    .await
+            }
             PeerCmd::KillReq { addr, reason } => self.handle_kill_req(&addr, &reason).await,
         }
     }
@@ -487,7 +495,7 @@ impl Session {
     async fn handle_piece_done(
         &mut self,
         addr: &String,
-        resp_ch: oneshot::Sender<PieceDoneCmd>,
+        resp_ch: oneshot::Sender<PieceCmd>,
     ) -> Result<bool, Error> {
         match self.peers.get(addr).ok_or(Error::PeerNotFound)?.piece_index {
             Some(piece_index) => {
@@ -502,17 +510,51 @@ impl Session {
 
         let chosen_index = self.choose_piece_index(addr);
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
-        let cmd = peer.handle_piece_done(chosen_index, &mut self.pieces_status, &self.metainfo);
+        let cmd = peer.handle_piece(chosen_index, &mut self.pieces_status, &self.metainfo);
         let _ = resp_ch.send(cmd);
         Ok(true)
     }
 
-    fn handle_sync_stats(
+    async fn handle_piece_cancel(
+        &mut self,
+        addr: &String,
+        resp_ch: oneshot::Sender<PieceCmd>,
+    ) -> Result<bool, Error> {
+        match self.peers.get(addr).ok_or(Error::PeerNotFound)?.piece_index {
+            Some(piece_index) => {
+                self.pieces_status[piece_index] = match self.pieces_status[piece_index] {
+                    Status::Reserved(peers_count) => match peers_count >= 2 {
+                        true => Status::Reserved(peers_count - 1),
+                        false => Status::Missing,
+                    },
+                    Status::Missing => Status::Missing,
+                    Status::Have => Status::Have,
+                }
+            }
+            None => panic!("Piece cancelled but not requested"),
+        }
+
+        let chosen_index = self.choose_piece_index(addr);
+        let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
+        let cmd = peer.handle_piece(chosen_index, &mut self.pieces_status, &self.metainfo);
+        let _ = resp_ch.send(cmd);
+        Ok(true)
+    }
+
+    async fn handle_sync_stats(
         &mut self,
         addr: &String,
         downloaded_rate: &Option<u32>,
         uploaded_rate: &Option<u32>,
+        unexpected_blocks: usize,
     ) -> Result<bool, Error> {
+        if unexpected_blocks > 0 {
+            self.log_peer(
+                addr,
+                format!("Stats: Unexpected pieces {}", unexpected_blocks),
+            )
+            .await?;
+        }
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.handle_sync_stats(downloaded_rate, uploaded_rate);
         Ok(true)
@@ -562,11 +604,22 @@ impl Session {
             }
         }
 
-        // Create pair (piece_index, count) for missing pieces
+        let still_missing = vec
+            .iter()
+            .enumerate()
+            .filter(|(piece_index, _)| self.pieces_status[*piece_index] != Status::Have)
+            .count();
+
+        let is_desired: Box<dyn Fn(usize) -> bool> = match still_missing < END_GAME_LIMIT {
+            true => Box::new(|idx: usize| self.pieces_status[idx] != Status::Have),
+            false => Box::new(|idx: usize| self.pieces_status[idx] == Status::Missing),
+        };
+
+        // Create pair (piece_index, count) for desired pieces
         let mut rarest: Vec<(usize, u32)> = vec
             .iter()
             .enumerate()
-            .filter(|(piece_index, _)| self.pieces_status[*piece_index] == Status::Missing)
+            .filter(|(piece_index, _)| is_desired(*piece_index))
             .map(|(piece_index, count)| (piece_index, *count))
             .collect();
 

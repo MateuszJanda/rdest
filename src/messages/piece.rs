@@ -54,6 +54,10 @@ impl Piece {
         }
     }
 
+    pub fn piece_index(&self) -> usize {
+        self.piece_index as usize
+    }
+
     pub fn block_begin(&self) -> usize {
         self.block_begin as usize
     }

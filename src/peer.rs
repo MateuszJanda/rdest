@@ -1,5 +1,5 @@
 use crate::commands::{
-    BitfieldCmd, HaveCmd, InitCmd, NotInterestedCmd, PieceDoneCmd, ReqData, RequestCmd, UnchokeCmd,
+    BitfieldCmd, HaveCmd, InitCmd, NotInterestedCmd, PieceCmd, ReqData, RequestCmd, UnchokeCmd,
 };
 use crate::constants::{MAX_UNCHOKED, PEER_ID_SIZE};
 use crate::messages::bitfield::Bitfield;
@@ -64,8 +64,15 @@ impl Peer {
         self.choked = true;
 
         match self.piece_index {
-            Some(piece_index) if pieces_status[piece_index] == Status::Reserved => {
-                pieces_status[piece_index] = Status::Missing
+            Some(piece_index) => {
+                pieces_status[piece_index] = match pieces_status[piece_index] {
+                    Status::Reserved(peers_count) => match peers_count >= 2 {
+                        true => Status::Reserved(peers_count - 1),
+                        false => Status::Missing,
+                    },
+                    Status::Missing => Status::Missing,
+                    Status::Have => Status::Have,
+                }
             }
             _ => (),
         }
@@ -79,7 +86,12 @@ impl Peer {
     ) -> UnchokeCmd {
         let cmd = match chosen_index {
             Some(chosen_index) => {
-                pieces_status[chosen_index] = Status::Reserved;
+                pieces_status[chosen_index] = match pieces_status[chosen_index] {
+                    Status::Reserved(peers_count) => Status::Reserved(peers_count + 1),
+                    Status::Missing => Status::Reserved(1),
+                    Status::Have => Status::Have,
+                };
+
                 match self.am_interested {
                     true => UnchokeCmd::SendRequest(req_data(metainfo, chosen_index)),
                     false => UnchokeCmd::SendInterestedAndRequest(req_data(metainfo, chosen_index)),
@@ -121,7 +133,7 @@ impl Peer {
 
         if pieces_status[piece_index] == Status::Missing && !self.am_interested {
             if !self.choked && self.piece_index.is_none() {
-                pieces_status[piece_index] = Status::Reserved;
+                pieces_status[piece_index] = Status::Reserved(1);
                 self.piece_index = Some(piece_index);
                 self.am_interested = true;
                 HaveCmd::SendInterestedAndRequest(req_data(metainfo, piece_index))
@@ -189,27 +201,32 @@ impl Peer {
         }
     }
 
-    pub fn handle_piece_done(
+    pub fn handle_piece(
         &mut self,
         chosen_index: Option<usize>,
         pieces_status: &mut Vec<Status>,
         metainfo: &Metainfo,
-    ) -> PieceDoneCmd {
+    ) -> PieceCmd {
         match chosen_index {
             Some(chosen_index) => {
-                pieces_status[chosen_index] = Status::Reserved;
+                pieces_status[chosen_index] = match pieces_status[chosen_index] {
+                    Status::Reserved(peers_count) => Status::Reserved(peers_count + 1),
+                    Status::Missing => Status::Reserved(1),
+                    Status::Have => Status::Have,
+                };
+
                 self.piece_index = Some(chosen_index);
                 match self.choked {
-                    true => PieceDoneCmd::Ignore,
-                    false => PieceDoneCmd::SendRequest(req_data(&metainfo, chosen_index)),
+                    true => PieceCmd::Ignore,
+                    false => PieceCmd::SendRequest(req_data(&metainfo, chosen_index)),
                 }
             }
             None => {
                 self.piece_index = None;
                 self.am_interested = false;
                 match self.interested {
-                    true => PieceDoneCmd::SendNotInterested,
-                    false => PieceDoneCmd::PrepareKill,
+                    true => PieceCmd::SendNotInterested,
+                    false => PieceCmd::PrepareKill,
                 }
             }
         }

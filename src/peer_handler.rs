@@ -1,12 +1,13 @@
 use crate::commands::{
-    BitfieldCmd, BroadCmd, HaveCmd, InitCmd, NotInterestedCmd, PeerCmd, PieceDoneCmd, ReqData,
+    BitfieldCmd, BroadCmd, HaveCmd, InitCmd, NotInterestedCmd, PeerCmd, PieceCmd, ReqData,
     RequestCmd, UnchokeCmd,
 };
 use crate::connection::Connection;
 use crate::constants::{HASH_SIZE, PEER_ID_SIZE, PIECE_BLOCK_SIZE};
 use crate::frame::Frame;
 use crate::messages::{
-    Bitfield, Choke, Handshake, Have, Interested, KeepAlive, NotInterested, Piece, Request, Unchoke,
+    Bitfield, Cancel, Choke, Handshake, Have, Interested, KeepAlive, NotInterested, Piece, Request,
+    Unchoke,
 };
 use crate::{utils, Error};
 use std::collections::VecDeque;
@@ -58,6 +59,7 @@ struct State {
 struct Stats {
     downloaded: VecDeque<usize>,
     uploaded: VecDeque<usize>,
+    unexpected_blocks: usize,
 }
 
 impl PieceRx {
@@ -90,6 +92,7 @@ impl Stats {
         Stats {
             downloaded: VecDeque::from(vec![0]),
             uploaded: VecDeque::from(vec![0]),
+            unexpected_blocks: 0,
         }
     }
 
@@ -101,6 +104,10 @@ impl Stats {
         self.uploaded[0] += amount;
     }
 
+    fn increment_unexpected_piece(&mut self) {
+        self.unexpected_blocks += 1;
+    }
+
     fn shift(&mut self) {
         if self.downloaded.len() == MAX_STATS_QUEUE_SIZE {
             self.downloaded.pop_back();
@@ -108,6 +115,8 @@ impl Stats {
         }
         self.downloaded.push_front(0);
         self.uploaded.push_front(0);
+
+        self.unexpected_blocks = 0;
     }
 
     fn downloaded_rate(&self) -> Option<u32> {
@@ -124,6 +133,10 @@ impl Stats {
         }
 
         Some(self.uploaded.iter().map(|d| *d as u32).sum::<u32>() / self.uploaded.len() as u32)
+    }
+
+    fn unexpected_blocks(&mut self) -> usize {
+        self.unexpected_blocks
     }
 }
 
@@ -210,7 +223,11 @@ impl PeerHandler {
             tokio::select! {
                 _ = keep_alive_timer.tick() => self.timeout_keep_alive().await?,
                 _ = sync_stats_timer.tick() => self.timeout_sync_stats().await?,
-                Ok(cmd) = self.broad_ch.recv() => self.handle_manager_cmd(cmd).await?,
+                Ok(cmd) = self.broad_ch.recv() => {
+                    if self.handle_manager_cmd(cmd).await? == false {
+                        break;
+                    }
+                },
                 Ok(frame) = self.connection.recv_frame() => {
                     if self.handle_frame(frame).await? == false {
                         break;
@@ -252,12 +269,27 @@ impl PeerHandler {
     async fn handle_manager_cmd(
         &mut self,
         cmd: BroadCmd,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<bool, Box<dyn std::error::Error>> {
         match cmd {
-            BroadCmd::SendHave { piece_index } => match self.peer_state.choked {
-                true => self.msg_buff.push(Frame::Have(Have::new(piece_index))),
-                false => self.connection.send_msg(&Have::new(piece_index)).await?,
-            },
+            BroadCmd::SendHave { piece_index } => {
+                if let Some(piece_rx) = &self.piece_rx {
+                    if piece_rx.piece_index == piece_index {
+                        for (block_begin, block_length) in &piece_rx.requested {
+                            self.connection
+                                .send_msg(&Cancel::new(piece_index, *block_begin, *block_length))
+                                .await?
+                        }
+
+                        self.piece_rx = None;
+                        self.trigger_cmd_piece_finish(false).await?;
+                    }
+                }
+
+                match self.peer_state.choked {
+                    true => self.msg_buff.push(Frame::Have(Have::new(piece_index))),
+                    false => self.connection.send_msg(&Have::new(piece_index)).await?,
+                }
+            }
             BroadCmd::SendOwnState { am_choked_map } => {
                 match am_choked_map.get(&self.connection.addr) {
                     Some(true) => self.connection.send_msg(&Choke::new()).await?,
@@ -267,7 +299,7 @@ impl PeerHandler {
             }
         }
 
-        Ok(())
+        Ok(true)
     }
 
     async fn handle_frame(
@@ -392,19 +424,12 @@ impl PeerHandler {
     }
 
     async fn handle_piece(&mut self, piece: &Piece) -> Result<bool, Box<dyn std::error::Error>> {
-        // Verify message
-        let piece_rx = self.piece_rx.as_mut().ok_or(Error::PieceNotRequested)?;
-        let is_piece_requested = piece_rx
-            .requested
-            .iter()
-            .any(|(block_begin, block_length)| {
-                piece
-                    .validate(piece_rx.piece_index, *block_begin, *block_length)
-                    .is_ok()
-            });
-        if !is_piece_requested {
-            return Err(Error::BlockNotRequested.into());
+        if !self.is_piece_requested(piece) {
+            self.stats.increment_unexpected_piece();
+            return Ok(true);
         }
+
+        let piece_rx = self.piece_rx.as_mut().ok_or(Error::PieceNotRequested)?;
 
         // Removed piece from "requested" queue
         piece_rx.requested.retain(|(block_begin, block_length)| {
@@ -420,12 +445,32 @@ impl PeerHandler {
         if piece_rx.left.is_empty() && piece_rx.requested.is_empty() {
             self.verify_piece_hash()?;
             self.save_piece_to_file().await?;
-            return Ok(self.trigger_cmd_recv_piece().await?);
+            return Ok(self.trigger_cmd_piece_finish(true).await?);
         } else {
             self.send_request().await?;
         }
 
         Ok(true)
+    }
+
+    fn is_piece_requested(&self, piece: &Piece) -> bool {
+        match &self.piece_rx {
+            Some(piece_rx) => {
+                if piece_rx.piece_index != piece.piece_index() {
+                    return false;
+                }
+
+                piece_rx
+                    .requested
+                    .iter()
+                    .any(|(block_begin, block_length)| {
+                        piece
+                            .validate(piece_rx.piece_index, *block_begin, *block_length)
+                            .is_ok()
+                    })
+            }
+            None => false,
+        }
     }
 
     async fn init_handshake(
@@ -594,22 +639,29 @@ impl PeerHandler {
         Ok(())
     }
 
-    async fn trigger_cmd_recv_piece(&mut self) -> Result<bool, Box<dyn std::error::Error>> {
+    async fn trigger_cmd_piece_finish(
+        &mut self,
+        done: bool,
+    ) -> Result<bool, Box<dyn std::error::Error>> {
         let (resp_tx, resp_rx) = oneshot::channel();
-        self.peer_ch
-            .send(PeerCmd::PieceDone {
+        let cmd = match done {
+            true => PeerCmd::PieceDone {
                 addr: self.connection.addr.clone(),
                 resp_ch: resp_tx,
-            })
-            .await?;
+            },
+            false => PeerCmd::PieceCancel {
+                addr: self.connection.addr.clone(),
+                resp_ch: resp_tx,
+            },
+        };
+
+        self.peer_ch.send(cmd).await?;
 
         match resp_rx.await? {
-            PieceDoneCmd::SendRequest(req_data) => self.new_peer_request(false, &req_data).await?,
-            PieceDoneCmd::SendNotInterested => {
-                self.connection.send_msg(&NotInterested::new()).await?
-            }
-            PieceDoneCmd::PrepareKill => return Ok(false),
-            PieceDoneCmd::Ignore => (),
+            PieceCmd::SendRequest(req_data) => self.new_peer_request(false, &req_data).await?,
+            PieceCmd::SendNotInterested => self.connection.send_msg(&NotInterested::new()).await?,
+            PieceCmd::PrepareKill => return Ok(false),
+            PieceCmd::Ignore => (),
         }
 
         Ok(true)
@@ -621,12 +673,14 @@ impl PeerHandler {
                 addr: self.connection.addr.clone(),
                 downloaded_rate: self.stats.downloaded_rate(),
                 uploaded_rate: self.stats.uploaded_rate(),
+                unexpected_blocks: self.stats.unexpected_blocks(),
             })
             .await?;
 
         Ok(())
     }
 
+    // TODO: new_peer_request -> new_piece_request
     async fn new_peer_request(
         &mut self,
         interested: bool,

@@ -73,12 +73,17 @@ pub enum PeerCmd {
     },
     PieceDone {
         addr: String,
-        resp_ch: oneshot::Sender<PieceDoneCmd>,
+        resp_ch: oneshot::Sender<PieceCmd>,
+    },
+    PieceCancel {
+        addr: String,
+        resp_ch: oneshot::Sender<PieceCmd>,
     },
     SyncStats {
         addr: String,
         downloaded_rate: Option<u32>,
         uploaded_rate: Option<u32>,
+        unexpected_blocks: usize,
     },
     KillReq {
         addr: String,
@@ -137,7 +142,7 @@ pub enum RequestCmd {
 }
 
 #[derive(Debug)]
-pub enum PieceDoneCmd {
+pub enum PieceCmd {
     SendRequest(ReqData),
     SendNotInterested,
     PrepareKill,

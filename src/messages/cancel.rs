@@ -20,6 +20,14 @@ impl Cancel {
     const LENGTH_SIZE: usize = 4;
     const FULL_SIZE: usize = Cancel::LEN_SIZE + Cancel::LEN as usize;
 
+    pub fn new(piece_index: usize, block_begin: usize, block_length: usize) -> Cancel {
+        Cancel {
+            piece_index: piece_index as u32,
+            block_begin: block_begin as u32,
+            block_length: block_length as u32,
+        }
+    }
+
     pub fn from(crs: &Cursor<&[u8]>) -> Cancel {
         let start = Cancel::LEN_SIZE + Cancel::ID_SIZE;
         let mut piece_index = [0; Cancel::INDEX_SIZE];

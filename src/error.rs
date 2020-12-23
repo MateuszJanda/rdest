@@ -33,8 +33,6 @@ pub enum Error {
     PieceBuffMissing,
     /// Piece hash mismatch.
     PieceHashMismatch,
-    /// Peer send not requested block.
-    BlockNotRequested,
     /// Peer doesn't send any message, keep-alive trigger.
     KeepAliveTimeout,
     /// Missing info field to calculate hash.
@@ -109,7 +107,6 @@ impl fmt::Display for Error {
             Error::PieceNotLoaded => write!(f, "Piece not loaded"),
             Error::PieceBuffMissing => write!(f, "Piece buff missing"),
             Error::PieceHashMismatch => write!(f, "Piece hash mismatch"),
-            Error::BlockNotRequested => write!(f, "Block not requested"),
             Error::KeepAliveTimeout => write!(f, "Keep alive timeout"),
             Error::SocketNotAvailable => write!(f, "Socket not available"),
             Error::CantReadFromSocket => write!(f, "Can't read from socket"),
