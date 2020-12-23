@@ -188,7 +188,7 @@ impl Session {
         }
 
         let new_optimistic = match self.round {
-            0 => self.new_optimistic_peers()?,
+            0 => self.new_optimistic_peers(),
             _ => vec![],
         };
 
@@ -236,7 +236,7 @@ impl Session {
         }
     }
 
-    fn new_optimistic_peers(&mut self) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    fn new_optimistic_peers(&mut self) -> Vec<String> {
         let all_am_choked_and_peer_interested = self
             .peers
             .iter()
@@ -245,8 +245,8 @@ impl Session {
             .collect::<Vec<String>>();
 
         match all_am_choked_and_peer_interested.choose(&mut rand::thread_rng()) {
-            Some(addr) => Ok(vec![addr.clone()]),
-            None => Ok(vec![]),
+            Some(addr) => vec![addr.clone()],
+            None => vec![],
         }
     }
 
