@@ -16,7 +16,7 @@ use crate::messages::unchoke::Unchoke;
 use crate::messages::{choke::Choke, handshake::Handshake};
 use crate::{utils, Error};
 use std::collections::VecDeque;
-use std::fs;
+use tokio::fs;
 use tokio::net::TcpStream;
 use tokio::sync::{broadcast, mpsc, oneshot};
 use tokio::time;
@@ -425,7 +425,7 @@ impl PeerHandler {
         // Send new request or call manager to decide
         if piece_rx.left.is_empty() && piece_rx.requested.is_empty() {
             self.verify_piece_hash()?;
-            self.save_piece_to_file()?;
+            self.save_piece_to_file().await?;
             return Ok(self.trigger_cmd_recv_piece().await?);
         } else {
             self.send_request().await?;
@@ -593,7 +593,7 @@ impl PeerHandler {
             RequestCmd::LoadAndSendPiece {
                 piece_index,
                 piece_hash,
-            } => self.load_piece_from_file(piece_index, &piece_hash)?,
+            } => self.load_piece_from_file(piece_index, &piece_hash).await?,
             RequestCmd::Ignore => self.piece_tx = None,
         };
 
@@ -696,13 +696,13 @@ impl PeerHandler {
         }
     }
 
-    fn load_piece_from_file(
+    async fn load_piece_from_file(
         &mut self,
         piece_index: usize,
         piece_hash: &[u8; HASH_SIZE],
     ) -> Result<(), Error> {
         let name = utils::hash_to_string(piece_hash) + ".piece";
-        match fs::read(name) {
+        match fs::read(name).await {
             Ok(data) => {
                 self.piece_tx = Some(PieceTx {
                     piece_index,
@@ -714,14 +714,14 @@ impl PeerHandler {
         }
     }
 
-    fn save_piece_to_file(&mut self) -> Result<(), Error> {
+    async fn save_piece_to_file(&mut self) -> Result<(), Error> {
         let piece_rx = self
             .piece_rx
             .take()
             .ok_or(Error::PieceBuffMissing)
             .expect("Saving to file: piece data not exist after validation");
         let name = utils::hash_to_string(&piece_rx.hash) + ".piece";
-        match fs::write(name, &piece_rx.buff) {
+        match fs::write(name, &piece_rx.buff).await {
             Ok(()) => Ok(()),
             Err(_) => Err(Error::FileCannotWrite),
         }
