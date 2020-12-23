@@ -121,7 +121,6 @@ impl Peer {
 
         if pieces_status[piece_index] == Status::Missing && !self.am_interested {
             if !self.choked && self.piece_index.is_none() {
-                // TODO: why choked is checked?
                 pieces_status[piece_index] = Status::Reserved;
                 self.piece_index = Some(piece_index);
                 self.am_interested = true;

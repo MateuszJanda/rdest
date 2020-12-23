@@ -5,15 +5,9 @@ use crate::commands::{
 use crate::connection::Connection;
 use crate::constants::{HASH_SIZE, PEER_ID_SIZE, PIECE_BLOCK_SIZE};
 use crate::frame::Frame;
-use crate::messages::bitfield::Bitfield;
-use crate::messages::have::Have;
-use crate::messages::interested::Interested;
-use crate::messages::keep_alive::KeepAlive;
-use crate::messages::not_interested::NotInterested;
-use crate::messages::piece::Piece;
-use crate::messages::request::Request;
-use crate::messages::unchoke::Unchoke;
-use crate::messages::{choke::Choke, handshake::Handshake};
+use crate::messages::{
+    Bitfield, Choke, Handshake, Have, Interested, KeepAlive, NotInterested, Piece, Request, Unchoke,
+};
 use crate::{utils, Error};
 use std::collections::VecDeque;
 use tokio::fs;

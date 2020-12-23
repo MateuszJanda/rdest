@@ -6,7 +6,7 @@ use crate::constants::{
     MAX_NOT_INTERESTED, MAX_OPTIMISTIC, MAX_OPTIMISTIC_ROUNDS, MAX_UNCHOKED, PEER_ID_SIZE, PORT,
 };
 use crate::extractor::Extractor;
-use crate::messages::bitfield::Bitfield;
+use crate::messages::Bitfield;
 use crate::peer::Peer;
 use crate::peer_handler::PeerHandler;
 use crate::progress_view::ProgressView;
