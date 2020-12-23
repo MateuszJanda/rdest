@@ -33,7 +33,8 @@ impl TrackerClient {
 
     /// Connect to tracker and wait for response.
     ///
-    /// If tracker respond with failure caller is informed and new connection is made after 0.5 sec.
+    /// If tracker respond with failure caller is informed and new connection is made after
+    /// DELAY_MS ms.
     pub async fn run(&mut self) {
         let params = [
             ("peer_id", String::from_utf8(self.own_id.to_vec()).unwrap()),
