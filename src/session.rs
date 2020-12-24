@@ -143,6 +143,10 @@ impl Session {
     /// # }
     /// ```
     pub async fn run(&mut self) {
+        // for i in 0..(self.pieces_status.len() - 20) {
+        //     self.pieces_status[i] = Status::Have
+        // }
+
         self.spawn_view();
         self.spawn_tracker();
         self.event_loop().await;
@@ -384,8 +388,7 @@ impl Session {
         peer_id: [u8; PEER_ID_SIZE],
         resp_ch: oneshot::Sender<InitCmd>,
     ) -> Result<bool, Error> {
-        self.log_peer(addr, "Handshake with peer".to_string())
-            .await?;
+        self.log_peer(addr, "Handshake with peer".to_string()).await;
 
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         let cmd = peer.handle_init(peer_id, &self.pieces_status);
@@ -395,7 +398,7 @@ impl Session {
 
     async fn handle_choke(&mut self, addr: &String) -> Result<bool, Error> {
         self.log_peer(addr, "Peer change state to Choke".to_string())
-            .await?;
+            .await;
 
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.handle_choke(&mut self.pieces_status);
@@ -408,9 +411,9 @@ impl Session {
         resp_ch: oneshot::Sender<UnchokeCmd>,
     ) -> Result<bool, Error> {
         self.log_peer(addr, "Peer change state to Unchoke".to_string())
-            .await?;
+            .await;
 
-        let chosen_index = self.choose_piece_index(addr);
+        let chosen_index = self.choose_piece_index(addr).await;
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         let cmd = peer.handle_unchoke(chosen_index, &mut self.pieces_status, &self.metainfo);
         let _ = &resp_ch.send(cmd);
@@ -419,7 +422,7 @@ impl Session {
 
     async fn handle_interested(&mut self, addr: &String) -> Result<bool, Error> {
         self.log_peer(addr, "Peer change state to Interested".to_string())
-            .await?;
+            .await;
 
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.handle_interested();
@@ -432,9 +435,9 @@ impl Session {
         resp_ch: oneshot::Sender<NotInterestedCmd>,
     ) -> Result<bool, Error> {
         self.log_peer(addr, "Peer change state to NotInterested".to_string())
-            .await?;
+            .await;
 
-        let chosen_index = self.choose_piece_index(addr);
+        let chosen_index = self.choose_piece_index(addr).await;
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         let cmd = peer.handle_not_interested(chosen_index);
         let _ = resp_ch.send(cmd);
@@ -459,12 +462,12 @@ impl Session {
         bitfield: &Bitfield,
         resp_ch: oneshot::Sender<BitfieldCmd>,
     ) -> Result<bool, Error> {
-        self.log_peer(addr, format!("Received a bitfield")).await?;
+        self.log_peer(addr, format!("Received a bitfield")).await;
 
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.update_pieces(&bitfield.to_vec(self.metainfo.pieces_num())?);
 
-        let chosen_index = self.choose_piece_index(addr);
+        let chosen_index = self.choose_piece_index(addr).await;
         let unchoked_num = self.unchoked_num();
 
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
@@ -484,7 +487,7 @@ impl Session {
             addr,
             format!("Peer sent request for piece: {}", piece_index),
         )
-        .await?;
+        .await;
 
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         let cmd = peer.handle_request(piece_index, &self.pieces_status, &self.metainfo);
@@ -508,7 +511,7 @@ impl Session {
             None => panic!("Piece downloaded but not requested"),
         }
 
-        let chosen_index = self.choose_piece_index(addr);
+        let chosen_index = self.choose_piece_index(addr).await;
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         let cmd = peer.handle_piece(chosen_index, &mut self.pieces_status, &self.metainfo);
         let _ = resp_ch.send(cmd);
@@ -534,7 +537,7 @@ impl Session {
             None => panic!("Piece cancelled but not requested"),
         }
 
-        let chosen_index = self.choose_piece_index(addr);
+        let chosen_index = self.choose_piece_index(addr).await;
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         let cmd = peer.handle_piece(chosen_index, &mut self.pieces_status, &self.metainfo);
         let _ = resp_ch.send(cmd);
@@ -553,7 +556,7 @@ impl Session {
                 addr,
                 format!("Stats: Unexpected pieces {}", unexpected_blocks),
             )
-            .await?;
+            .await;
         }
         let peer = self.peers.get_mut(addr).ok_or(Error::PeerNotFound)?;
         peer.handle_sync_stats(downloaded_rate, uploaded_rate);
@@ -562,7 +565,7 @@ impl Session {
 
     async fn handle_kill_req(&mut self, addr: &String, reason: &String) -> Result<bool, Error> {
         self.log_peer(addr, "Peer killed, reason: ".to_string() + reason)
-            .await?;
+            .await;
         self.kill_peer(&addr).await;
 
         let have_all = self
@@ -591,7 +594,7 @@ impl Session {
             .count()
     }
 
-    fn choose_piece_index(&self, addr: &String) -> Option<usize> {
+    async fn choose_piece_index(&mut self, addr: &String) -> Option<usize> {
         let pieces = &self.peers[addr].pieces;
 
         // Count how many peers have specific piece
@@ -623,6 +626,8 @@ impl Session {
             .map(|(piece_index, count)| (piece_index, *count))
             .collect();
 
+        drop(is_desired);
+
         // Shuffle to get better distribution of pieces from peers
         rarest.shuffle(&mut rand::thread_rng());
 
@@ -631,6 +636,10 @@ impl Session {
 
         for (piece_index, count) in rarest.iter() {
             if count > &0 && pieces[*piece_index] == true {
+                if still_missing < END_GAME_LIMIT {
+                    self.log_peer(addr, format!("Eng game request piece: {}", piece_index))
+                        .await;
+                }
                 return Some(*piece_index);
             }
         }
@@ -774,17 +783,16 @@ impl Session {
         }
     }
 
-    async fn log_peer(&mut self, addr: &String, text: String) -> Result<(), Error> {
+    async fn log_peer(&mut self, addr: &String, text: String) {
         if let Some(view) = &mut self.view {
-            let peer = self.peers.get(addr).ok_or(Error::PeerNotFound)?;
-
-            let cmd = ViewCmd::LogPeer {
-                addr: addr.clone(),
-                peer_id: peer.id,
-                text,
-            };
-            let _ = view.channel.send(cmd).await;
+            if let Some(peer) = self.peers.get(addr) {
+                let cmd = ViewCmd::LogPeer {
+                    addr: addr.clone(),
+                    peer_id: peer.id,
+                    text,
+                };
+                let _ = view.channel.send(cmd).await;
+            }
         }
-        Ok(())
     }
 }
