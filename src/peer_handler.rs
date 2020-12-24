@@ -691,7 +691,7 @@ impl PeerHandler {
             self.connection.send_msg(&Interested::new()).await?;
         }
 
-        // BEP3 suggests send more than one request to get good better TCP performance (pipeline)
+        // BEP3 suggests to send more than one request to get better TCP performance (pipeline)
         self.send_request().await?;
         self.send_request().await?;
         Ok(())
