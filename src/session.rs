@@ -143,9 +143,9 @@ impl Session {
     /// # }
     /// ```
     pub async fn run(&mut self) {
-        // for i in 0..(self.pieces_status.len() - 20) {
-        //     self.pieces_status[i] = Status::Have
-        // }
+        for i in 0..(self.pieces_status.len() - 20) {
+            self.pieces_status[i] = Status::Have
+        }
 
         self.spawn_view();
         self.spawn_tracker();
@@ -637,7 +637,7 @@ impl Session {
         for (piece_index, count) in rarest.iter() {
             if count > &0 && pieces[*piece_index] == true {
                 if still_missing < END_GAME_LIMIT {
-                    self.log_peer(addr, format!("Eng game request piece: {}", piece_index))
+                    self.log_peer(addr, format!("End game mode request, piece: {}", piece_index))
                         .await;
                 }
                 return Some(*piece_index);
