@@ -143,10 +143,6 @@ impl Session {
     /// # }
     /// ```
     pub async fn run(&mut self) {
-        for i in 0..(self.pieces_status.len() - 20) {
-            self.pieces_status[i] = Status::Have
-        }
-
         self.spawn_view();
         self.spawn_tracker();
         self.event_loop().await;
