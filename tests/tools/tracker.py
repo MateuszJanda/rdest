@@ -3,8 +3,8 @@
 import http.server
 import socketserver
 
-TRACKER_PORT = 8002
-PEER_PORT = 6882
+TRACKER_PORT = 8000
+PEER_PORT = 6881
 
 
 class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
@@ -21,8 +21,6 @@ class HttpRequestHandler(http.server.SimpleHTTPRequestHandler):
 
         exit()
         return
-
-assert len(str(PEER_PORT)) == 4, "Encoding fail if port doesn't have 4 characters"
 
 
 with socketserver.TCPServer(("", TRACKER_PORT), HttpRequestHandler) as httpd:
