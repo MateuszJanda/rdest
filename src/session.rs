@@ -637,7 +637,7 @@ impl Session {
         for (piece_index, count) in rarest.iter() {
             if count > &0 && pieces[*piece_index] == true {
                 if still_missing < END_GAME_LIMIT {
-                    self.log_peer(addr, format!("End game mode request, piece: {}", piece_index))
+                    self.log_peer(addr, format!("End game mode, piece: {}", piece_index))
                         .await;
                 }
                 return Some(*piece_index);
