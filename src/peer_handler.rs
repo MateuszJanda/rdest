@@ -518,9 +518,9 @@ impl PeerHandler {
 
         match resp_rx.await? {
             UnchokeCmd::SendInterestedAndRequest(req_data) => {
-                self.new_peer_request(true, &req_data).await?
+                self.new_piece_request(true, &req_data).await?
             }
-            UnchokeCmd::SendRequest(req_data) => self.new_peer_request(false, &req_data).await?,
+            UnchokeCmd::SendRequest(req_data) => self.new_piece_request(false, &req_data).await?,
             UnchokeCmd::SendNotInterested => {
                 self.connection.send_msg(&NotInterested::new()).await?
             }
@@ -572,7 +572,7 @@ impl PeerHandler {
 
         match resp_rx.await? {
             HaveCmd::SendInterestedAndRequest(req_data) => {
-                self.new_peer_request(true, &req_data).await?
+                self.new_piece_request(true, &req_data).await?
             }
 
             HaveCmd::SendInterested => self.connection.send_msg(&Interested::new()).await?,
@@ -658,7 +658,7 @@ impl PeerHandler {
         self.peer_ch.send(cmd).await?;
 
         match resp_rx.await? {
-            PieceCmd::SendRequest(req_data) => self.new_peer_request(false, &req_data).await?,
+            PieceCmd::SendRequest(req_data) => self.new_piece_request(false, &req_data).await?,
             PieceCmd::SendNotInterested => self.connection.send_msg(&NotInterested::new()).await?,
             PieceCmd::PrepareKill => return Ok(false),
             PieceCmd::Ignore => (),
@@ -680,8 +680,7 @@ impl PeerHandler {
         Ok(())
     }
 
-    // TODO: new_peer_request -> new_piece_request
-    async fn new_peer_request(
+    async fn new_piece_request(
         &mut self,
         interested: bool,
         req_data: &ReqData,
