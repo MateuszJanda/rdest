@@ -66,14 +66,14 @@ impl TrackerResp {
             Some(BValue::Int(interval)) => {
                 u64::try_from(*interval).or(Err(Error::TrackerRespFail("interval".into())))
             }
-            _ => Err(Error::TrackerIncorrectOrMissing("interval".into())),
+            _ => Err(Error::TrackerIncorrectOrMissing("interval")),
         }
     }
 
     fn find_peers(dict: &HashMap<Vec<u8>, BValue>) -> Result<Vec<PeerAddr>, Error> {
         match dict.get(&b"peers".to_vec()) {
             Some(BValue::List(peers)) => Ok(Self::peer_list(peers)),
-            _ => Err(Error::TrackerIncorrectOrMissing("peers".into())),
+            _ => Err(Error::TrackerIncorrectOrMissing("peers")),
         }
     }
 

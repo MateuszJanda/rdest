@@ -18,7 +18,7 @@ impl Unchoke {
     pub fn check(length: usize) -> Result<usize, Error> {
         match length == Unchoke::LEN as usize {
             true => Ok(Unchoke::FULL_SIZE),
-            false => Err(Error::Incomplete("Unchoke".into())),
+            false => Err(Error::Incomplete("Unchoke")),
         }
     }
 }

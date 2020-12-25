@@ -18,7 +18,7 @@ impl Interested {
     pub fn check(length: usize) -> Result<usize, Error> {
         match length == Interested::LEN as usize {
             true => Ok(Interested::FULL_SIZE),
-            false => Err(Error::Incomplete("Interested".into())),
+            false => Err(Error::Incomplete("Interested")),
         }
     }
 }

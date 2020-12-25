@@ -48,7 +48,7 @@ impl Bitfield {
         };
 
         if self.pieces_bytes.len() != bytes_num {
-            return Err(Error::InvalidLength("Bitfield".into()));
+            return Err(Error::InvalidLength("Bitfield"));
         }
 
         let mut pieces = vec![];
@@ -70,7 +70,7 @@ impl Bitfield {
     pub fn check(available_data: usize, length: usize) -> Result<usize, Error> {
         match available_data >= Bitfield::LEN_SIZE + length {
             true => Ok(Bitfield::LEN_SIZE + length),
-            false => Err(Error::Incomplete("Bitfield".into())),
+            false => Err(Error::Incomplete("Bitfield")),
         }
     }
 
@@ -82,7 +82,7 @@ impl Bitfield {
 
         match self.pieces_bytes.len() == bytes_num {
             true => Ok(()),
-            false => Err(Error::InvalidLength("Bitfield".into())),
+            false => Err(Error::InvalidLength("Bitfield")),
         }
     }
 }

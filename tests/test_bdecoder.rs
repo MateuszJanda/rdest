@@ -10,7 +10,7 @@ fn empty_input() {
 fn incorrect_character() {
     assert_eq!(
         BDecoder::from_array(b"x"),
-        Err(Error::DecodeIncorrectChar(&"values_vector", 0))
+        Err(Error::DecodeIncorrectChar("values_vector", 0))
     );
 }
 
@@ -26,7 +26,7 @@ fn byte_str() {
 fn byte_str_unexpected_end() {
     assert_eq!(
         BDecoder::from_array(b"4"),
-        Err(Error::DecodeNotEnoughChars(&"parse_byte_str", 0))
+        Err(Error::DecodeNotEnoughChars("parse_byte_str", 0))
     );
 }
 
@@ -34,7 +34,7 @@ fn byte_str_unexpected_end() {
 fn byte_str_missing_value() {
     assert_eq!(
         BDecoder::from_array(b"4:"),
-        Err(Error::DecodeNotEnoughChars(&"parse_byte_str", 0))
+        Err(Error::DecodeNotEnoughChars("parse_byte_str", 0))
     );
 }
 
@@ -42,7 +42,7 @@ fn byte_str_missing_value() {
 fn byte_str_not_enough_characters() {
     assert_eq!(
         BDecoder::from_array(b"4:spa"),
-        Err(Error::DecodeNotEnoughChars(&"parse_byte_str", 0))
+        Err(Error::DecodeNotEnoughChars("parse_byte_str", 0))
     );
 }
 
@@ -50,7 +50,7 @@ fn byte_str_not_enough_characters() {
 fn byte_str_invalid_len_character() {
     assert_eq!(
         BDecoder::from_array(b"4+3:spa"),
-        Err(Error::DecodeIncorrectChar(&"parse_byte_str", 0))
+        Err(Error::DecodeIncorrectChar("parse_byte_str", 0))
     );
 }
 
@@ -66,7 +66,7 @@ fn byte_str_zero_length() {
 fn int_missing_e() {
     assert_eq!(
         BDecoder::from_array(b"i"),
-        Err(Error::DecodeMissingTerminalChars(&"parse_int", 0))
+        Err(Error::DecodeMissingTerminalChars("parse_int", 0))
     );
 }
 
@@ -74,7 +74,7 @@ fn int_missing_e() {
 fn int_missing_value() {
     assert_eq!(
         BDecoder::from_array(b"ie"),
-        Err(Error::DecodeUnableConvert(&"parse_int", &"int", 0))
+        Err(Error::DecodeUnableConvert("parse_int", "int", 0))
     );
 }
 
@@ -82,7 +82,7 @@ fn int_missing_value() {
 fn int_incorrect_format1() {
     assert_eq!(
         BDecoder::from_array(b"i-e"),
-        Err(Error::DecodeUnableConvert(&"parse_int", &"int", 0))
+        Err(Error::DecodeUnableConvert("parse_int", "int", 0))
     );
 }
 
@@ -90,7 +90,7 @@ fn int_incorrect_format1() {
 fn int_incorrect_format2() {
     assert_eq!(
         BDecoder::from_array(b"i--4e"),
-        Err(Error::DecodeUnableConvert(&"parse_int", &"int", 0))
+        Err(Error::DecodeUnableConvert("parse_int", "int", 0))
     );
 }
 
@@ -98,7 +98,7 @@ fn int_incorrect_format2() {
 fn int_incorrect_format3() {
     assert_eq!(
         BDecoder::from_array(b"i-4-e"),
-        Err(Error::DecodeUnableConvert(&"parse_int", &"int", 0))
+        Err(Error::DecodeUnableConvert("parse_int", "int", 0))
     );
 }
 
@@ -106,7 +106,7 @@ fn int_incorrect_format3() {
 fn int_incorrect_character() {
     assert_eq!(
         BDecoder::from_array(b"i+4e"),
-        Err(Error::DecodeIncorrectChar(&"extract_int", 0))
+        Err(Error::DecodeIncorrectChar("extract_int", 0))
     );
 }
 
@@ -122,7 +122,7 @@ fn int_leading_zero() {
 fn int_leading_zero_for_negative() {
     assert_eq!(
         BDecoder::from_array(b"i-01e"),
-        Err(Error::DecodeLeadingZero(&"parse_int", 0))
+        Err(Error::DecodeLeadingZero("parse_int", 0))
     );
 }
 
@@ -183,7 +183,7 @@ fn list_of_nested_values() {
 fn dict_odd_number_of_elements() {
     assert_eq!(
         BDecoder::from_array(b"di1ee"),
-        Err(Error::DecodeOddNumOfElements(&"parse_dict", 0))
+        Err(Error::DecodeOddNumOfElements("parse_dict", 0))
     );
 }
 
@@ -191,7 +191,7 @@ fn dict_odd_number_of_elements() {
 fn dict_key_not_string() {
     assert_eq!(
         BDecoder::from_array(b"di1ei1ee"),
-        Err(Error::DecodeKeyNotString(&"keys_from_list", 0))
+        Err(Error::DecodeKeyNotString("keys_from_list", 0))
     );
 }
 
@@ -223,6 +223,6 @@ fn empty_string_and_int() {
 fn incorrect_value_char_pointer_change() {
     assert_eq!(
         BDecoder::from_array(b"i1ei2ei01e"),
-        Err(Error::DecodeLeadingZero(&"parse_int", 6))
+        Err(Error::DecodeLeadingZero("parse_int", 6))
     );
 }

@@ -119,7 +119,7 @@ impl Frame {
             return Ok(crs.get_ref()[0] as usize);
         }
 
-        Err(Error::Incomplete("Protocol ID getter".into()))
+        Err(Error::Incomplete("Protocol ID getter"))
     }
 
     fn get_message_length(crs: &Cursor<&[u8]>) -> Result<usize, Error> {
@@ -132,7 +132,7 @@ impl Frame {
             return Ok(u32::from_be_bytes(b) as usize);
         }
 
-        Err(Error::Incomplete("Message length getter".into()))
+        Err(Error::Incomplete("Message length getter"))
     }
 
     fn get_message_id(crs: &Cursor<&[u8]>) -> Result<u8, Error> {
@@ -143,7 +143,7 @@ impl Frame {
             return Ok(crs.get_ref()[MSG_ID_POS]);
         }
 
-        Err(Error::Incomplete("Message ID getter".into()))
+        Err(Error::Incomplete("Message ID getter"))
     }
 
     fn available_data(crs: &Cursor<&[u8]>) -> usize {

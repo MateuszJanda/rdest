@@ -51,7 +51,7 @@ impl Handshake {
     ) -> Result<usize, Error> {
         if protocol_id_length == Handshake::PROTOCOL_ID.len() {
             if available_data < Handshake::FULL_SIZE {
-                return Err(Error::Incomplete("Handshake".into()));
+                return Err(Error::Incomplete("Handshake"));
             }
 
             for idx in 0..Handshake::PROTOCOL_ID.len() {

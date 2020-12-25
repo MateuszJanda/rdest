@@ -18,7 +18,7 @@ impl Choke {
     pub fn check(length: usize) -> Result<usize, Error> {
         match length == Choke::LEN as usize {
             true => Ok(Choke::FULL_SIZE),
-            false => Err(Error::Incomplete("Choke".into())),
+            false => Err(Error::Incomplete("Choke")),
         }
     }
 }

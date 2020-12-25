@@ -191,9 +191,9 @@ impl Metainfo {
     pub fn find_announce(dict: &HashMap<Vec<u8>, BValue>) -> Result<String, Error> {
         match dict.get(&b"announce".to_vec()) {
             Some(BValue::ByteStr(val)) => {
-                String::from_utf8(val.to_vec()).or(Err(Error::MetaInvalidUtf8("announce".into())))
+                String::from_utf8(val.to_vec()).or(Err(Error::MetaInvalidUtf8("announce")))
             }
-            _ => Err(Error::MetaIncorrectOrMissing("announce".into())),
+            _ => Err(Error::MetaIncorrectOrMissing("announce")),
         }
     }
 
@@ -202,9 +202,9 @@ impl Metainfo {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"name".to_vec()) {
                 Some(BValue::ByteStr(val)) => {
-                    String::from_utf8(val.to_vec()).or(Err(Error::MetaInvalidUtf8("name".into())))
+                    String::from_utf8(val.to_vec()).or(Err(Error::MetaInvalidUtf8("name")))
                 }
-                _ => Err(Error::MetaIncorrectOrMissing("name".into())),
+                _ => Err(Error::MetaIncorrectOrMissing("name")),
             },
             _ => Err(Error::MetaIncorrectOrMissing("info".into())),
         }
@@ -215,9 +215,9 @@ impl Metainfo {
         match dict.get(&b"info".to_vec()) {
             Some(BValue::Dict(info)) => match info.get(&b"piece length".to_vec()) {
                 Some(BValue::Int(length)) => {
-                    u64::try_from(*length).or(Err(Error::MetaInvalidU64("piece length".into())))
+                    u64::try_from(*length).or(Err(Error::MetaInvalidU64("piece length")))
                 }
-                _ => Err(Error::MetaIncorrectOrMissing("piece length".into())),
+                _ => Err(Error::MetaIncorrectOrMissing("piece length")),
             },
             _ => Err(Error::MetaIncorrectOrMissing("info".into())),
         }
@@ -229,14 +229,14 @@ impl Metainfo {
             Some(BValue::Dict(info)) => match info.get(&b"pieces".to_vec()) {
                 Some(BValue::ByteStr(pieces)) => {
                     if pieces.len() % HASH_SIZE != 0 {
-                        return Err(Error::MetaNotDivisible("pieces".into()));
+                        return Err(Error::MetaNotDivisible("pieces"));
                     }
                     Ok(pieces
                         .chunks(HASH_SIZE)
                         .map(|chunk| chunk.try_into().unwrap())
                         .collect())
                 }
-                _ => Err(Error::MetaIncorrectOrMissing("pieces".into())),
+                _ => Err(Error::MetaIncorrectOrMissing("pieces")),
             },
             _ => Err(Error::MetaIncorrectOrMissing("info".into())),
         }

@@ -8,7 +8,7 @@ pub enum Error {
     /// Not supported ID message (probably from not supported standard extension).
     UnknownId(u8),
     /// Incomplete message (details as argument e.g: message name).
-    Incomplete(String),
+    Incomplete(&'static str),
     /// Invalid protocol ID in Handshake message. Check [BEP3](https://www.bittorrent.org/beps/bep_0003.html#peer%20protocol).
     InvalidProtocolId,
     /// Peer return invalid info hash in Handshake message.
@@ -16,9 +16,9 @@ pub enum Error {
     /// Peer introduced himself with unexpected ID
     InvalidPeerId,
     /// Invalid length of Piece or Request message (different than requested peer).
-    InvalidLength(String),
+    InvalidLength(&'static str),
     /// Invalid piece index (different than requested by peer).
-    InvalidPieceIndex(String),
+    InvalidPieceIndex(&'static str),
     /// Can't load piece file.
     FileNotFound,
     /// Can't write to file.
@@ -66,7 +66,7 @@ pub enum Error {
     /// Not enough data in tracker response.
     TrackerDataMissing,
     /// Incorrect or missing fields in tracker response.
-    TrackerIncorrectOrMissing(String),
+    TrackerIncorrectOrMissing(&'static str),
     /// Tracker replay with error.
     TrackerRespFail(String),
     /// Missing metainfo file.
@@ -80,13 +80,13 @@ pub enum Error {
     /// Missing length or files in metafile.
     MetaLenOrFilesMissing,
     /// Can't convert metainfo fields to UTF-8.
-    MetaInvalidUtf8(String),
+    MetaInvalidUtf8(&'static str),
     /// Missing field in metainfo.
-    MetaIncorrectOrMissing(String),
+    MetaIncorrectOrMissing(&'static str),
     /// Can't convert metainfo field to u64
-    MetaInvalidU64(String),
+    MetaInvalidU64(&'static str),
     /// Not enough data to extract SHA-1 hashes.
-    MetaNotDivisible(String),
+    MetaNotDivisible(&'static str),
 }
 
 impl fmt::Display for Error {

@@ -53,7 +53,7 @@ impl Request {
             return Ok(Request::FULL_SIZE);
         }
 
-        Err(Error::Incomplete("Request".into()))
+        Err(Error::Incomplete("Request"))
     }
 
     pub fn piece_index(&self) -> usize {
@@ -75,15 +75,15 @@ impl Request {
         piece_length: usize,
     ) -> Result<(), Error> {
         if self.piece_index >= pieces_num as u32 || self.piece_index != piece_index as u32 {
-            return Err(Error::InvalidPieceIndex("Request".into()));
+            return Err(Error::InvalidPieceIndex("Request"));
         }
 
         if self.block_length > PIECE_BLOCK_SIZE as u32 {
-            return Err(Error::InvalidLength("Request".into()));
+            return Err(Error::InvalidLength("Request"));
         }
 
         if self.block_begin + self.block_length > piece_length as u32 {
-            return Err(Error::InvalidLength("Request".into()));
+            return Err(Error::InvalidLength("Request"));
         }
 
         Ok(())

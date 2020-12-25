@@ -35,7 +35,7 @@ impl Have {
     pub fn check(available_data: usize, length: usize) -> Result<usize, Error> {
         match length == Have::LEN as usize && available_data >= Have::LEN_SIZE + length {
             true => Ok(Have::FULL_SIZE),
-            false => Err(Error::Incomplete("Have".into())),
+            false => Err(Error::Incomplete("Have")),
         }
     }
 
@@ -46,7 +46,7 @@ impl Have {
     pub fn validate(&self, pieces_num: usize) -> Result<(), Error> {
         match (self.piece_index as usize) < pieces_num {
             true => Ok(()),
-            false => Err(Error::InvalidPieceIndex("Have".into())),
+            false => Err(Error::InvalidPieceIndex("Have")),
         }
     }
 }

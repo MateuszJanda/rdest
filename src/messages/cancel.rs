@@ -51,7 +51,7 @@ impl Cancel {
     pub fn check(available_data: usize, length: usize) -> Result<usize, Error> {
         match length == Cancel::LEN as usize && available_data >= Cancel::LEN_SIZE + length {
             true => return Ok(Cancel::FULL_SIZE),
-            false => Err(Error::Incomplete("Cancel".into())),
+            false => Err(Error::Incomplete("Cancel")),
         }
     }
 }

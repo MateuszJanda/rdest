@@ -94,11 +94,11 @@ impl BDecoder {
 
         let len_str = match String::from_utf8(len_bytes) {
             Ok(v) => v,
-            Err(_) => return Err(Error::DecodeUnableConvert("parse_byte_str", &"string", pos)),
+            Err(_) => return Err(Error::DecodeUnableConvert("parse_byte_str", "string", pos)),
         };
         let len: usize = match len_str.parse() {
             Ok(v) => v,
-            Err(_) => return Err(Error::DecodeUnableConvert("parse_byte_str", &"int", pos)),
+            Err(_) => return Err(Error::DecodeUnableConvert("parse_byte_str", "int", pos)),
         };
 
         let str_value: Vec<_> = it.take(len).map(|(_, &b)| b).collect();
@@ -124,7 +124,7 @@ impl BDecoder {
         }
         let num_as_str = match String::from_utf8(num_as_bytes) {
             Ok(v) => v,
-            Err(_) => return Err(Error::DecodeUnableConvert("parse_int", &"string", pos)),
+            Err(_) => return Err(Error::DecodeUnableConvert("parse_int", "string", pos)),
         };
 
         if num_as_str.len() >= 2 && num_as_str.starts_with("0") || num_as_str.starts_with("-0") {
@@ -133,7 +133,7 @@ impl BDecoder {
 
         let num = num_as_str
             .parse::<i64>()
-            .or(Err(Error::DecodeUnableConvert("parse_int", &"int", pos)))?;
+            .or(Err(Error::DecodeUnableConvert("parse_int", "int", pos)))?;
 
         Ok((num, raw_num))
     }

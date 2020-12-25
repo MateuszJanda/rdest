@@ -5,7 +5,7 @@ use rdest::{BValue, Error, File, Metainfo};
 fn find_announce_incorrect() {
     assert_eq!(
         Metainfo::find_announce(&hashmap![b"announce".to_vec() => BValue::Int(5)]),
-        Err(Error::MetaIncorrectOrMissing("announce".into()))
+        Err(Error::MetaIncorrectOrMissing("announce"))
     );
 }
 
@@ -25,7 +25,7 @@ fn find_name_incorrect() {
         Metainfo::find_name(
             &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"name".to_vec() => BValue::Int(12)])]
         ),
-        Err(Error::MetaIncorrectOrMissing("name".into()))
+        Err(Error::MetaIncorrectOrMissing("name"))
     );
 }
 
@@ -33,7 +33,7 @@ fn find_name_incorrect() {
 fn find_name_incorrect_info() {
     assert_eq!(
         Metainfo::find_name(&hashmap![b"info".to_vec() => BValue::Int(12)]),
-        Err(Error::MetaIncorrectOrMissing("info".into()))
+        Err(Error::MetaIncorrectOrMissing("info"))
     );
 }
 
@@ -53,7 +53,7 @@ fn find_piece_length_incorrect() {
         Metainfo::find_piece_length(
             &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"piece length".to_vec() => BValue::ByteStr(b"BAD".to_vec())])]
         ),
-        Err(Error::MetaIncorrectOrMissing("piece length".into()))
+        Err(Error::MetaIncorrectOrMissing("piece length"))
     );
 }
 
@@ -63,7 +63,7 @@ fn find_piece_length_negative() {
         Metainfo::find_piece_length(
             &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"piece length".to_vec() => BValue::Int(-12)])]
         ),
-        Err(Error::MetaInvalidU64("piece length".into()))
+        Err(Error::MetaInvalidU64("piece length"))
     );
 }
 
@@ -71,7 +71,7 @@ fn find_piece_length_negative() {
 fn find_piece_length_incorrect_info() {
     assert_eq!(
         Metainfo::find_piece_length(&hashmap![b"info".to_vec() => BValue::Int(12)]),
-        Err(Error::MetaIncorrectOrMissing("info".into()))
+        Err(Error::MetaIncorrectOrMissing("info"))
     );
 }
 
@@ -91,7 +91,7 @@ fn find_pieces_incorrect() {
         Metainfo::find_pieces(
             &hashmap![b"info".to_vec() => BValue::Dict(hashmap![b"pieces".to_vec() => BValue::Int(12)])]
         ),
-        Err(Error::MetaIncorrectOrMissing("pieces".into()))
+        Err(Error::MetaIncorrectOrMissing("pieces"))
     );
 }
 
@@ -109,7 +109,7 @@ fn find_pieces_not_divisible() {
 fn find_pieces_incorrect_info() {
     assert_eq!(
         Metainfo::find_pieces(&hashmap![b"info".to_vec() => BValue::Int(12)]),
-        Err(Error::MetaIncorrectOrMissing("info".into()))
+        Err(Error::MetaIncorrectOrMissing("info"))
     );
 }
 
@@ -255,7 +255,7 @@ fn empty_input_incorrect() {
 fn incorrect_bencode() {
     assert_eq!(
         Metainfo::from_bencode(b"12"),
-        Err(Error::DecodeNotEnoughChars(&"parse_byte_str", 0))
+        Err(Error::DecodeNotEnoughChars("parse_byte_str", 0))
     );
 }
 
@@ -263,7 +263,7 @@ fn incorrect_bencode() {
 fn missing_announce() {
     assert_eq!(
         Metainfo::from_bencode(b"d8:announcei1e4:infod4:name4:NAME6:lengthi111ee"),
-        Err(Error::MetaIncorrectOrMissing("announce".into()))
+        Err(Error::MetaIncorrectOrMissing("announce"))
     );
 }
 

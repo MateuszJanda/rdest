@@ -50,7 +50,7 @@ impl Piece {
     pub fn check(available_data: usize, length: usize) -> Result<usize, Error> {
         match length >= Piece::MIN_LEN && available_data >= Piece::LEN_SIZE + length {
             true => Ok(Piece::LEN_SIZE + length),
-            false => Err(Error::Incomplete("Piece".into())),
+            false => Err(Error::Incomplete("Piece")),
         }
     }
 
@@ -77,15 +77,15 @@ impl Piece {
         block_length: usize,
     ) -> Result<(), Error> {
         if self.piece_index as usize != piece_index {
-            return Err(Error::InvalidPieceIndex("Piece".into()));
+            return Err(Error::InvalidPieceIndex("Piece"));
         }
 
         if self.block_begin as usize != block_begin {
-            return Err(Error::InvalidPieceIndex("Piece".into()));
+            return Err(Error::InvalidPieceIndex("Piece"));
         }
 
         if self.block.len() as usize != block_length {
-            return Err(Error::InvalidLength("Piece".into()));
+            return Err(Error::InvalidLength("Piece"));
         }
 
         Ok(())
