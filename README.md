@@ -1,10 +1,14 @@
 # rdest
 rdest is simple BitTorrent client, currently supporting [BEP3](https://www.bittorrent.org/beps/bep_0003.html#bencoding) specification.
 
+<p align="center">
+<img src="./gallery/demo.gif"/>
+</p>
+
 # Examples
 Running rdest from command line.
 ```bash
-rdest get ubuntu-20.04.1-desktop-amd64.iso.torrent
+rdest get ubuntu-20.04.2.0-desktop-amd64.iso.torrent
 ```
 Running rdest code.
 ```rust
