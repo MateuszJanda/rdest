@@ -97,7 +97,7 @@ impl Session {
     /// use rdest::{Metainfo, Session};
     /// use std::path::PathBuf;
     ///
-    /// let path = PathBuf::from("ubuntu-20.04.1-desktop-amd64.iso.torrent");
+    /// let path = PathBuf::from("ubuntu-20.04.2.0-desktop-amd64.iso.torrent");
     /// let torrent_file = Metainfo::from_file(path.as_path()).unwrap();
     /// let peer_id = b"AAAAABBBBBCCCCCDDDDD";
     ///
@@ -134,7 +134,7 @@ impl Session {
     ///
     /// # #[tokio::main]
     /// # async fn main() {
-    /// let path = Path::new("ubuntu-20.04.1-desktop-amd64.iso.torrent");
+    /// let path = Path::new("ubuntu-20.04.2.0-desktop-amd64.iso.torrent");
     /// let torrent_file = Metainfo::from_file(path).unwrap();
     /// let peer_id = b"AAAAABBBBBCCCCCDDDDD";
     ///

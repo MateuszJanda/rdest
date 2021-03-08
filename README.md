@@ -14,7 +14,7 @@ use std::path::Path;
 
 #[tokio::main]
 async fn main() {
-    let path = Path::new("ubuntu-20.04.1-desktop-amd64.iso.torrent");
+    let path = Path::new("ubuntu-20.04.2.0-desktop-amd64.iso.torrent");
     let torrent_file = Metainfo::from_file(path).unwrap();
 
     let mut session = Session::new(torrent_file, peer_id::generate());
