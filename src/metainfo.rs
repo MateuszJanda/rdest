@@ -122,7 +122,7 @@ impl Metainfo {
     /// use rdest::Metainfo;
     /// use std::path::PathBuf;
     ///
-    /// let path = PathBuf::from("ubuntu-20.04.2.0-desktop-amd64.iso.torrent");
+    /// let path = PathBuf::from("ubuntu-20.04.4-desktop-amd64.iso.torrent");
     /// let torrent = Metainfo::from_file(path.as_path()).unwrap();
     /// ```
     pub fn from_file(path: &Path) -> Result<Metainfo, Error> {
