@@ -65,7 +65,7 @@ impl TrackerClient {
                 }
                 Err(e) => {
                     self.send_cmd(TrackerCmd::Fail(e)).await;
-                    time::delay_for(Duration::from_millis(DELAY_MS)).await;
+                    time::sleep(Duration::from_millis(DELAY_MS)).await;
                 }
             }
         }
