@@ -22,4 +22,4 @@ url = "2.2"
 bytes = "1.2"
 termion = "1.5"
 reqwest = { version = "0.11" }
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1.20", features = ["full"] }
