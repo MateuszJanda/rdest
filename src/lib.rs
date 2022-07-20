@@ -18,7 +18,7 @@
 //!
 //! # #[tokio::main]
 //! # async fn main() {
-//! let path = Path::new("ubuntu-20.04.4-desktop-amd64.iso.torrent");
+//! let path = Path::new("ubuntu-22.04-desktop-amd64.iso.torrent");
 //! let torrent_file = Metainfo::from_file(path).unwrap();
 //! let peer_id = b"AAAAABBBBBCCCCCDDDDD";
 //!

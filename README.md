@@ -8,7 +8,7 @@ rdest is simple BitTorrent client, currently supporting [BEP3](https://www.bitto
 # Examples
 Running rdest from command line.
 ```bash
-rdest get ubuntu-20.04.4-desktop-amd64.iso.torrent
+rdest get ubuntu-22.04-desktop-amd64.iso.torrent
 ```
 Running rdest code.
 ```rust
@@ -18,7 +18,7 @@ use std::path::Path;
 
 #[tokio::main]
 async fn main() {
-    let path = Path::new("ubuntu-20.04.4-desktop-amd64.iso.torrent");
+    let path = Path::new("ubuntu-22.04-desktop-amd64.iso.torrent");
     let torrent_file = Metainfo::from_file(path).unwrap();
 
     let mut session = Session::new(torrent_file, peer_id::generate());
