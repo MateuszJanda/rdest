@@ -739,7 +739,7 @@ impl PeerHandler {
     fn verify_piece_hash(&self) -> Result<(), Error> {
         match self.piece_rx.as_ref() {
             Some(piece_rx) => {
-                let mut hasher = sha1::Sha1::new();
+                let mut hasher = sha1_smol::Sha1::new();
                 hasher.update(piece_rx.buff.as_ref());
 
                 match hasher.digest().bytes() == piece_rx.hash {

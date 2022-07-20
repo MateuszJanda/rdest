@@ -13,7 +13,7 @@ use crate::constants::{HASH_SIZE, PIECE_LENGTH};
 use crate::hashmap;
 use crate::Error;
 use crate::{BDecoder, DeepFinder};
-use sha1;
+use sha1_smol;
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
 use std::fs;
@@ -82,7 +82,7 @@ impl Metainfo {
         let pieces = data
             .chunks(PIECE_LENGTH)
             .flat_map(|chunk| {
-                let mut hasher = sha1::Sha1::new();
+                let mut hasher = sha1_smol::Sha1::new();
                 hasher.update(chunk);
                 hasher.digest().bytes().as_ref().to_vec()
             })
@@ -297,7 +297,7 @@ impl Metainfo {
 
     fn calculate_hash(data: &[u8]) -> Result<[u8; HASH_SIZE], Error> {
         if let Some(info) = DeepFinder::find_first("4:info", data) {
-            let mut hasher = sha1::Sha1::new();
+            let mut hasher = sha1_smol::Sha1::new();
             hasher.update(info.as_ref());
             return Ok(hasher.digest().bytes());
         }
