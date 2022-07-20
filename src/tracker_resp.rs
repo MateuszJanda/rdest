@@ -11,6 +11,8 @@ use crate::constants::HASH_SIZE;
 use crate::{BDecoder, Error};
 use std::collections::HashMap;
 use std::convert::{TryFrom, TryInto};
+use std::net::IpAddr;
+use std::str::FromStr;
 
 /// Response from the tracker.
 #[derive(PartialEq, Clone, Debug)]
@@ -122,7 +124,16 @@ impl TrackerResp {
     pub fn peers(&self) -> Vec<(String, [u8; HASH_SIZE])> {
         self.peers
             .iter()
-            .map(|p| (p.ip.clone() + ":" + p.port.to_string().as_str(), p.peer_id))
+            .map(|p| {
+                (
+                    if IpAddr::from_str(&p.ip).unwrap().is_ipv4() {
+                        p.ip.clone() + ":" + p.port.to_string().as_str()
+                    } else {
+                        "[".to_owned() + p.ip.as_str() + "]:" + p.port.to_string().as_str()
+                    },
+                    p.peer_id,
+                )
+            })
             .collect()
     }
 }
