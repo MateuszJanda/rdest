@@ -157,7 +157,7 @@ impl Session {
     }
 
     async fn event_loop(&mut self) {
-        let mut listener = TcpListener::bind((Ipv4Addr::new(0, 0, 0, 0), PORT))
+        let listener = TcpListener::bind((Ipv4Addr::new(0, 0, 0, 0), PORT))
             .await
             .expect(&format!("Can't bind to port {}", PORT));
 
